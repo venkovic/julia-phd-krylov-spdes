@@ -25,6 +25,6 @@ function uexact(xx, yy)
 end
 
 A, b = @time do_assembly(mesh.cell, mesh.point, a, f)
-#A, b = apply_dirichlet(e, p, nnode, A, b, g1)
-#u = solve(gk, gf)
+#A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
+#u = solve(A, b)
 
