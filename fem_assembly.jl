@@ -29,7 +29,7 @@ end
 
 
 """
-do_assembly(nodes, p)
+do_assembly(nodes, p, a, f)
 
 Does assembly of sparse Galerkin operator for 2D P1 finite elements with a 
 given triangulation (nodes, p).
@@ -140,6 +140,8 @@ function do_assembly(nodes, p, a, f)
       b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[k], y[k])) / Area / 12
     end
   end
+  #
+  # Assemble sparse array of Galerkin operator
   A_mat = sparse(I, J, V)
   #
   return A_mat, b_vec
@@ -207,22 +209,30 @@ A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
 """
 function apply_dirichlet(e, p, A_mat, b_vec, uexact)
   _, nnode = size(p) # Number of nodes
-  _, npres = size(e)
+  _, npres = size(e) # Number of boundary points
   g1 = zeros(npres)
+  #
+  # Evaluate solution at boundary points
   for i in 1:npres
     xb = p[1, e[1, i]]
     yb = p[2, e[1, i]]
     g1[i] = uexact(xb, yb)
   end
+  #
+  # Loop of boundary points
   for i in 1:npres
     nod = e[1, i]
+    #
+    # Loop over mesh nodes
     for k in 1:nnode
       b_vec[k] -= A_mat[k, nod] * g1[i]
       A_mat[nod, k] = 0
       A_mat[k, nod] = 0
     end
+    #
     A_mat[nod, nod] = 1
     b_vec[nod] = g1[i]
   end
+  #
   return A_mat, b_vec
 end
