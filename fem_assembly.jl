@@ -29,7 +29,7 @@ end
 
 
 """
-do_assembly(nodes, p, a, f)
+do_isotropic_elliptic_assembly(nodes, p, a, f)
 
 Does assembly of sparse Galerkin operator for 2D P1 finite elements with a 
 given triangulation (nodes, p).
@@ -78,14 +78,14 @@ function f(x::Float64, y::Float64)
 end
 
 # Assembly for 1_165_446 DoFs
-A, b = @time do_assembly(mesh.cell, mesh.point);
+A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point);
 
 Maximum triangle area: .0000005
   2.584544 seconds (685.03 k allocations: 1.228 GiB, 10.03% gc time)
 
 ```
 """
-function do_assembly(nodes, p, a, f)
+function do_isotropic_elliptic_assembly(nodes, p, a, f)
   _, nel = size(nodes) # Number of elements
   _, nnode = size(p) # Number of nodes
   I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for sparse Galerkin operator

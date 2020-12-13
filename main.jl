@@ -24,7 +24,7 @@ function uexact(xx, yy)
     return .734
 end
 
-A, b = @time do_assembly(mesh.cell, mesh.point, a, f)
+A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point, a, f)
 #A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
 #u = solve(A, b)
 
