@@ -27,35 +27,6 @@ function plot_TriMesh(m :: TriMesh;
     return fig
 end
 
-# Triangulation data: p, t, e.
-#
-# nnodes: Number of nodes in mesh 
-#
-# p[1:2, 1:nnode]: coordinates of nodal points (not including at boundary?)
-# p[1, inode]: x-coordinate of node indexed inode ∈ [1, nnode]
-# p[2, inode]: y-coordinate of node indexed inode ∈ [1, nnode]
-#
-# t[1:3, 1:nel]: Node indices of elements
-# t[1, iel]: 1st node index of element iel ∈ [1, nel]
-# t[2, iel]: 2nd node index of element iel ∈ [1, nel]
-# t[3, iel]: 3rd node index of element iel ∈ [1, nel]
-#
-# e[1:2, nbndnode]: Nodal points on boundary
-# e[1, ibndnode]: x-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
-# e[2, ibndnode]: y-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
-
-function a(x, y)
-  return 1.
-end
-
-function f(x, y)
-  return -1.
-end
-
-function uexact(xx, yy)
-    return .734
-end
-
 
 """
 do_assembly(nodes, p)
@@ -74,13 +45,19 @@ p[1:2, 1:nnode]: coordinates of nodal points (not including at boundary?)
 p[1, inode]: x-coordinate of node indexed inode ∈ [1, nnode]
 p[2, inode]: y-coordinate of node indexed inode ∈ [1, nnode]
 
+a: function(x::Float64, y::Float64)::Float64 > 0 ∀ x, y
+
+f: function(x::Float64, y::Float64)::Float64
+
 Output:
 
 A_mat: sparse array of Galerkin formulation (nnode-by-nnode)
-       with components Amat_ij = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j dΩ where 
+       with components A_mat_ij = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j dΩ where 
        a: Ω → R is also projected on Span{ϕ_k}_{k=1}^nnode.
 
 b_vec: right hand side vector of Galerkin formulation (nnode-by-1)
+       with components b_vec_i = ∫_Ω f ϕ_i dΩ where 
+       f: Ω → R is also projected on Span{ϕ_k}_{k=1}^nnode.
 
 # Examples
 ```jldoctest
@@ -92,6 +69,14 @@ using Fem;
 poly = polygon_Lshape();
 mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true);
 
+function a(x::Float64, y::Float64)
+  return 1.
+end
+
+function f(x::Float64, y::Float64)
+  return -1.
+end
+
 # Assembly for 1_165_446 DoFs
 A, b = @time do_assembly(mesh.cell, mesh.point);
 
@@ -100,7 +85,7 @@ Maximum triangle area: .0000005
 
 ```
 """
-function do_assembly(nodes, p)
+function do_assembly(nodes, p, a, f)
   _, nel = size(nodes) # Number of elements
   _, nnode = size(p) # Number of nodes
   I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for sparse Galerkin operator
@@ -112,6 +97,7 @@ function do_assembly(nodes, p)
   for iel in 1:nel
     #
     # Get (x, y) coordinates of each element vertex
+    # and coefficient at the center of the element
     coeff = 0.
     for j in 1:3
       jj = nodes[j, iel]
@@ -147,11 +133,11 @@ function do_assembly(nodes, p)
     for i in 1:3
       j = i + 1 - floor(Int, (i + 1) / 3) * 3
       j == 0 ? j = 3 : nothing
-      m = i + 2 - floor(Int, (i + 2) / 3) * 3
-      m == 0 ? m = 3 : nothing
+      k = i + 2 - floor(Int, (i + 2) / 3) * 3
+      k == 0 ? k = 3 : nothing
       #
       ii = nodes[i, iel]
-      b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[m], y[m])) / Area / 12
+      b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[k], y[k])) / Area / 12
     end
   end
   A_mat = sparse(I, J, V)
@@ -161,6 +147,31 @@ end
 
 
 
+
+
+
+
+
+
+
+
+
+# Triangulation data: p, t, e.
+#
+# nnodes: Number of nodes in mesh 
+#
+# p[1:2, 1:nnode]: coordinates of nodal points (not including at boundary?)
+# p[1, inode]: x-coordinate of node indexed inode ∈ [1, nnode]
+# p[2, inode]: y-coordinate of node indexed inode ∈ [1, nnode]
+#
+# t[1:3, 1:nel]: Node indices of elements
+# t[1, iel]: 1st node index of element iel ∈ [1, nel]
+# t[2, iel]: 2nd node index of element iel ∈ [1, nel]
+# t[3, iel]: 3rd node index of element iel ∈ [1, nel]
+#
+# e[1:2, nbndnode]: Nodal points on boundary
+# e[1, ibndnode]: x-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
+# e[2, ibndnode]: y-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
 
 """
 apply_dirichlet(e, p, nnode, gk, gf, g1)

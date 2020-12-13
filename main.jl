@@ -12,7 +12,19 @@ p = mesh.point
 nel = mesh.n_cell
 nodes = mesh.cell
 
-A, b = @time do_assembly(mesh.cell, mesh.point)
+function a(x::Float64, y::Float64)
+    return 1. + x * y
+end
+  
+function f(x::Float64, y::Float64)
+  return -1.
+end
+
+function uexact(xx, yy)
+    return .734
+end
+
+A, b = @time do_assembly(mesh.cell, mesh.point, a, f)
 #A, b = apply_dirichlet(e, p, nnode, A, b, g1)
 #u = solve(gk, gf)
 
