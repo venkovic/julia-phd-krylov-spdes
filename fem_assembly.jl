@@ -44,8 +44,11 @@ end
 # e[1, ibndnode]: x-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
 # e[2, ibndnode]: y-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
 
+function a(x, y)
+  return 1.
+end
 
-function f(xx, yy)
+function f(x, y)
   return -1.
 end
 
@@ -73,8 +76,11 @@ p[2, inode]: y-coordinate of node indexed inode ∈ [1, nnode]
 
 Output:
 
-Amat: sparse array of Galerkin formulation (nnode-by-nnode)
-bvec: right hand side vector of Galerkin formulation (nnode-by-1)
+A_mat: sparse array of Galerkin formulation (nnode-by-nnode)
+       with components Amat_ij = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j dΩ where 
+       a: Ω → R is also projected on Span{ϕ_k}_{k=1}^nnode.
+
+b_vec: right hand side vector of Galerkin formulation (nnode-by-1)
 
 # Examples
 ```jldoctest
@@ -98,57 +104,62 @@ function do_assembly(nodes, p)
   _, nel = size(nodes) # Number of elements
   _, nnode = size(p) # Number of nodes
   I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for sparse Galerkin operator
-  bvec = zeros(nnode, 1) # Right hand side
-  xx, yy = zeros(3), zeros(3) # (x, y) coordinates of element vertices
-  a, b, c = zeros(3), zeros(3), zeros(3) 
+  b_vec = zeros(nnode, 1) # Right hand side
+  x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
+  Δx, Δy = zeros(3), zeros(3), zeros(3)
   #
   # Loop over elements
   for iel in 1:nel
     #
     # Get (x, y) coordinates of each element vertex
+    coeff = 0.
     for j in 1:3
       jj = nodes[j, iel]
-      xx[j], yy[j] = p[1, jj], p[2, jj]
+      x[j], y[j] = p[1, jj], p[2, jj]
+      coeff += a(x[j], y[j])
+    end
+    coeff /= 3.
+    #
+    # Terms of shoelace formula for a triangle
+    Δx[1] = x[3] - x[2]
+    Δx[2] = x[1] - x[3]
+    Δx[3] = x[2] - x[1]
+    Δy[1] = y[2] - y[3]
+    Δy[2] = y[3] - y[1]
+    Δy[3] = y[1] - y[2]
+    #
+    # Area of element
+    Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+    #
+    # Add local stiffness contributions from element
+    for i in 1:3
+      ii = nodes[i, iel]
+      for j in 1:3
+        Kij = coeff * (Δy[i] * Δy[j] + Δx[i] * Δx[j]) / 4 / Area
+        jj = nodes[j, iel]
+        push!(I, ii)
+        push!(J, jj)
+        push!(V, Kij)
+      end
     end
     #
-    # Compute area of element 
+    # Add right hand side contributions from element
     for i in 1:3
       j = i + 1 - floor(Int, (i + 1) / 3) * 3
       j == 0 ? j = 3 : nothing
       m = i + 2 - floor(Int, (i + 2) / 3) * 3
       m == 0 ? m = 3 : nothing
-      a[i] = xx[j] * yy[m] - xx[m] * yy[j]
-      b[i] = yy[j] - yy[m]
-      c[i] = xx[m] - xx[j]
-    end
-    Δel = (c[3] * b[2] - c[2] * b[3]) / 2.
-    #
-    # Add stiffness contributions from element
-    for ir in 1:3
-      ii = nodes[ir, iel]
-      for ic in 1:3
-        ak = (b[ir] * b[ic] + c[ir] * c[ic]) / 4 / Δel
-        jj = nodes[ic, iel]
-        push!(I, ii)
-        push!(J, jj)
-        push!(V, ak)
-      end
-    end
-    #
-    # Add right hand side contributions from element
-    for ir in 1:3
-      ii = nodes[ir, iel]
-      j = ir + 1 - floor(Int, (ir + 1) / 3) * 3
-      j == 0 ? j = 3 : nothing
-      m = ir + 2 - floor(Int, (ir + 2) / 3) * 3
-      m == 0 ? m = 3 : nothing
-      bvec[ii] += (2 * f(xx[ir], yy[ir]) + f(xx[j], yy[j]) + f(xx[m], yy[m])) / Δel / 12
+      #
+      ii = nodes[i, iel]
+      b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[m], y[m])) / Area / 12
     end
   end
-  Amat = sparse(I, J, V)
+  A_mat = sparse(I, J, V)
   #
-  return Amat, bvec
+  return A_mat, b_vec
 end
+
+
 
 
 """
@@ -158,7 +169,7 @@ Applies Dirichlet boundary condition.
 
 ```
 """
-function apply_dirichlet(e, p, nnode, Amat, bvec, g1)
+function apply_dirichlet(e, p, nnode, A_mat, b_vec, g1)
   _, npres = size(e)
   g1 = zeros(npres)
   for i in 1:npres
@@ -169,12 +180,12 @@ function apply_dirichlet(e, p, nnode, Amat, bvec, g1)
   for i in 1:npres
     nod = e[1, i]
     for k in 1:nnode
-      bvec[k] -= Amat[k, nod] * g1[i]
-      Amat[nod, k] = 0
-      Amat[k, nod] = 0
+      b_vec[k] -= A_mat[k, nod] * g1[i]
+      A_mat[nod, k] = 0
+      A_mat[k, nod] = 0
     end
-    Amat[nod, nod] = 1
-    bvec[nod] = g1[i]
+    A_mat[nod, nod] = 1
+    b_vec[nod] = g1[i]
   end
-  return Amat, bvec
+  return A_mat, b_vec
 end
