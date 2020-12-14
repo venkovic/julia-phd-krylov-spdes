@@ -1,0 +1,6 @@
+Example01_pde:
+ Assembly of Galerkin operator and right hand side for discretization
+ of an heterogenous isotropic elliptic equation with 2D P1 elements.
+
+Example02_kl:
+ Assembly of Galerkin Kernel operator with 2D P1 elements.
