@@ -3,7 +3,7 @@ Example01_pde:
  of an heterogenous isotropic elliptic equation with 2D P1 elements.
 
 Example02_kl:
- Assembly of Galerkin Kernel operator with 2D P1 elements.
+ Assembly of Galerkin kernel operator with 2D P1 elements.
 
 To do:
 1. Check derivation for do_mass_covariance_assembly()

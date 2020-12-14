@@ -18,5 +18,4 @@ function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
 end
   
 C = @time do_mass_covariance_assembly(mesh.cell, mesh.point, cov)
-#u = solve(A, b)
-
+M = @time get_mass_matrix(mesh.cell, mesh.point)
