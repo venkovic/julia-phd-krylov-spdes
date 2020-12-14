@@ -31,8 +31,8 @@ end
 """
 do_isotropic_elliptic_assembly(nodes, p, a, f)
 
-Does assembly of sparse Galerkin operator for 2D P1 finite elements with a 
-given triangulation (nodes, p).
+Does assembly of sparse Galerkin operator and right hand side 
+for 2D P1 finite elements with a given triangulation (nodes, p).
 
 Input:
 
@@ -53,24 +53,23 @@ Output:
 
 A_mat: sparse array of Galerkin formulation (nnode-by-nnode)
        with components A_mat_ij = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j dΩ where 
-       a: Ω → R is also projected on Span{ϕ_k}_{k=1}^nnode.
+       a: Ω → R is interpolated at the nodes in Span {ϕ_k}_{k=1}^nnode.
 
 b_vec: right hand side vector of Galerkin formulation (nnode-by-1)
-       with components b_vec_i = ∫_Ω f ϕ_i dΩ where 
-       f: Ω → R is also projected on Span{ϕ_k}_{k=1}^nnode.
+       with components b_vec_i = ∫_Ω f ϕ_i dΩ where f: Ω → R is 
+       interpolated at the nodes in Span {ϕ_k}_{k=1}^nnode.
 
 # Examples
 ```jldoctest
 julia>
-using TriangleMesh;
-push!(LOAD_PATH, ".");
-using Fem;
+using TriangleMesh
+using Fem
 
-poly = polygon_Lshape();
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true);
+poly = polygon_Lshape()
+mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
 
 function a(x::Float64, y::Float64)
-  return 1.
+  return 1. + x * y
 end
 
 function f(x::Float64, y::Float64)
@@ -78,8 +77,11 @@ function f(x::Float64, y::Float64)
 end
 
 # Assembly for 1_165_446 DoFs
-A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point);
+A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point)
 
+Maximum triangle area: .0000005
+  2.584544 seconds (685.03 k allocations: 1.228 GiB, 10.03% gc time)
+  
 Maximum triangle area: .0000005
   2.584544 seconds (685.03 k allocations: 1.228 GiB, 10.03% gc time)
 
@@ -106,7 +108,7 @@ function do_isotropic_elliptic_assembly(nodes, p, a, f)
     end
     coeff /= 3.
     #
-    # Terms of shoelace formula for a triangle
+    # Terms of the shoelace formula for a triangle
     Δx[1] = x[3] - x[2]
     Δx[2] = x[1] - x[3]
     Δx[3] = x[2] - x[1]
@@ -137,7 +139,7 @@ function do_isotropic_elliptic_assembly(nodes, p, a, f)
       k == 0 ? k = 3 : nothing
       #
       ii = nodes[i, iel]
-      b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[k], y[k])) / Area / 12
+      b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[k], y[k])) * Area / 12
     end
   end
   #
@@ -200,7 +202,7 @@ function uexact(xx, yy)
 end
 
 # Assembly for 1_165_446 DoFs
-A, b = @time do_assembly(mesh.cell, mesh.point);
+A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point);
 
 # Apply Dirichlet boundary conditions
 A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
