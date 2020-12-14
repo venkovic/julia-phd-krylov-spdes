@@ -10,6 +10,7 @@ To do:
 2. Check implementation for do_mass_covariance_assembly()
 3. Add get_mass_matrix()
 4. Test kl.
-5. Check apply_dirichlet()
-6. Domain decomposition for kl
-7. Add update_galerkin() to avoid repeating assembly.
+5. Find a way to identify boundary nodes and create the e array
+6. Check apply_dirichlet()
+7. Domain decomposition for kl
+8. Add update_galerkin() to avoid repeating assembly.
