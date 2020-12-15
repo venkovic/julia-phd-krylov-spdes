@@ -13,7 +13,7 @@ nel = mesh.n_cell
 nodes = mesh.cell
 
 function a(x::Float64, y::Float64)
-    return 1. + x * y
+  return 1. + x * y
 end
   
 function f(x::Float64, y::Float64)
@@ -21,7 +21,7 @@ function f(x::Float64, y::Float64)
 end
 
 function uexact(xx, yy)
-    return .734
+  return .734
 end
 
 A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point, a, f)

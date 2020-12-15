@@ -3,11 +3,11 @@ using SparseArrays
 using PyPlot
 
 function plot_TriMesh(m :: TriMesh; 
-                        linewidth :: Real = 1, 
-                        marker :: String = "None",
-                        markersize :: Real = 10,
-                        linestyle :: String = "-",
-                        color :: String = "red")
+                      linewidth :: Real = 1, 
+                      marker :: String = "None",
+                      markersize :: Real = 10,
+                      linestyle :: String = "-",
+                      color :: String = "red")
 
     fig = matplotlib[:pyplot][:figure]("2D Mesh Plot", figsize = (10,10))
     
@@ -16,11 +16,11 @@ function plot_TriMesh(m :: TriMesh;
     
     # Connectivity list -1 for Python
     tri = ax[:triplot](m.point[1,:], m.point[2,:], m.cell'.-1 )
-    setp(tri,   linestyle = linestyle,
-                linewidth = linewidth,
-                marker = marker,
-                markersize = markersize,
-                color = color)
+    setp(tri, linestyle = linestyle,
+              linewidth = linewidth,
+              marker = marker,
+              markersize = markersize,
+              color = color)
     
     fig[:canvas][:draw]()
     println("yrdy")    
@@ -91,10 +91,10 @@ function do_isotropic_elliptic_assembly(nodes, p, a, f)
   b_vec = zeros(nnode, 1) # Right hand side
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
-  #
+  
   # Loop over elements
   for iel in 1:nel
-    #
+    
     # Get (x, y) coordinates of each element vertex
     # and coefficient at the center of the element
     coeff = 0.
@@ -104,7 +104,7 @@ function do_isotropic_elliptic_assembly(nodes, p, a, f)
       coeff += a(x[j], y[j])
     end
     coeff /= 3.
-    #
+    
     # Terms of the shoelace formula for a triangle
     Δx[1] = x[3] - x[2]
     Δx[2] = x[1] - x[3]
@@ -112,14 +112,18 @@ function do_isotropic_elliptic_assembly(nodes, p, a, f)
     Δy[1] = y[2] - y[3]
     Δy[2] = y[3] - y[1]
     Δy[3] = y[1] - y[2]
-      #
-      # Area of element
-      Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
-    #
-    # Add local stiffness contributions from element
+    
+    # Area of element
+    Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+    
+    # Loop over vertices of element
     for i in 1:3
       ii = nodes[i, iel]
+
+      # Loop over vertices of element
       for j in 1:3
+
+        # Store local contribution
         Kij = coeff * (Δy[i] * Δy[j] + Δx[i] * Δx[j]) / 4 / Area
         jj = nodes[j, iel]
         push!(I, ii)
@@ -127,22 +131,23 @@ function do_isotropic_elliptic_assembly(nodes, p, a, f)
         push!(V, Kij)
       end
     end
-    #
+    
     # Add right hand side contributions from element
     for i in 1:3
       j = i + 1 - floor(Int, (i + 1) / 3) * 3
       j == 0 ? j = 3 : nothing
       k = i + 2 - floor(Int, (i + 2) / 3) * 3
       k == 0 ? k = 3 : nothing
-      #
       ii = nodes[i, iel]
-      b_vec[ii] += (2 * f(x[i], y[i]) + f(x[j], y[j]) + f(x[k], y[k])) * Area / 12
+      b_vec[ii] += (2 * f(x[i], y[i]) 
+                      + f(x[j], y[j])
+                      + f(x[k], y[k])) * Area / 12
     end
   end
-  #
+  
   # Assemble sparse array of Galerkin operator
   A_mat = sparse(I, J, V)
-  #
+  
   return A_mat, b_vec
 end
 
@@ -201,24 +206,24 @@ function do_mass_covariance_assembly(nodes, p, cov)
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3) # Used to store terms of shoelace formula
   Area = zeros(nel) # Used to store element areas
-  #
-  # Loop over nodes
+  
+  # Loop over mesh nodes
   for j in 1:nnode
-    #
+    
     # Get coordinates of node
     xj = p[1, j]
     yj = p[2, j]
-    #
+    
     # Loop over elements
     for iel in 1:nel
-      #
+      
       # Get (x, y) coordinates of each element vertex
       # and coefficient at the center of the element
       for r in 1:3
         rr = nodes[r, iel]
         x[r], y[r] = p[1, rr], p[2, rr]
       end
-      #
+      
       # Terms of the shoelace formula for a triangle
       Δx[1] = x[3] - x[2]
       Δx[2] = x[1] - x[3]
@@ -226,11 +231,11 @@ function do_mass_covariance_assembly(nodes, p, cov)
       Δy[1] = y[2] - y[3]
       Δy[2] = y[3] - y[1]
       Δy[3] = y[1] - y[2]
-      #
+      
       # Area of element
       Area_iel = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
       Area[iel] = Area_iel
-      #
+      
       # Add local contributions
       for r in 1:3
         s = r + 1 - floor(Int, (r + 1) / 3) * 3
@@ -244,16 +249,16 @@ function do_mass_covariance_assembly(nodes, p, cov)
       end
     end
   end
-  #
-  # Loop over nodes
+  
+  # Loop over mesh nodes
   for i in 1:nnode
-    #
+    
     # Loop over elements
     for iel in 1:nel
-      #
+      
       # Get area of element
       Area_iel = Area[iel]
-      #
+      
       # Add local contributions
       for r in 1:3
         s = r + 1 - floor(Int, (r + 1) / 3) * 3
@@ -269,7 +274,7 @@ function do_mass_covariance_assembly(nodes, p, cov)
       end
     end
   end
-  #
+  
   return C
 end
 
@@ -329,17 +334,17 @@ function get_mass_matrix(nodes, p)
   I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for mass matrix
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3) # Used to store terms of shoelace formula
-  #
+  
   # Loop over elements
   for iel in 1:nel
-    #
+    
     # Get (x, y) coordinates of each element vertex
     # and coefficient at the center of the element
     for r in 1:3
       rr = nodes[r, iel]
       x[r], y[r] = p[1, rr], p[2, rr]
     end
-    #
+    
     # Terms of the shoelace formula for a triangle
     Δx[1] = x[3] - x[2]
     Δx[2] = x[1] - x[3]
@@ -347,14 +352,18 @@ function get_mass_matrix(nodes, p)
     Δy[1] = y[2] - y[3]
     Δy[2] = y[3] - y[1]
     Δy[3] = y[1] - y[2]
-    #
+    
     # Area of element
     Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
-    #
-    # Add local mass contributions from element
+    
+    # Loop over vertices of element
     for i in 1:3
       ii = nodes[i, iel]
+
+      # Loop over vertices of element
       for j in 1:3
+        
+        # Store local contribution
         if i == j
           Kij = Area / 6.
         else
@@ -367,10 +376,10 @@ function get_mass_matrix(nodes, p)
       end
     end
   end
-  #
+  
   # Assemble sparse mass matrix
   M = sparse(I, J, V)
-  #
+  
   return M
 end
 
@@ -438,28 +447,29 @@ function apply_dirichlet(e, p, A_mat, b_vec, uexact)
   _, nnode = size(p) # Number of nodes
   _, npres = size(e) # Number of boundary points
   g1 = zeros(npres)
-  #
+  
   # Evaluate solution at boundary points
   for i in 1:npres
     xb = p[1, e[1, i]]
     yb = p[2, e[1, i]]
     g1[i] = uexact(xb, yb)
   end
-  #
+  
   # Loop of boundary points
   for i in 1:npres
     nod = e[1, i]
-    #
+    
     # Loop over mesh nodes
     for k in 1:nnode
       b_vec[k] -= A_mat[k, nod] * g1[i]
       A_mat[nod, k] = 0
       A_mat[k, nod] = 0
     end
-    #
+    
+    # Change coefficients of related DoFs
     A_mat[nod, nod] = 1
     b_vec[nod] = g1[i]
   end
-  #
+  
   return A_mat, b_vec
 end
