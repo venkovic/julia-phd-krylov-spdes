@@ -7,5 +7,7 @@ export apply_dirichlet
 export plot_TriMesh
 
 include("Assembly.jl")
+include("BoundaryConditions.jl")
+include("Mesh.jl")
 
 end

@@ -1,32 +1,4 @@
-using TriangleMesh
 using SparseArrays
-using PyPlot
-
-function plot_TriMesh(m :: TriMesh; 
-                      linewidth :: Real = 1, 
-                      marker :: String = "None",
-                      markersize :: Real = 10,
-                      linestyle :: String = "-",
-                      color :: String = "red")
-
-    fig = matplotlib[:pyplot][:figure]("2D Mesh Plot", figsize = (10,10))
-    
-    ax = matplotlib[:pyplot][:axes]()
-    ax[:set_aspect]("equal")
-    
-    # Connectivity list -1 for Python
-    tri = ax[:triplot](m.point[1,:], m.point[2,:], m.cell'.-1 )
-    setp(tri, linestyle = linestyle,
-              linewidth = linewidth,
-              marker = marker,
-              markersize = markersize,
-              color = color)
-    
-    fig[:canvas][:draw]()
-    println("yrdy")    
-    return fig
-end
-
 
 """
 do_isotropic_elliptic_assembly(nodes, p, a, f)
@@ -310,20 +282,10 @@ using Fem
 poly = polygon_Lshape()
 mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
 
-function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
-  L = .1
-  return exp(-((x1 - x2)^ 2 + (y1 - y2)^2) / L^2)
-end
-
-# Assembly for 11_894 DoFs
-C = @time do_mass_covariance_assembly(mesh.cell, mesh.point, cov)
-
-Maximum triangle area: .00005
- 90.211575 seconds (243.67 k allocations: 2.121 GiB, 0.01% gc time)
-
 # Assembly for 11_894 DoFs
 M = @time get_mass_matrix(mesh.cell, mesh.point)
 
+Maximum triangle area: .00005
   0.337066 seconds (595.71 k allocations: 44.153 MiB)
 
 ```
@@ -381,95 +343,4 @@ function get_mass_matrix(nodes, p)
   M = sparse(I, J, V)
   
   return M
-end
-
-
-"""
-apply_dirichlet(e, p, A_mat, b_vec, uexact)
-
-Applies Dirichlet boundary condition.
-
-Input:
-
-e[1:2, nbndnode]: Nodal points on boundary
-e[1, ibndnode]: x-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
-e[2, ibndnode]: y-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
-
-p[1:2, 1:nnode]: coordinates of nodal points (not including at boundary?)
-p[1, inode]: x-coordinate of node indexed inode ∈ [1, nnode]
-p[2, inode]: y-coordinate of node indexed inode ∈ [1, nnode]
-
-A_mat::SparseMatrixCSC{Float64}
-
-b_vec::Vector{Float64}
-
-uexact: function(x::Float64, y::Float64)::Float64 > 0 ∀ x, y
-
-Output:
-
-A_mat: sparse array of Galerkin formulation (nnode-by-nnode)
-       with Dirichlet boundary condition applied.
-
-b_vec: right hand side vector of Galerkin formulation (nnode-by-1)
-       with Dirichlet boundary condition applied.
-
-# Examples
-```jldoctest
-julia>
-using TriangleMesh;
-push!(LOAD_PATH, ".");
-using Fem;
-
-poly = polygon_Lshape();
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true);
-
-function a(x::Float64, y::Float64)
-  return 1.
-end
-
-function f(x::Float64, y::Float64)
-  return -1.
-end
-
-function uexact(xx, yy)
-    return .734
-end
-
-# Assembly for 1_165_446 DoFs
-A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point);
-
-# Apply Dirichlet boundary conditions
-A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
-
-```
-"""
-function apply_dirichlet(e, p, A_mat, b_vec, uexact)
-  _, nnode = size(p) # Number of nodes
-  _, npres = size(e) # Number of boundary points
-  g1 = zeros(npres)
-  
-  # Evaluate solution at boundary points
-  for i in 1:npres
-    xb = p[1, e[1, i]]
-    yb = p[2, e[1, i]]
-    g1[i] = uexact(xb, yb)
-  end
-  
-  # Loop of boundary points
-  for i in 1:npres
-    nod = e[1, i]
-    
-    # Loop over mesh nodes
-    for k in 1:nnode
-      b_vec[k] -= A_mat[k, nod] * g1[i]
-      A_mat[nod, k] = 0
-      A_mat[k, nod] = 0
-    end
-    
-    # Change coefficients of related DoFs
-    A_mat[nod, nod] = 1
-    b_vec[nod] = g1[i]
-  end
-  
-  return A_mat, b_vec
 end
