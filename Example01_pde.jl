@@ -7,13 +7,11 @@ mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_ar
 #fig = plot_TriMesh(mesh)
 
 nnode = mesh.n_point
-p = mesh.point
-
+nbdnseg = mesh.n_segment
 nel = mesh.n_cell
-nodes = mesh.cell
 
 function a(x::Float64, y::Float64)
-  return 1. + x * y
+  return .1 + .0001 * x * y
 end
   
 function f(x::Float64, y::Float64)
@@ -25,6 +23,10 @@ function uexact(xx, yy)
 end
 
 A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point, a, f)
-#A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
-#u = solve(A, b)
+println(A.nzval)
+A, b = apply_dirichlet(mesh.segment, mesh.point, A, b, uexact)
+println(A.nzval)
+
+using IterativeSolvers
+u = IterativeSolvers.cg(A, b)
 
