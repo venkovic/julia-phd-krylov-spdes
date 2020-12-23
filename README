@@ -5,6 +5,10 @@ Example01_pde:
 Example02_kl:
  Assembly of Galerkin kernel operator with 2D P1 elements.
 
+Example03_dd:
+ Assembly of Schur decomposition of Galerkin operator with 2D 
+ P1 elements.
+
 To do:
 1. Check derivation for do_mass_covariance_assembly()
 2. Check implementation for do_mass_covariance_assembly()
