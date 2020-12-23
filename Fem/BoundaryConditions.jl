@@ -1,19 +1,19 @@
 using SparseArrays
 
 """
-apply_dirichlet(e, p, A_mat, b_vec, uexact)
+apply_dirichlet(segments, points, A_mat, b_vec, uexact)
 
 Applies Dirichlet boundary condition.
 
 Input:
 
-e[1:2, nbndnode]: Nodal points on boundary
-e[1, ibndnode]: x-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
-e[2, ibndnode]: y-coordinate of boundary node indexed ibndnode ∈ [1, nbndnode]
+segments[1:2, nbndseg]: Global node indices of boundary segments
+segments[1, iseg]: node index at begining of segment iseg ∈ [1, nbndseg]
+segments[2, iseg]: node index at end of segment iseg ∈ [1, nbndseg]
 
-p[1:2, 1:nnode]: coordinates of nodal points (not including at boundary?)
-p[1, inode]: x-coordinate of node indexed inode ∈ [1, nnode]
-p[2, inode]: y-coordinate of node indexed inode ∈ [1, nnode]
+points[1:2, 1:nnode]: coordinates of all nodal points
+points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
+points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
 
 A_mat::SparseMatrixCSC{Float64}
 
@@ -58,21 +58,21 @@ A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
 
 ```
 """
-function apply_dirichlet(e, p, A_mat, b_vec, uexact)
-  _, nnode = size(p) # Number of nodes
-  _, npres = size(e) # Number of boundary points
-  g1 = zeros(npres)
+function apply_dirichlet(segments, points, A_mat, b_vec, uexact)
+  _, nnode = size(points) # Number of nodes
+  _, nbndseg = size(segments) # Number of boundary segments
+  g1 = zeros(nbndseg)
   
-  # Evaluate solution at boundary points
-  for i in 1:npres
-    xb = p[1, e[1, i]]
-    yb = p[2, e[1, i]]
+  # Evaluate solution at starting node of segments
+  for i in 1:nbndseg
+    xb = points[1, segments[1, i]]
+    yb = points[2, segments[1, i]]
     g1[i] = uexact(xb, yb)
   end
   
-  # Loop of boundary points
-  for i in 1:npres
-    nod = e[1, i]
+  # Loop over boundary segments
+  for i in 1:nbndseg
+    nod = segments[1, i]
     
     # Loop over mesh nodes
     for k in 1:nnode
