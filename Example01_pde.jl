@@ -1,8 +1,10 @@
 using TriangleMesh
+using NPZ
 push!(LOAD_PATH, "./Fem/")
 using Fem
 
-poly = polygon_Lshape()
+
+poly = polygon_unitSquare()
 mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
 #fig = plot_TriMesh(mesh)
 
@@ -23,10 +25,13 @@ function uexact(xx, yy)
 end
 
 A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point, a, f)
-println(A.nzval)
-A, b = apply_dirichlet(mesh.segment, mesh.point, A, b, uexact)
-println(A.nzval)
+
+# APPLYING BC IS WAY TOO SLOW AS IT IS!!!
+A, b = @time apply_dirichlet(mesh.segment, mesh.point, A, b, uexact)
+
+@time npzwrite("cells.npz", mesh.cell' .- 1)
+@time npzwrite("points.npz", mesh.point')
 
 using IterativeSolvers
-u = IterativeSolvers.cg(A, b)
-
+u = @time IterativeSolvers.cg(A, b)
+@time npzwrite("u.npz", u)
