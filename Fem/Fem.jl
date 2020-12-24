@@ -6,6 +6,9 @@ export get_mass_matrix
 export apply_dirichlet
 export mesh_partition
 export set_subdomains
+export do_IId_assembly
+export do_IΓ_assembly
+export do_ΓΓ_assembly
 
 export plot_TriMesh
 
