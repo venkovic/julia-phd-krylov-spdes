@@ -13,7 +13,7 @@ cells[1, iel]: Global node index of 1st node of element iel ∈ [1, nel]
 cells[2, iel]: Global node index of 2nd node of element iel ∈ [1, nel]
 cells[3, iel]: Global node index of 3rd node of element iel ∈ [1, nel]
 
-points[1:2, 1:nnode]: coordinates of all nodal points
+points[1:2, 1:nnode]: Coordinates of all nodal points
 points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
 points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
 
@@ -23,11 +23,11 @@ f: function(x::Float64, y::Float64)::Float64
 
 Output:
 
-A_mat: sparse array of Galerkin formulation (nnode-by-nnode)
+A_mat: Sparse array of Galerkin formulation (nnode-by-nnode)
        with components A_mat_ij = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j dΩ where 
        a: Ω → R is interpolated at the nodes in Span {ϕ_k}_{k=1}^nnode.
 
-b_vec: right hand side vector of Galerkin formulation (nnode-by-1)
+b_vec: Right hand side vector of Galerkin formulation (nnode-by-1)
        with components b_vec_i = ∫_Ω f ϕ_i dΩ where f: Ω → R is 
        interpolated at the nodes in Span {ϕ_k}_{k=1}^nnode.
 
@@ -137,7 +137,7 @@ cells[1, iel]: Global node index of 1st node of element iel ∈ [1, nel]
 cells[2, iel]: Global node index of 2nd node of element iel ∈ [1, nel]
 cells[3, iel]: Global node index of 3rd node of element iel ∈ [1, nel]
 
-points[1:2, 1:nnode]: coordinates of all nodal points
+points[1:2, 1:nnode]: Coordinates of all nodal points
 points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
 points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
 
@@ -264,7 +264,7 @@ cells[1, iel]: Global node index of 1st node of element iel ∈ [1, nel]
 cells[2, iel]: Global node index of 2nd node of element iel ∈ [1, nel]
 cells[3, iel]: Global node index of 3rd node of element iel ∈ [1, nel]
 
-points[1:2, 1:nnode]: coordinates of all nodal points
+points[1:2, 1:nnode]: Coordinates of all nodal points
 points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
 points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
 

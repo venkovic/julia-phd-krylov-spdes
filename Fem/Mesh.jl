@@ -1,6 +1,29 @@
 using TriangleMesh
 using PyPlot
 
+
+function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
+  nel = mesh.n_cell # number of elements
+  
+  # Write mesh for mpmetis
+  open("mesh.metis", "w") do io
+    print(io, "$nel\n")
+    for el in 1:nel
+      
+      # Metis starts indexing nodes at 1 
+      print(io, "$(mesh.cell[1, el]) $(mesh.cell[2, el]) $(mesh.cell[3, el])\n")
+    end
+  end
+  
+  # Call mpmetis for contiguous partition
+  run(`mpmetis mesh.metis $ndom -contig`, wait=true)
+  epart = readdlm("mesh.metis.epart.$ndom", Int) .+ 1 # Metis starts indexing doms at 0
+  npart = readdlm("mesh.metis.npart.$ndom", Int) .+ 1 # Metis starts indexing doms at 0
+  
+  return epart, npart 
+end
+
+
 function plot_TriMesh(m :: TriMesh; 
                       linewidth :: Real = 1, 
                       marker :: String = "None",

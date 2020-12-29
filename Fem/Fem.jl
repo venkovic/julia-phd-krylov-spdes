@@ -1,16 +1,18 @@
 module Fem
 
 export do_isotropic_elliptic_assembly
-export do_mass_covariance_assembly
 export get_mass_matrix
-export apply_dirichlet
-export mesh_partition
-export set_subdomains
-export do_IId_assembly
-export do_IΓ_assembly
-export do_ΓΓ_assembly
 
+export apply_dirichlet
+
+export do_mass_covariance_assembly
+
+export mesh_partition
 export plot_TriMesh
+
+export set_subdomains
+export do_schur_assembly
+export apply_schur
 
 include("Assembly.jl")
 include("BoundaryConditions.jl")
