@@ -14,9 +14,11 @@ export set_subdomains
 export do_schur_assembly
 export apply_schur
 
-include("Assembly.jl")
-include("BoundaryConditions.jl")
 include("Mesh.jl")
-include("DomainDecomposition.jl")
+include("EllipticPde.jl")
+include("BoundaryConditions.jl")
+include("EllipticPdeDomainDecomposition.jl")
+include("KarhunenLoeve.jl")
+include("KarhunenLoeveDomainDecomposition.jl")
 
 end
