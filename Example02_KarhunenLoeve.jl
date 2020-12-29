@@ -1,10 +1,12 @@
 using TriangleMesh
 push!(LOAD_PATH, "./Fem/")
 using Fem
+using Arpack
+using NPZ
 
 poly = polygon_Lshape()
 mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
-fig = plot_TriMesh(mesh)
+#fig = plot_TriMesh(mesh)
 
 nnode = mesh.n_point
 p = mesh.point
@@ -19,3 +21,7 @@ end
   
 C = @time do_mass_covariance_assembly(mesh.cell, mesh.point, cov)
 M = @time get_mass_matrix(mesh.cell, mesh.point)
+
+λ, Φ = map(x -> real(x), eigs(C, M, nev=400))
+
+area = get_total_area(mesh.cell, mesh.point)

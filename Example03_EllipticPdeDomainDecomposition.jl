@@ -38,10 +38,6 @@ cg!(S, u_Γ, ̂b)
 # compute u_Id
 # compare with regular solve
 
-#using Distributed
-#addprocs(2)
-#addprocs(([("marcel", 4)]), tunnel=true)
-#addprocs(([("andrew", 4)]), tunnel=true)
 
 @time npzwrite("cells.npz", mesh.cell' .- 1)
 @time npzwrite("points.npz", mesh.point')
