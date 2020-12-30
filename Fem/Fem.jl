@@ -8,7 +8,12 @@ export apply_dirichlet
 export do_mass_covariance_assembly
 
 export mesh_partition
+export get_total_area
 export plot_TriMesh
+
+export set_subdomain
+export do_local_mass_covariance_assembly
+export do_local_mass_assembly
 
 export set_subdomains
 export do_schur_assembly

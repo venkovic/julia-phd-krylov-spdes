@@ -46,7 +46,7 @@ Maximum triangle area: .00005
 
 ```
 """
-function do_mass_covariance_assembly(cells, p, cov)
+function do_mass_covariance_assembly(cells, points, cov)
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
   R = zeros(nnode, nnode) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'

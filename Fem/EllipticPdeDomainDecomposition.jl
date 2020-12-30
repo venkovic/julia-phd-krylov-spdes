@@ -137,9 +137,6 @@ function set_subdomains(mesh::TriangleMesh.TriMesh, epart::Array{Int64,2}, npart
 end
 
 
-#function do_schur_assembly(elemsd, cells, points, is_on_Γ, ind_Id, nn_Id, a, f)
-
-
 function do_schur_assembly(cells, points, epart, ind_Id, ind_Γ, is_on_Γ, a, f)
   ndom = length(ind_Id) # Number of subdomains  
   _, nel = size(cells) # Number of elements
