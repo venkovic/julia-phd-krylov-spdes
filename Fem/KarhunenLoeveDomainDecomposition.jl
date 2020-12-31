@@ -1,5 +1,6 @@
 using SparseArrays
 import TriangleMesh
+import Distributions
 
 
 """
@@ -576,35 +577,32 @@ function do_global_mass_covariance_reduced_assembly(cells, points, elemsd, inds_
   return K
 end
 
-
-
-
 function draw(mesh, Λ, Φ, ϕd, inds_l2gd)
-    nnode = mesh.n_point # Number of mesh nodes
-    nmode = length(Λ) # Number of global modes
-    ndom = length(ϕd) # Number of subdomains
-    md = Int[] # Number of local modes for each subdomain
+  nnode = mesh.n_point # Number of mesh nodes
+  nmode = length(Λ) # Number of global modes
+  ndom = length(ϕd) # Number of subdomains
+  md = Int[] # Number of local modes for each subdomain
   
-    ξ = rand(Normal(), nmode)
-    g = zeros(nnode)
-    cnt = zeros(Int, nnode)
+  ξ = rand(Distributions.Normal(), nmode)
+  g = zeros(nnode)
+  cnt = zeros(Int, nnode)
   
-    # Get the number of local modes retained for each subdomain
-    for idom in 1:ndom
-      push!(md, size(ϕd[idom])[2])
-    end
-  
-    for idom in 1:ndom
-      for (i, inode) in enumerate(inds_l2gd[idom])
-        cnt[inode] += 1
-        for α in 1:md[idom]
-          idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
-          for γ in 1:nmode
-            g[inode] += sqrt(Λ[γ]) * ξ[γ] * Φ[ind_α_idom, γ] * ϕd[idom][i, α]
-          end
-        end # for α
-      end # for γ
-    end # for idom
-  
-    return ξ, g
+  # Get the number of local modes retained for each subdomain
+  for idom in 1:ndom
+    push!(md, size(ϕd[idom])[2])
   end
+  
+  for idom in 1:ndom
+    for (i, inode) in enumerate(inds_l2gd[idom])
+      cnt[inode] += 1
+      for α in 1:md[idom]
+        idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
+        for γ in 1:nmode
+          g[inode] += sqrt(Λ[γ]) * ξ[γ] * Φ[ind_α_idom, γ] * ϕd[idom][i, α]
+        end
+      end # for α
+    end # for γ
+  end # for idom
+  g ./= cnt # should done cleanly instead
+  return ξ, g
+end
