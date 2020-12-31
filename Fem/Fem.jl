@@ -14,6 +14,9 @@ export plot_TriMesh
 export set_subdomain
 export do_local_mass_covariance_assembly
 export do_local_mass_assembly
+export do_global_mass_reduced_assembly
+export do_global_mass_covariance_reduced_assembly
+export draw
 
 export set_subdomains
 export do_schur_assembly
