@@ -9,7 +9,6 @@ export do_mass_covariance_assembly
 
 export mesh_partition
 export get_total_area
-export plot_TriMesh
 
 export set_subdomain
 export do_local_mass_covariance_assembly

@@ -1,5 +1,4 @@
 using TriangleMesh
-using PyPlot
 
 function get_total_area(cells, points)
   _, nel = size(cells) # Number of elements
@@ -54,6 +53,8 @@ function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
   return epart, npart 
 end
 
+"""
+using PyPlot
 
 function plot_TriMesh(m :: TriMesh; 
                       linewidth :: Real = 1, 
@@ -79,3 +80,4 @@ function plot_TriMesh(m :: TriMesh;
     println("yrdy")    
     return fig
 end
+"""
