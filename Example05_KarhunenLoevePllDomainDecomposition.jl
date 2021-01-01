@@ -5,16 +5,28 @@ addprocs(([("andrew", 4)]), tunnel=true)
 
 @everywhere push!(LOAD_PATH, "./Fem/")  
 
+"""
+@everywhere using Fem
+@everywhere using TriangleMesh
+@everywhere using LinearAlgebra
+@everywhere using Arpack
+@everywhere using Distributions
+@everywhere using Distributed
+@everywhere using DistributedOperations
+"""
+
 @everywhere begin 
   using Fem
   using TriangleMesh
-  #using NPZ
-  #import LinearAlgebra
+  import LinearAlgebra
   import Arpack
-  #using Distributions
+  using Distributed
+  using Distributions
   using Distributed
   using DistributedOperations
 end
+
+using NPZ
 
 @everywhere begin
   ndom = 20
