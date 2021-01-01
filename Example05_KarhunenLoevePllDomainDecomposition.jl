@@ -3,17 +3,11 @@ addprocs(2)
 addprocs(([("marcel", 4)]), tunnel=true)
 addprocs(([("andrew", 4)]), tunnel=true)
 
-@everywhere push!(LOAD_PATH, "./Fem/")  
-
-"""
-@everywhere using Fem
-@everywhere using TriangleMesh
-@everywhere using LinearAlgebra
-@everywhere using Arpack
-@everywhere using Distributions
-@everywhere using Distributed
-@everywhere using DistributedOperations
-"""
+@everywhere begin
+  push!(LOAD_PATH, "./Fem/")
+  import Pkg
+  Pkg.activate(".")
+end
 
 @everywhere begin 
   using Fem
