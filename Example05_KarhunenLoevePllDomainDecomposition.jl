@@ -3,7 +3,8 @@ addprocs(2)
 addprocs(([("marcel", 4)]), tunnel=true)
 addprocs(([("andrew", 4)]), tunnel=true)
 
-@everywhere push!(LOAD_PATH, "./Fem/")
+@everywhere push!(LOAD_PATH, "./Fem/")  
+
 @everywhere begin 
   using Fem
   using TriangleMesh
