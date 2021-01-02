@@ -1,5 +1,7 @@
 module Fem
 
+export SubDomain
+
 export do_isotropic_elliptic_assembly
 export get_mass_matrix
 
@@ -17,9 +19,8 @@ export do_global_mass_reduced_assembly
 export do_global_mass_covariance_reduced_assembly
 export draw
 
-export set_subdomains
-export do_schur_assembly
-export apply_schur
+export do_global_mass_covariance_reduced_pll_assembly
+export pll_draw
 
 include("Mesh.jl")
 include("EllipticPde.jl")
@@ -27,5 +28,5 @@ include("BoundaryConditions.jl")
 include("EllipticPdeDomainDecomposition.jl")
 include("KarhunenLoeve.jl")
 include("KarhunenLoeveDomainDecomposition.jl")
-
+include("KarhunenLoevePllDomainDecomposition.jl")
 end

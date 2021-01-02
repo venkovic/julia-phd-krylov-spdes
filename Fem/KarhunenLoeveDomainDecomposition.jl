@@ -316,8 +316,12 @@ function do_local_mass_assembly(cells, points, inds_g2l, elems)
 end
 
 
+function do_global_mass_reduced_assembly(cells::Array{Int,2}, 
+                                         points::Array{Int,2}, 
+                                         epart::Array{Int,2}, 
+                                         inds_g2ld,
+                                         Φd)
 
-function do_global_mass_reduced_assembly(cells, points, epart::Array{Int64,2}, inds_g2ld, Φd)
     _, nel = size(cells) # Number of elements
     ndom = length(Φd) # Number of subdomains
     md = Int[] # Number of local modes for each subdomain
