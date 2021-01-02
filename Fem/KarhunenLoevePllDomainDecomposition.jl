@@ -188,7 +188,7 @@ function project_on_mesh(mesh::TriangleMesh.TriMesh,
 
   # Get the number of local modes retained for each subdomain
   for idom in 1:ndom
-    push!(md, size(ϕd[idom])[2])
+    push!(md, size(domain[idom].ϕ)[2])
   end
   
   # Loop over reduced modes
@@ -198,7 +198,7 @@ function project_on_mesh(mesh::TriangleMesh.TriMesh,
     for idom in 1:ndom
 
       # Loop over mesh nodes
-      for (i, inode) in enumerate(inds_l2gd[idom])
+      for (i, inode) in enumerate(domain[idom].inds_l2g)
         cnt[inode] += 1
 
         # Loop over local modes and add contributions
