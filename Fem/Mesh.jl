@@ -1,5 +1,14 @@
 using TriangleMesh
 
+function get_mesh(tentative_nnode::Int)
+  poly = polygon_unitSquare()
+  mesh = create_mesh(poly, voronoi=true, delaunay=true)
+  divide_cell_into = ceil(Int, .645 * tentative_nnode)
+  mesh = refine(mesh, divide_cell_into=divide_cell_into)
+  return mesh
+end
+
+
 function get_total_area(cells, points)
   _, nel = size(cells) # Number of elements
   area = 0. # Total mesh area
