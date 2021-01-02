@@ -33,8 +33,9 @@ end
 
 
 function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
-  nel = mesh.n_cell # number of elements
-  
+  nel = mesh.n_cell # Number of elements
+  nnode = mesh.n_point # Number of mesh nodes
+
   # Write mesh for mpmetis
   open("mesh.metis", "w") do io
     print(io, "$nel\n")
@@ -47,8 +48,10 @@ function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
   
   # Call mpmetis for contiguous partition
   run(`mpmetis mesh.metis $ndom -contig`, wait=true)
-  epart = readdlm("mesh.metis.epart.$ndom", Int) .+ 1 # Metis starts indexing doms at 0
-  npart = readdlm("mesh.metis.npart.$ndom", Int) .+ 1 # Metis starts indexing doms at 0
+
+  # Read and adjust partition from Metis for proper Julia indexing
+  epart = reshape(readdlm("mesh.metis.epart.$ndom", Int), nel) .+ 1 
+  npart = reshape(readdlm("mesh.metis.npart.$ndom", Int), nnode) .+ 1 # Metis starts indexing doms at 0
   
   return epart, npart 
 end

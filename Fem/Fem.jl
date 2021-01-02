@@ -17,9 +17,12 @@ export do_local_mass_covariance_assembly
 export do_local_mass_assembly
 export do_global_mass_reduced_assembly
 export do_global_mass_covariance_reduced_assembly
+export solve_local_kl
+export project_on_mesh
 export draw
 
-export do_global_mass_covariance_reduced_pll_assembly
+export pll_do_global_mass_covariance_reduced_assembly
+export pll_solve_local_kl
 export pll_draw
 
 include("Mesh.jl")

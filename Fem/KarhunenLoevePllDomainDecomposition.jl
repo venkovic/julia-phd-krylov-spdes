@@ -1,3 +1,6 @@
+using Distributed
+import Arpack
+
 struct SubDomain
     inds_g2l::Dict{Int,Int}  #
     inds_l2g::Vector{Int}    #
@@ -5,7 +8,7 @@ struct SubDomain
     ϕ::Array{Float64,2}      #
 end
 
-function do_global_mass_covariance_reduced_pll_assembly(cells::Array{Int,2},
+function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                         points::Array{Float64,2},
                                                         domain::Dict{Int,SubDomain},
                                                         idom::Int,
@@ -142,6 +145,36 @@ function do_global_mass_covariance_reduced_pll_assembly(cells::Array{Int,2},
   end
 
 
+function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
+                            epart::Array{Int,1},
+                            cov::Function,
+                            nev::Int,
+                            idom::Int)
+
+  ndom = maximum(epart) # Number of subdomains
+
+  # Parallel loop over subdomains
+  inds_l2g, inds_g2l, elems = set_subdomain(mesh, epart, idom)
+  
+  # Assemble local generalized eigenvalue problem
+  C = do_local_mass_covariance_assembly(mesh.cell, mesh.point, inds_l2g, 
+                                        inds_g2l, elems, cov)
+  M = do_local_mass_assembly(mesh.cell, mesh.point, inds_g2l, elems)
+  
+  # Solve local generalized eigenvalue problem
+  λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
+  
+  # Arpack 0.5.1 does not normalize the vectors properly
+  for k in 1:size(ϕ)[2]
+    ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
+  end
+  
+  # truncate here
+  println("$idom, $(length(inds_l2g)), $(sum(λ))")
+  return Dict(idom => SubDomain(inds_g2l, inds_l2g, elems, ϕ))
+end
+
+
 function pll_draw(mesh, Λ, Φ, ϕd, inds_l2gd)
     nnode = mesh.n_point # Number of mesh nodes
     nmode = length(Λ) # Number of global modes
@@ -170,4 +203,4 @@ function pll_draw(mesh, Λ, Φ, ϕd, inds_l2gd)
     end # for idom
     g ./= cnt # should done cleanly instead
     return ξ, g
-  end
+end
