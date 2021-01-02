@@ -682,15 +682,15 @@ end
 function draw(Λ::Array{Float64,1},
               Ψ::Array{Float64,2})
 
-nnode, _ = size(Ψ) # Number of mesh nodes
-nmode = length(Λ) # Number of reduced modes
+  nnode, _ = size(Ψ) # Number of mesh nodes
+  nmode = length(Λ) # Number of reduced modes
 
-ξ = rand(Distributions.Normal(), nmode)
-g = zeros(nnode)
-
-for α in 1:nmode
-  g[:] += sqrt(Λ[α]) * ξ[α] * Ψ[:, α]
-end
-
-return ξ, g
+  ξ = rand(Distributions.Normal(), nmode)
+  g = zeros(nnode)
+  
+  for α in 1:nmode
+    g[:] += sqrt(Λ[α]) * ξ[α] * Ψ[:, α]
+  end
+  
+  return ξ, g
 end

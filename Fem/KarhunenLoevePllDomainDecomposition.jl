@@ -175,6 +175,61 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
 end
 
 
+function project_on_mesh(mesh::TriangleMesh.TriMesh,
+                         Φ::Array{Float64,2},
+                         domain:: Array{SubDomain,1})
+
+  ndom = length(domain) # Number of subdomains
+  _, nmodes = size(Φ) # Number of reduced modes
+  md = Int[] # Number of local modes in each subdomain
+  nnodes = mesh.n_point # Number of mesh nodes
+  Ψ = zeros(nnodes, nmodes) # Eigenfunction projection at the mesh nodes
+  cnt = zeros(Int, nnodes) # Number of subdomains to which each node belongs
+
+  # Get the number of local modes retained for each subdomain
+  for idom in 1:ndom
+    push!(md, size(ϕd[idom])[2])
+  end
+  
+  # Loop over reduced modes
+  for imode in 1:nmodes
+    # Loop over subdomains
+    cnt .= 0
+    for idom in 1:ndom
+
+      # Loop over mesh nodes
+      for (i, inode) in enumerate(inds_l2gd[idom])
+        cnt[inode] += 1
+
+        # Loop over local modes and add contributions
+        for α in 1:md[idom]
+          idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
+          Ψ[inode, imode] += Φ[ind_α_idom, imode] * ϕd[idom][i, α]
+        end 
+      end # for inode
+    end # for idom
+
+    Ψ[:, imode] ./= cnt
+  end # for imode
+
+  return Ψ
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function pll_draw(mesh, Λ, Φ, ϕd, inds_l2gd)
     nnode = mesh.n_point # Number of mesh nodes
     nmode = length(Λ) # Number of global modes
