@@ -177,7 +177,7 @@ end
 
 function project_on_mesh(mesh::TriangleMesh.TriMesh,
                          Φ::Array{Float64,2},
-                         domain:: Array{SubDomain,1})
+                         domain:: Dict{Int,SubDomain})
 
   ndom = length(domain) # Number of subdomains
   _, nmodes = size(Φ) # Number of reduced modes
