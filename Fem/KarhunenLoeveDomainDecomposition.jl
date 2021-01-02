@@ -335,84 +335,84 @@ function do_global_mass_reduced_assembly(cells::Array{Int,2},
                                          inds_g2ld::Array{Dict{Int,Int},1},
                                          Φd::Array{Array{Float64,2},1})
 
-    _, nel = size(cells) # Number of elements
-    ndom = length(Φd) # Number of subdomains
-    md = Int[] # Number of local modes for each subdomain
-    I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for mass matrix
-    x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
-    Δx, Δy = zeros(3), zeros(3), zeros(3) # Used to store terms of shoelace formula
+  _, nel = size(cells) # Number of elements
+  ndom = length(Φd) # Number of subdomains
+  md = Int[] # Number of local modes for each subdomain
+  I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for mass matrix
+  x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
+  Δx, Δy = zeros(3), zeros(3), zeros(3) # Used to store terms of shoelace formula
 
-    # Get the number of local modes retained for each subdomain
-    for idom in 1:ndom
-      push!(md, size(Φd[idom])[2])
+  # Get the number of local modes retained for each subdomain
+  for idom in 1:ndom
+    push!(md, size(Φd[idom])[2])
+  end
+
+  # Loop over elements
+  for iel in 1:nel
+      
+    # Get (x, y) coordinates of each element vertex
+    for r in 1:3
+      rnode = cells[r, iel]
+      x[r], y[r] = points[1, rnode], points[2, rnode]
     end
-
-    # Loop over elements
-    for iel in 1:nel
       
-      # Get (x, y) coordinates of each element vertex
-      for r in 1:3
-        rnode = cells[r, iel]
-        x[r], y[r] = points[1, rnode], points[2, rnode]
-      end
+    # Terms of the shoelace formula for a triangle
+    Δx[1] = x[3] - x[2]
+    Δx[2] = x[1] - x[3]
+    Δx[3] = x[2] - x[1]
+    Δy[1] = y[2] - y[3]
+    Δy[2] = y[3] - y[1]
+    Δy[3] = y[1] - y[2]
       
-      # Terms of the shoelace formula for a triangle
-      Δx[1] = x[3] - x[2]
-      Δx[2] = x[1] - x[3]
-      Δx[3] = x[2] - x[1]
-      Δy[1] = y[2] - y[3]
-      Δy[2] = y[3] - y[1]
-      Δy[3] = y[1] - y[2]
-      
-      # Area of element
-      Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+    # Area of element
+    Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
 
-      # Get host subdomain
-      idom = epart[iel]
+    # Get host subdomain
+    idom = epart[iel]
 
-      # Loop over local modes of subdomain
-      for α in 1:md[idom]
-        idom == 1 ? ind_dα = α : ind_dα = sum(md[1:idom-1]) + α
+    # Loop over local modes of subdomain
+    for α in 1:md[idom]
+      idom == 1 ? ind_dα = α : ind_dα = sum(md[1:idom-1]) + α
 
-        # Loop over local modes of subdomain 
-        for β in α:md[idom]
-          idom == 1 ? ind_dβ = β : ind_dβ = sum(md[1:idom-1]) + β
+      # Loop over local modes of subdomain 
+      for β in α:md[idom]
+        idom == 1 ? ind_dβ = β : ind_dβ = sum(md[1:idom-1]) + β
+
+        # Loop over vertices of element
+        value = 0.
+        for i in 1:3
+          inode = inds_g2ld[idom][cells[i, iel]]
+          ϕ_d_α_i = Φd[idom][inode, α]
 
           # Loop over vertices of element
-          value = 0.
-          for i in 1:3
-            inode = inds_g2ld[idom][cells[i, iel]]
-            ϕ_d_α_i = Φd[idom][inode, α]
-
-            # Loop over vertices of element
-            for j in 1:3
-              jnode = inds_g2ld[idom][cells[j, iel]]
-              ϕ_d_β_j = Φd[idom][jnode, β]
-              if i == j
-                value += ϕ_d_α_i * ϕ_d_β_j * Area / 6
-              else
-                value += ϕ_d_α_i * ϕ_d_β_j * Area / 12
-              end
+          for j in 1:3
+            jnode = inds_g2ld[idom][cells[j, iel]]
+            ϕ_d_β_j = Φd[idom][jnode, β]
+            if i == j
+              value += ϕ_d_α_i * ϕ_d_β_j * Area / 6
+            else
+              value += ϕ_d_α_i * ϕ_d_β_j * Area / 12
             end
           end
+        end
 
-          push!(I, ind_dα)
-          push!(J, ind_dβ)
+        push!(I, ind_dα)
+        push!(J, ind_dβ)
+        push!(V, value)
+        if β != α
+          push!(I, ind_dβ)
+          push!(J, ind_dα)
           push!(V, value)
-          if β != α
-            push!(I, ind_dβ)
-            push!(J, ind_dα)
-            push!(V, value)
-          end
         end
       end
     end
-    
-    # Assemble sparse mass matrix
-    M = sparse(I, J, V)
-    
-    return M
   end
+    
+  # Assemble sparse mass matrix
+  M = sparse(I, J, V)
+    
+  return M
+end
 
 
 """
@@ -602,6 +602,34 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
 end
 
 
+function solve_local_kl(mesh::TriangleMesh.TriMesh,
+                        epart::Array{Int,1},
+                        cov::Function,
+                        nev::Int,
+                        idom::Int)
+
+  ndom = maximum(epart) # Number of subdomains
+  inds_l2g, inds_g2l, elems = set_subdomain(mesh, epart, idom)
+  
+  # Assemble local generalized eigenvalue problem
+  C = do_local_mass_covariance_assembly(mesh.cell, mesh.point, inds_l2g, 
+                                        inds_g2l, elems, cov)
+  M = do_local_mass_assembly(mesh.cell, mesh.point, inds_g2l, elems)
+  
+  # Solve local generalized eigenvalue problem
+  λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
+  
+  # Arpack 0.5.1 does not normalize the vectors properly
+  for k in 1:size(ϕ)[2]
+    ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
+  end
+  
+  # truncate here
+  println("$idom, $(length(inds_l2g)), $(sum(λ))")
+  return SubDomain(inds_g2l, inds_l2g, elems, ϕ)
+end
+
+
 function draw(mesh::TriangleMesh.TriMesh,
               Λ::Array{Float64,1},
               Φ::Array{Float64,2},
@@ -671,7 +699,7 @@ function project_on_mesh(mesh::TriangleMesh.TriMesh,
           idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
           Ψ[inode, imode] += Φ[ind_α_idom, imode] * ϕd[idom][i, α]
         end 
-      end # for γ
+      end # for inode
     end # for idom
     Ψ[:, imode] ./= cnt
   end # for imode

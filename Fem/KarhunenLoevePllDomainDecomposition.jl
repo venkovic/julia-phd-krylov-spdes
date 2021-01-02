@@ -204,7 +204,7 @@ function project_on_mesh(mesh::TriangleMesh.TriMesh,
         # Loop over local modes and add contributions
         for α in 1:md[idom]
           idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
-          Ψ[inode, imode] += Φ[ind_α_idom, imode] * ϕd[idom][i, α]
+          Ψ[inode, imode] += Φ[ind_α_idom, imode] * domain[idom].ϕ[i, α]
         end 
       end # for inode
     end # for idom
