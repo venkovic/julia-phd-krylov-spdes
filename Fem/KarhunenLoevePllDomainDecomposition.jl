@@ -143,6 +143,8 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
       end # end α
     end # for jdom
   
+    println("Done with idom = $idom.")
+  
     return K
   end
 
