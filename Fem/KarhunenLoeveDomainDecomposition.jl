@@ -493,7 +493,7 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
     # Loop over subdomains
     for jdom in idom:ndom
       nnode_jdom = inds_g2ld[jdom].count
-      
+
       R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
       C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
 
@@ -537,45 +537,45 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
           end
         end # for el
       end # for jnode
-      
-      # Loop over mesh nodes of the idom-th subdomain 
-      for (i, inode) in enumerate(inds_l2gd[idom])
         
-        # Loop over elements of the jdom-th subdomain
-        for (jel, el) in enumerate(elemsd[jdom])
+      # Loop over elements of the jdom-th subdomain
+      for (jel, el) in enumerate(elemsd[jdom])
         
-          # Get (x, y) coordinates of each element vertex
-          for r in 1:3
-            rnode = cells[r, el]
-            x[r], y[r] = points[1, rnode], points[2, rnode]
-          end
+        # Get (x, y) coordinates of each element vertex
+        for r in 1:3
+          rnode = cells[r, el]
+          x[r], y[r] = points[1, rnode], points[2, rnode]
+        end
           
-          # Terms of the shoelace formula for a triangle
-          Δx[1] = x[3] - x[2]
-          Δx[2] = x[1] - x[3]
-          Δx[3] = x[2] - x[1]
-          Δy[1] = y[2] - y[3]
-          Δy[2] = y[3] - y[1]
-          Δy[3] = y[1] - y[2]
+        # Terms of the shoelace formula for a triangle
+        Δx[1] = x[3] - x[2]
+        Δx[2] = x[1] - x[3]
+        Δx[3] = x[2] - x[1]
+        Δy[1] = y[2] - y[3]
+        Δy[2] = y[3] - y[1]
+        Δy[3] = y[1] - y[2]
           
-          # Area of element
-          Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+        # Area of element
+        Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
 
-          # Add local contributions
-          for r in 1:3
-            s = r + 1 - floor(Int, (r + 1) / 3) * 3
-            s == 0 ? s = 3 : nothing
-            t = r + 2 - floor(Int, (r + 2) / 3) * 3
-            t == 0 ? t = 3 : nothing
-            j = inds_g2ld[jdom][cells[r, el]]
-            k = inds_g2ld[jdom][cells[s, el]]
-            ℓ = inds_g2ld[jdom][cells[t, el]]
+        # Add local contributions
+        for r in 1:3
+          s = r + 1 - floor(Int, (r + 1) / 3) * 3
+          s == 0 ? s = 3 : nothing
+          t = r + 2 - floor(Int, (r + 2) / 3) * 3
+          t == 0 ? t = 3 : nothing
+          j = inds_g2ld[jdom][cells[r, el]]
+          k = inds_g2ld[jdom][cells[s, el]]
+          ℓ = inds_g2ld[jdom][cells[t, el]]
+
+          # Loop over mesh nodes of the idom-th subdomain 
+          for (i, inode) in enumerate(inds_l2gd[idom])
             C[i, j] += (2 * R[i, j] 
                           + R[i, k]  
                           + R[i, ℓ]) * Area_el / 12
           end
-        end # for el
-      end # for inode
+        end # for r
+      end # for el
 
       # Loop over local modes of the idom-th subdomain
       for α in 1:md[idom]
@@ -585,14 +585,15 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
         for β in 1:md[jdom]
           jdom == 1 ? ind_β_jdom = β : ind_β_jdom = sum(md[1:jdom-1]) + β
           
-          for i in 1:nnode_idom
-            for j in 1:nnode_jdom
-              K[ind_α_idom, ind_β_jdom] += Φd[idom][i, α] * Φd[jdom][j, β] * C[i, j]
+          for j in 1:nnode_jdom
+            Φ_j_β = Φd[jdom][j, β]
+          
+            for i in 1:nnode_idom
+              K[ind_α_idom, ind_β_jdom] += Φd[idom][i, α] * C[i, j] * Φ_j_β
             end
           end
           
           idom == jdom ? nothing : K[ind_β_jdom, ind_α_idom] = K[ind_α_idom, ind_β_jdom]
-
         end # end β
       end # end α
     end # for jdom
