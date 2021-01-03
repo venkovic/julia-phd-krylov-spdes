@@ -6,6 +6,7 @@ struct SubDomain
     inds_l2g::Vector{Int}    #
     elems::Vector{Int}       #
     ϕ::Array{Float64,2}      #
+    center::Array{Float64,1} #
 end
 
 function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
@@ -13,7 +14,8 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                         domain::Dict{Int,SubDomain},
                                                         idom::Int,
                                                         md::Array{Int,1},
-                                                        cov)
+                                                        cov::Function;
+                                                        forget=-1.)
 
     _, nel = size(cells) # Number of elements
     _, nnode = size(points) # Number of nodes
@@ -28,21 +30,60 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
     # Loop over other subdomains
     nnode_idom = domain[idom].inds_g2l.count
     for jdom in 1:ndom
-      nnode_jdom = domain[jdom].inds_g2l.count
-
-      R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
-      C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
       
-      # Loop over mesh nodes of the jdom-th subdomain 
-      for (j, jnode) in enumerate(domain[jdom].inds_l2g)
+      # Check if subdomains are significantly correlated
+      if cov(domain[idom].center[1], domain[idom].center[2], 
+             domain[jdom].center[1], domain[jdom].center[2]) > forget
         
-        # Get coordinates of node
-        xj = points[1, jnode]
-        yj = points[2, jnode]
+        nnode_jdom = domain[jdom].inds_g2l.count
+  
+        R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
+        C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
         
-        # Loop over elements of the idom-th subdomain
-        for (iel, el) in enumerate(domain[idom].elems)
+        # Loop over mesh nodes of the jdom-th subdomain 
+        for (j, jnode) in enumerate(domain[jdom].inds_l2g)
+        
+          # Get coordinates of node
+          xj = points[1, jnode]
+          yj = points[2, jnode]
           
+          # Loop over elements of the idom-th subdomain
+          for (iel, el) in enumerate(domain[idom].elems)
+            
+            # Get (x, y) coordinates of each element vertex
+            for r in 1:3
+              rnode = cells[r, el]
+              x[r], y[r] = points[1, rnode], points[2, rnode]
+            end
+            
+            # Terms of the shoelace formula for a triangle
+            Δx[1] = x[3] - x[2]
+            Δx[2] = x[1] - x[3]
+            Δx[3] = x[2] - x[1]
+            Δy[1] = y[2] - y[3]
+            Δy[2] = y[3] - y[1]
+            Δy[3] = y[1] - y[2]
+            
+            # Area of element
+            Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+            
+            # Add local contributions
+            for r in 1:3
+              s = r + 1 - floor(Int, (r + 1) / 3) * 3
+              s == 0 ? s = 3 : nothing
+              t = r + 2 - floor(Int, (r + 2) / 3) * 3
+              t == 0 ? t = 3 : nothing
+              i = domain[idom].inds_g2l[cells[r, el]]
+              R[i, j] += (2 * cov(x[r], y[r], xj, yj) 
+                            + cov(x[s], y[s], xj, yj) 
+                            + cov(x[t], y[t], xj, yj)) * Area_el / 12
+            end
+          end # for el
+        end # for jnode
+          
+        # Loop over elements of the jdom-th subdomain
+        for (jel, el) in enumerate(domain[jdom].elems)
+            
           # Get (x, y) coordinates of each element vertex
           for r in 1:3
             rnode = cells[r, el]
@@ -66,99 +107,65 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
             s == 0 ? s = 3 : nothing
             t = r + 2 - floor(Int, (r + 2) / 3) * 3
             t == 0 ? t = 3 : nothing
-            i = domain[idom].inds_g2l[cells[r, el]]
-            R[i, j] += (2 * cov(x[r], y[r], xj, yj) 
-                          + cov(x[s], y[s], xj, yj) 
-                          + cov(x[t], y[t], xj, yj)) * Area_el / 12
-          end
-        end # for el
-      end # for jnode
-        
-        
-      # Loop over elements of the jdom-th subdomain
-      for (jel, el) in enumerate(domain[jdom].elems)
-          
-        # Get (x, y) coordinates of each element vertex
-        for r in 1:3
-          rnode = cells[r, el]
-          x[r], y[r] = points[1, rnode], points[2, rnode]
-        end
-          
-        # Terms of the shoelace formula for a triangle
-        Δx[1] = x[3] - x[2]
-        Δx[2] = x[1] - x[3]
-        Δx[3] = x[2] - x[1]
-        Δy[1] = y[2] - y[3]
-        Δy[2] = y[3] - y[1]
-        Δy[3] = y[1] - y[2]
-          
-        # Area of element
-        Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
-          
-        # Add local contributions
-        for r in 1:3
-          s = r + 1 - floor(Int, (r + 1) / 3) * 3
-          s == 0 ? s = 3 : nothing
-          t = r + 2 - floor(Int, (r + 2) / 3) * 3
-          t == 0 ? t = 3 : nothing
-          j = domain[jdom].inds_g2l[cells[r, el]]
-          k = domain[jdom].inds_g2l[cells[s, el]]
-          ℓ = domain[jdom].inds_g2l[cells[t, el]]
+            j = domain[jdom].inds_g2l[cells[r, el]]
+            k = domain[jdom].inds_g2l[cells[s, el]]
+            ℓ = domain[jdom].inds_g2l[cells[t, el]]
 
-
-          # Loop over mesh nodes of the idom-th subdomain 
-          for (i, inode) in enumerate(domain[idom].inds_l2g)
-            C[i, j] += (2 * R[i, j] 
-                          + R[i, k]  
-                          + R[i, ℓ]) * Area_el / 12
-          end
-        end # for r
-      end # for jel
-      
-      # Loop over local modes of the idom-th subdomain
-      for α in 1:md[idom]
-        if idom == 1
-          ind_α_idom = α
-        else
-          ind_α_idom = sum(md[1:idom-1]) + α 
-        end
-
-        # Loop over local modes of the jdom-th subdomain
-        for β in 1:md[jdom]
-          if jdom == 1
-            ind_β_jdom = β
-          else
-            ind_β_jdom = sum(md[1:jdom-1]) + β
-          end
-
-          # Add contributions
-          for j in 1:nnode_jdom
-            Φ_j_β = domain[jdom].ϕ[j, β]
-
-            for i in 1:nnode_idom
-              K[ind_α_idom, ind_β_jdom] += domain[idom].ϕ[i, α] * C[i, j] * Φ_j_β
+            # Loop over mesh nodes of the idom-th subdomain 
+            for (i, inode) in enumerate(domain[idom].inds_l2g)
+              C[i, j] += (2 * R[i, j] 
+                            + R[i, k]  
+                            + R[i, ℓ]) * Area_el / 12
             end
+          end # for r
+        end # for jel
+      
+        # Loop over local modes of the idom-th subdomain
+        for α in 1:md[idom]
+          if idom == 1
+            ind_α_idom = α
+          else
+            ind_α_idom = sum(md[1:idom-1]) + α 
           end
-        end # end β
-      end # end α
-    end # for jdom
+
+          # Loop over local modes of the jdom-th subdomain
+          for β in 1:md[jdom]
+            if jdom == 1
+              ind_β_jdom = β
+            else
+              ind_β_jdom = sum(md[1:jdom-1]) + β
+            end
+
+            # Add contributions
+            for j in 1:nnode_jdom
+              Φ_j_β = domain[jdom].ϕ[j, β]
+
+              for i in 1:nnode_idom
+                K[ind_α_idom, ind_β_jdom] += domain[idom].ϕ[i, α] * C[i, j] * Φ_j_β
+              end
+            end
+          end # end β
+        end # end α
+    end # if subdomain are significantly correlated 
+  end # for jdom
   
-    println("Done with idom = $idom.")
+  println("Done with idom = $idom.")
   
-    return K
-  end
+  return K
+end
 
 
 function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
                             epart::Array{Int,1},
                             cov::Function,
                             nev::Int,
-                            idom::Int)
+                            idom::Int;
+                            forget=-1.)
 
   ndom = maximum(epart) # Number of subdomains
 
   # Parallel loop over subdomains
-  inds_l2g, inds_g2l, elems = set_subdomain(mesh, epart, idom)
+  inds_l2g, inds_g2l, elems, center = set_subdomain(mesh, epart, idom)
   
   # Assemble local generalized eigenvalue problem
   C = do_local_mass_covariance_assembly(mesh.cell, mesh.point, inds_l2g, 
@@ -175,7 +182,7 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
   
   # truncate here
   println("$idom, $(length(inds_l2g)), $(sum(λ))")
-  return Dict(idom => SubDomain(inds_g2l, inds_l2g, elems, ϕ))
+  return Dict(idom => SubDomain(inds_g2l, inds_l2g, elems, ϕ, center))
 end
 
 

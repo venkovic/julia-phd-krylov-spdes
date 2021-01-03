@@ -21,6 +21,7 @@ export do_global_mass_covariance_reduced_assembly
 export solve_local_kl
 export project_on_mesh
 export draw
+export trim_and_order
 
 export pll_do_global_mass_covariance_reduced_assembly
 export pll_solve_local_kl

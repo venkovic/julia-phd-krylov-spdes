@@ -67,7 +67,8 @@ function set_subdomain(mesh::TriangleMesh.TriMesh,
                     # nodes of the idom-th subdomain
   inds_g2l = Dict{Int, Int}() # Conversion table from global to local indices of the 
                               # nodes of the idom-th subdomain
-  elems = Int[] # Elements contained inside each subdomain
+  elems = Int[] # Elements contained in subdomain
+  center = zeros(2) # Center of subdomain 
 
   iel_cell = zeros(Int, 3)
   for iel in 1:nel
@@ -88,7 +89,13 @@ function set_subdomain(mesh::TriangleMesh.TriMesh,
     end
   end
 
-  return inds_l2g, inds_g2l, elems
+  for inode in inds_l2g
+    center[1] += mesh.point[1, inode]
+    center[2] += mesh.point[2, inode]
+  end
+  center ./= length(inds_l2g)
+
+  return inds_l2g, inds_g2l, elems, center
 end
 
 
@@ -610,7 +617,7 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
                         idom::Int)
 
   ndom = maximum(epart) # Number of subdomains
-  inds_l2g, inds_g2l, elems = set_subdomain(mesh, epart, idom)
+  inds_l2g, inds_g2l, elems, center = set_subdomain(mesh, epart, idom)
   
   # Assemble local generalized eigenvalue problem
   C = do_local_mass_covariance_assembly(mesh.cell, mesh.point, inds_l2g, 
@@ -627,7 +634,7 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
   
   # truncate here
   println("$idom, $(length(inds_l2g)), $(sum(λ))")
-  return SubDomain(inds_g2l, inds_l2g, elems, ϕ)
+  return SubDomain(inds_g2l, inds_l2g, elems, ϕ, center)
 end
 
 
@@ -722,4 +729,13 @@ function draw(Λ::Array{Float64,1},
   end
   
   return ξ, g
+end
+
+function trim_and_order(Λ::Array{Float64,1},
+                        Φ::Array{Float64,2})
+  
+  neg_vals = sum([λ < 0 for λ in Λ])
+  Λ = reverse(Λ[neg_vals+1:end])
+  Φ = reverse(Φ[:, neg_vals+1:end], dims=2)
+  return Λ, Φ
 end
