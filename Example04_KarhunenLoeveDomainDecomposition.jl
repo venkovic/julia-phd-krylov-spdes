@@ -1,23 +1,29 @@
 push!(LOAD_PATH, "./Fem/")
+import Pkg
+Pkg.activate(".")
 using Fem
-using TriangleMesh
 using NPZ
 import LinearAlgebra
 import Arpack
 using Distributions
 
-poly = polygon_unitSquare()
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, 
-                   set_area_max=true)
+# Advice:
+# - At fixed value of ndom * nev, 
+#   use large ndom and small nev.
 
-ndom = 20
+ndom = 80
 nev = 35
+tentative_nnode = 20_000
+forget = 1e-6
+
+mesh = get_mesh(tentative_nnode)
+npzwrite("cells.npz", mesh.cell' .- 1)
+npzwrite("points.npz", mesh.point')
 epart, npart = mesh_partition(mesh, ndom)
 
-L = .1
-sig2 = 1.
-
 function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
+  L = .1
+  sig2 = 1.
   return sig2 * exp(-((x1 - x2)^ 2 + (y1 - y2)^2) / L^2)
 end
 
@@ -25,37 +31,33 @@ inds_g2ld = [Dict{Int,Int}() for _ in 1:ndom]
 inds_l2gd = Array{Int,1}[]
 elemsd = Array{Int,1}[]
 ϕd = Array{Float64,2}[]
+centerd = Array{Float64,1}[]
+energy_expected = 0.
 
-for idom in 1:ndom
-  inds_l2g, inds_g2l, elems = set_subdomain(mesh, epart, idom)
-  C = do_local_mass_covariance_assembly(mesh.cell, mesh.point, inds_l2g, inds_g2l, 
-                                        elems, cov)
-  M = do_local_mass_assembly(mesh.cell, mesh.point, inds_g2l, elems)
-  λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
-  inds_g2ld[idom] = inds_g2l
-  push!(inds_l2gd, inds_l2g)
-  push!(elemsd, elems)
-  push!(ϕd, ϕ)
-  println("$idom, $(length(inds_l2g)), $(sum(λ))")
+# Loop over subdomains and compute local KL expansions
+@time for idom in 1:ndom
+  subdom = solve_local_kl(mesh, epart, cov, nev, idom, relative=.996)
+  inds_g2ld[idom] = subdom.inds_g2l
+  push!(inds_l2gd, subdom.inds_l2g)
+  push!(elemsd, subdom.elems)
+  push!(ϕd, subdom.ϕ)
+  push!(centerd, subdom.center)
+  global energy_expected += subdom.energy
 end
 
-npzwrite("cells.npz", mesh.cell' .- 1)
-npzwrite("points.npz", mesh.point')
+# Assemble globally reduced eigenvalue problem
+K = @time do_global_mass_covariance_reduced_assembly(mesh.cell, mesh.point, elemsd,
+                                                     inds_g2ld, inds_l2gd, ϕd,
+                                                     centerd, cov, forget=forget)
 
-for idom in 1:ndom
-  npzwrite("phi_d$idom.npz", ϕd[idom])
-  npzwrite("inds_l2gd$idom.npz", inds_l2gd[idom] .- 1)
-end
+# Solve globally reduced eigenvalue problem, and project eigenfunctions 
+Λ, Ψ = @time solve_global_reduced_kl(mesh, K, energy_expected,
+                                     elemsd, inds_l2gd, ϕd,
+                                     relative=.995)
+npzwrite("kl-eigvals.npz", Λ)
+npzwrite("kl-eigvecs.npz", Ψ)
 
-#M = do_global_mass_reduced_assembly(mesh.cell, mesh.point, epart, inds_g2ld, ϕd)
-K = @time do_global_mass_covariance_reduced_assembly(mesh.cell, mesh.point, elemsd, 
-                                                     inds_g2ld, inds_l2gd, ϕd, cov)
-
-Λ, Φ = @time LinearAlgebra.eigen(K)
-
-npzwrite("dd-kl-eigvals.npz", Λ)
-npzwrite("dd-kl-eigvecs.npz", Φ)
-
-ξ, g = @time draw(mesh, Λ, Φ, ϕd, inds_l2gd)
-
-@time npzwrite("g.npz", g)
+# Sample
+ξ, g = @time draw(Λ, Ψ)
+@time draw!(Λ, Ψ, ξ, g)
+npzwrite("greal.npz", g)
