@@ -7,6 +7,7 @@ struct SubDomain
     elems::Vector{Int}       #
     ϕ::Array{Float64,2}      #
     center::Array{Float64,1} #
+    energy::Float64          #
 end
 
 function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},

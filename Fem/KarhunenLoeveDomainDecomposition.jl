@@ -1,6 +1,8 @@
 using SparseArrays
 import TriangleMesh
 import Distributions
+import LinearAlgebra
+using Printf
 
 
 """
@@ -68,7 +70,8 @@ function set_subdomain(mesh::TriangleMesh.TriMesh,
   inds_g2l = Dict{Int, Int}() # Conversion table from global to local indices of the 
                               # nodes of the idom-th subdomain
   elems = Int[] # Elements contained in subdomain
-  center = zeros(2) # Center of subdomain 
+  center = zeros(2) # Center of subdomain
+  energy = 0.
 
   iel_cell = zeros(Int, 3)
   for iel in 1:nel
@@ -474,7 +477,9 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                     inds_g2ld::Array{Dict{Int,Int},1},
                                                     inds_l2gd::Array{Array{Int,1},1},
                                                     Φd::Array{Array{Float64,2},1},
-                                                    cov::Function)
+                                                    centerd::Array{Array{Float64,1},1},
+                                                    cov::Function;
+                                                    forget=-1.)
 
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
@@ -499,20 +504,59 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
 
     # Loop over subdomains
     for jdom in idom:ndom
-      nnode_jdom = inds_g2ld[jdom].count
 
-      R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
-      C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
-
-      # Loop over mesh nodes of the jdom-th subdomain 
-      for (j, jnode) in enumerate(inds_l2gd[jdom])
-
-        # Get coordinates of node
-        xj = points[1, jnode]
-        yj = points[2, jnode]
+      # Check if subdomains are significantly correlated
+      if cov(centerd[idom][1], centerd[idom][2], 
+             centerd[jdom][1], centerd[jdom][2]) > forget
         
-        # Loop over elements of the idom-th subdomain
-        for (iel, el) in enumerate(elemsd[idom])
+        nnode_jdom = inds_g2ld[jdom].count
+
+        R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
+        C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
+
+        # Loop over mesh nodes of the jdom-th subdomain 
+        for (j, jnode) in enumerate(inds_l2gd[jdom])
+
+          # Get coordinates of node
+          xj = points[1, jnode]
+          yj = points[2, jnode]
+        
+          # Loop over elements of the idom-th subdomain
+          for (iel, el) in enumerate(elemsd[idom])
+        
+            # Get (x, y) coordinates of each element vertex
+            for r in 1:3
+              rnode = cells[r, el]
+              x[r], y[r] = points[1, rnode], points[2, rnode]
+            end
+          
+            # Terms of the shoelace formula for a triangle
+            Δx[1] = x[3] - x[2]
+            Δx[2] = x[1] - x[3]
+            Δx[3] = x[2] - x[1]
+            Δy[1] = y[2] - y[3]
+            Δy[2] = y[3] - y[1]
+            Δy[3] = y[1] - y[2]
+          
+            # Area of element
+            Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+          
+            # Add local contributions
+            for r in 1:3
+              s = r + 1 - floor(Int, (r + 1) / 3) * 3
+              s == 0 ? s = 3 : nothing
+              t = r + 2 - floor(Int, (r + 2) / 3) * 3
+              t == 0 ? t = 3 : nothing
+              i = inds_g2ld[idom][cells[r, el]]
+              R[i, j] += (2 * cov(x[r], y[r], xj, yj) 
+                            + cov(x[s], y[s], xj, yj) 
+                            + cov(x[t], y[t], xj, yj)) * Area_el / 12
+            end
+          end # for el
+        end # for jnode
+        
+        # Loop over elements of the jdom-th subdomain
+        for (jel, el) in enumerate(elemsd[jdom])
         
           # Get (x, y) coordinates of each element vertex
           for r in 1:3
@@ -530,80 +574,49 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
           
           # Area of element
           Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
-          
+
           # Add local contributions
           for r in 1:3
             s = r + 1 - floor(Int, (r + 1) / 3) * 3
             s == 0 ? s = 3 : nothing
             t = r + 2 - floor(Int, (r + 2) / 3) * 3
             t == 0 ? t = 3 : nothing
-            i = inds_g2ld[idom][cells[r, el]]
-            R[i, j] += (2 * cov(x[r], y[r], xj, yj) 
-                          + cov(x[s], y[s], xj, yj) 
-                          + cov(x[t], y[t], xj, yj)) * Area_el / 12
-          end
-        end # for el
-      end # for jnode
-        
-      # Loop over elements of the jdom-th subdomain
-      for (jel, el) in enumerate(elemsd[jdom])
-        
-        # Get (x, y) coordinates of each element vertex
-        for r in 1:3
-          rnode = cells[r, el]
-          x[r], y[r] = points[1, rnode], points[2, rnode]
-        end
-          
-        # Terms of the shoelace formula for a triangle
-        Δx[1] = x[3] - x[2]
-        Δx[2] = x[1] - x[3]
-        Δx[3] = x[2] - x[1]
-        Δy[1] = y[2] - y[3]
-        Δy[2] = y[3] - y[1]
-        Δy[3] = y[1] - y[2]
-          
-        # Area of element
-        Area_el = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+            j = inds_g2ld[jdom][cells[r, el]]
+            k = inds_g2ld[jdom][cells[s, el]]
+            ℓ = inds_g2ld[jdom][cells[t, el]]
 
-        # Add local contributions
-        for r in 1:3
-          s = r + 1 - floor(Int, (r + 1) / 3) * 3
-          s == 0 ? s = 3 : nothing
-          t = r + 2 - floor(Int, (r + 2) / 3) * 3
-          t == 0 ? t = 3 : nothing
-          j = inds_g2ld[jdom][cells[r, el]]
-          k = inds_g2ld[jdom][cells[s, el]]
-          ℓ = inds_g2ld[jdom][cells[t, el]]
-
-          # Loop over mesh nodes of the idom-th subdomain 
-          for (i, inode) in enumerate(inds_l2gd[idom])
-            C[i, j] += (2 * R[i, j] 
-                          + R[i, k]  
-                          + R[i, ℓ]) * Area_el / 12
-          end
-        end # for r
-      end # for el
-
-      # Loop over local modes of the idom-th subdomain
-      for α in 1:md[idom]
-        idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α 
-
-        # Loop over local modes of the jdom-th subdomain
-        for β in 1:md[jdom]
-          jdom == 1 ? ind_β_jdom = β : ind_β_jdom = sum(md[1:jdom-1]) + β
-          
-          for j in 1:nnode_jdom
-            Φ_j_β = Φd[jdom][j, β]
-          
-            for i in 1:nnode_idom
-              K[ind_α_idom, ind_β_jdom] += Φd[idom][i, α] * C[i, j] * Φ_j_β
+            # Loop over mesh nodes of the idom-th subdomain 
+            for (i, inode) in enumerate(inds_l2gd[idom])
+              C[i, j] += (2 * R[i, j] 
+                            + R[i, k]  
+                            + R[i, ℓ]) * Area_el / 12
             end
-          end
+          end # for r
+        end # for el
+
+        # Loop over local modes of the idom-th subdomain
+        for α in 1:md[idom]
+          idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α 
+
+          # Loop over local modes of the jdom-th subdomain
+          for β in 1:md[jdom]
+            jdom == 1 ? ind_β_jdom = β : ind_β_jdom = sum(md[1:jdom-1]) + β
           
-          idom == jdom ? nothing : K[ind_β_jdom, ind_α_idom] = K[ind_α_idom, ind_β_jdom]
-        end # end β
-      end # end α
+            for j in 1:nnode_jdom
+              Φ_j_β = Φd[jdom][j, β]
+          
+              for i in 1:nnode_idom
+                K[ind_α_idom, ind_β_jdom] += Φd[idom][i, α] * C[i, j] * Φ_j_β
+              end
+            end
+          
+            idom == jdom ? nothing : K[ind_β_jdom, ind_α_idom] = K[ind_α_idom, ind_β_jdom]
+          end # end β
+        end # end α
+      end # if subdomains are significantly correlated
     end # for jdom
+
+    println("Done with idom = $idom.")
   end # for idom
 
   return K
@@ -614,7 +627,8 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
                         epart::Array{Int,1},
                         cov::Function,
                         nev::Int,
-                        idom::Int)
+                        idom::Int;
+                        relative=.99)
 
   ndom = maximum(epart) # Number of subdomains
   inds_l2g, inds_g2l, elems, center = set_subdomain(mesh, epart, idom)
@@ -626,15 +640,86 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
   
   # Solve local generalized eigenvalue problem
   λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
-  
+
+  # Integrate variance over subdomain
+  x, y = zeros(3), zeros(3)
+  Δx, Δy = zeros(3), zeros(3)
+  Area = 0.
+  for el in elems
+    for r in 1:3
+      rnode = mesh.cell[r, el]
+      x[r], y[r] = mesh.point[1, rnode], mesh.point[2, rnode]
+    end  
+    Δx[1] = x[3] - x[2]
+    Δx[2] = x[1] - x[3]
+    Δx[3] = x[2] - x[1]
+    Δy[1] = y[2] - y[3]
+    Δy[2] = y[3] - y[1]
+    Δy[3] = y[1] - y[2]   
+    Area += (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+  end
+  energy_expected = relative * Area * cov(center[1], center[2],
+                                          center[1], center[2])
+
+  # Keep dominant eigenpairs with positive eigenvalues
+  energy_achieved = 0.
+  nvec = 0
+  for i in 1:nev
+    if λ[i] > 0 
+      nvec += 1
+      energy_achieved += λ[i]
+    else
+      break
+    end
+    energy_achieved >= energy_expected ? break : nothing
+  end
+
   # Arpack 0.5.1 does not normalize the vectors properly
-  for k in 1:size(ϕ)[2]
+  for k in 1:nvec
     ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
   end
   
-  # truncate here
-  println("$idom, $(length(inds_l2g)), $(sum(λ))")
-  return SubDomain(inds_g2l, inds_l2g, elems, ϕ, center)
+  # Details about truncation
+  print("idom = $idom, $nvec/$nev vectors kept for ")
+  str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+  println("$str relative energy")
+
+  return SubDomain(inds_g2l,
+                   inds_l2g,
+                   elems,
+                   ϕ[:, 1:nvec],
+                   center,
+                   energy_expected / relative)
+end
+
+
+function solve_global_reduced_kl(mesh::TriangleMesh.TriMesh,
+                                 K::Array{Float64,2},
+                                 energy_expected::Float64,
+                                 elemsd::Array{Array{Int,1},1},
+                                 inds_l2gd::Array{Array{Int,1},1},
+                                 ϕd::Array{Array{Float64,2},1};
+                                 relative=.99)
+                                 
+  Ksym = LinearAlgebra.Symmetric(K)
+  Λ, Φ = LinearAlgebra.eigen(Ksym)
+  Λ, Φ = trim_and_order(Λ, Φ)
+  energy_expected *= relative
+  energy_achieved = 0.
+  nvec = 0
+  for λ_i in Λ
+    energy_achieved += λ_i
+    nvec += 1 
+    energy_achieved >= energy_expected ? break : nothing
+  end
+  Ψ = project_on_mesh(mesh, Φ[:, 1:nvec], elemsd, inds_l2gd, ϕd)
+
+  # Details about truncation
+  print("$nvec/$(length(Λ)) vectors kept for ")
+  str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+  println("$str relative energy")
+
+  return Λ[1:nvec], Ψ
 end
 
 
@@ -715,6 +800,7 @@ function project_on_mesh(mesh::TriangleMesh.TriMesh,
   return Ψ
 end
 
+
 function draw(Λ::Array{Float64,1},
               Ψ::Array{Float64,2})
 
@@ -730,6 +816,27 @@ function draw(Λ::Array{Float64,1},
   
   return ξ, g
 end
+
+
+function draw!(Λ::Array{Float64,1},
+  Ψ::Array{Float64,2},
+  ξ::Array{Float64,1},
+  g::Array{Float64,1})
+
+  nnode, _ = size(Ψ) # Number of mesh nodes
+  nmode = length(Λ) # Number of reduced modes
+
+  ξ .= rand(Distributions.Normal(), nmode)
+  g .= 0
+
+  for α in 1:nmode
+    c_α = sqrt(Λ[α]) * ξ[α]
+    LinearAlgebra.BLAS.axpy!(c_α, Ψ[:, α], g)
+  end
+
+  return
+end
+
 
 function trim_and_order(Λ::Array{Float64,1},
                         Φ::Array{Float64,2})
