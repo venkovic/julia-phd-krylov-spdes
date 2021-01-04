@@ -16,7 +16,8 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                         idom::Int,
                                                         md::Array{Int,1},
                                                         cov::Function;
-                                                        forget=-1.)
+                                                        forget=-1.,
+                                                        relative=.99)
 
     _, nel = size(cells) # Number of elements
     _, nnode = size(points) # Number of nodes
@@ -220,12 +221,12 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
   str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
   println("$str relative energy")
 
-  return SubDomain(inds_g2l,
-                   inds_l2g,
-                   elems,
-                   ϕ[:, 1:nvec],
-                   center,
-                   energy_expected / relative)
+  return Dict(idom => SubDomain(inds_g2l,
+                                inds_l2g,
+                                elems,
+                                ϕ[:, 1:nvec],
+                                center,
+                                energy_expected / relative))
 end
 
 
