@@ -161,7 +161,8 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
                             cov::Function,
                             nev::Int,
                             idom::Int;
-                            forget=-1.)
+                            forget=-1.,
+                            relative=.99)
 
   ndom = maximum(epart) # Number of subdomains
 
@@ -181,9 +182,50 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
     ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
   end
   
-  # truncate here
-  println("$idom, $(length(inds_l2g)), $(sum(λ))")
-  return Dict(idom => SubDomain(inds_g2l, inds_l2g, elems, ϕ, center))
+  # Integrate variance over subdomain
+  x, y = zeros(3), zeros(3)
+  Δx, Δy = zeros(3), zeros(3)
+  Area = 0.
+  for el in elems
+    for r in 1:3
+      rnode = mesh.cell[r, el]
+      x[r], y[r] = mesh.point[1, rnode], mesh.point[2, rnode]
+    end  
+    Δx[1] = x[3] - x[2]
+    Δx[2] = x[1] - x[3]
+    Δx[3] = x[2] - x[1]
+    Δy[1] = y[2] - y[3]
+    Δy[2] = y[3] - y[1]
+    Δy[3] = y[1] - y[2]   
+    Area += (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+  end
+  energy_expected = relative * Area * cov(center[1], center[2],
+                                          center[1], center[2])
+
+  # Keep dominant eigenpairs with positive eigenvalues
+  energy_achieved = 0.
+  nvec = 0
+  for i in 1:nev
+    if λ[i] > 0 
+      nvec += 1
+      energy_achieved += λ[i]
+    else
+      break
+    end
+    energy_achieved >= energy_expected ? break : nothing
+  end
+
+  # Details about truncation
+  print("idom = $idom, $nvec/$nev vectors kept for ")
+  str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+  println("$str relative energy")
+
+  return SubDomain(inds_g2l,
+                   inds_l2g,
+                   elems,
+                   ϕ[:, 1:nvec],
+                   center,
+                   energy_expected / relative)
 end
 
 
@@ -226,20 +268,6 @@ function project_on_mesh(mesh::TriangleMesh.TriMesh,
 
   return Ψ
 end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 function pll_draw(mesh, Λ, Φ, ϕd, inds_l2gd)
