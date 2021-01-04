@@ -233,7 +233,7 @@ end
 function solve_global_reduced_kl(mesh::TriangleMesh.TriMesh,
     K::Array{Float64,2},
     energy_expected::Float64,
-    domain::Array{SubDomain,1};
+    domain::Dict{Int,SubDomain};
     relative=.99)
     
 Ksym = LinearAlgebra.Symmetric(K)
