@@ -230,6 +230,34 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
 end
 
 
+function solve_global_reduced_kl(mesh::TriangleMesh.TriMesh,
+    K::Array{Float64,2},
+    energy_expected::Float64,
+    domain::Array{SubDomain,1};
+    relative=.99)
+    
+Ksym = LinearAlgebra.Symmetric(K)
+Λ, Φ = LinearAlgebra.eigen(Ksym)
+Λ, Φ = trim_and_order(Λ, Φ)
+energy_expected *= relative
+energy_achieved = 0.
+nvec = 0
+for λ_i in Λ
+energy_achieved += λ_i
+nvec += 1 
+energy_achieved >= energy_expected ? break : nothing
+end
+Ψ = project_on_mesh(mesh, Φ[:, 1:nvec], domain)
+
+# Details about truncation
+print("$nvec/$(length(Λ)) vectors kept for ")
+str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+println("$str relative energy")
+
+return Λ[1:nvec], Ψ
+end
+
+
 function project_on_mesh(mesh::TriangleMesh.TriMesh,
                          Φ::Array{Float64,2},
                          domain:: Dict{Int,SubDomain})
