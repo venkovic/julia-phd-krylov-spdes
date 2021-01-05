@@ -851,7 +851,9 @@ end
 function get_kl_coordinates(g::Array{Float64,1},
                             Λ::Array{Float64,1},
                             Φ::Array{Float64,2},
-                            M)
-  return Φ'(M * g) ./ Λ
+                            M::SparseMatrixCSC{Float64})
+  g = M * g
+  ξ = Φ'g
+  return ξ ./ Sqrt(Λ)
 end
 

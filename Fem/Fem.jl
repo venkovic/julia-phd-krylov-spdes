@@ -24,7 +24,7 @@ export project_on_mesh
 export draw
 export draw!
 export trim_and_order
-export suggest_relative
+export get_kl_coordinates
 
 export pll_do_global_mass_covariance_reduced_assembly
 export pll_solve_local_kl
