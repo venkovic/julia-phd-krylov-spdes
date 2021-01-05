@@ -249,8 +249,8 @@ end
 Ψ = project_on_mesh(mesh, Φ[:, 1:nvec], domain)
 
 # Details about truncation
-print("$nvec/$(length(Λ)) vectors kept for ")
-str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+str = "$nvec/$(length(Λ)) vectors kept for "
+str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
 println("$str relative energy")
 
 return Λ[1:nvec], Ψ
