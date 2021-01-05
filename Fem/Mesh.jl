@@ -61,7 +61,10 @@ function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
   # Read and adjust partition from Metis for proper Julia indexing
   epart = reshape(readdlm("mesh.metis.epart.$ndom", Int), nel) .+ 1 
   npart = reshape(readdlm("mesh.metis.npart.$ndom", Int), nnode) .+ 1 # Metis starts indexing doms at 0
-  
+
+  # Clean-up
+  run(`rm mesh.metis mesh.metis.epart.$ndom mesh.metis.npart.$ndom`)
+
   return epart, npart 
 end
 

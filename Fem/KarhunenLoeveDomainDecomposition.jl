@@ -680,8 +680,8 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
   end
   
   # Details about truncation
-  print("idom = $idom, $nvec/$nev vectors kept for ")
-  str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+  str = "idom = $idom, $nvec/$nev vectors kept for "
+  str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
   println("$str relative energy")
 
   return SubDomain(inds_g2l,
@@ -715,8 +715,8 @@ function solve_global_reduced_kl(mesh::TriangleMesh.TriMesh,
   Ψ = project_on_mesh(mesh, Φ[:, 1:nvec], elemsd, inds_l2gd, ϕd)
 
   # Details about truncation
-  print("$nvec/$(length(Λ)) vectors kept for ")
-  str = @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+  str = "$nvec/$(length(Λ)) vectors kept for "
+  str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
   println("$str relative energy")
 
   return Λ[1:nvec], Ψ
