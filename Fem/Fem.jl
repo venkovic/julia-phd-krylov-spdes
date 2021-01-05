@@ -30,6 +30,8 @@ export pll_do_global_mass_covariance_reduced_assembly
 export pll_solve_local_kl
 export pll_draw
 
+export suggest_parameters
+
 include("Mesh.jl")
 include("EllipticPde.jl")
 include("BoundaryConditions.jl")
@@ -37,4 +39,5 @@ include("EllipticPdeDomainDecomposition.jl")
 include("KarhunenLoeve.jl")
 include("KarhunenLoeveDomainDecomposition.jl")
 include("KarhunenLoevePllDomainDecomposition.jl")
+include("KarhunenLoeveDomainDecompositionHelper.jl")
 end

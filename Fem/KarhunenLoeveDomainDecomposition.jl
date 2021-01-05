@@ -847,17 +847,3 @@ function trim_and_order(Λ::Array{Float64,1},
   return Λ, Φ
 end
 
-
-function suggest_relative(nnode::Int)
-  if nnode >= 1_000_000
-    relative_local = .99996
-    relative_global = .99995
-  elseif nnode >= 100_000
-    relative_local = .9996 
-    relative_global = .9995
-  elseif nnode <= 10_000
-    relative_local = .996
-    relative_global = .995
-  end
-  return relative_local, relative_global
-end
