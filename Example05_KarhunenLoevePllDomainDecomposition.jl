@@ -1,7 +1,7 @@
 using Distributed
 
 addprocs(([("marcel", 4)]), tunnel=true)
-addprocs(([("andrew", 4)]), tunnel=true)
+#addprocs(([("andrew", 4)]), tunnel=true)
 #addprocs(([("moorcock", 4)]), tunnel=true)
 addprocs(3)
 
@@ -33,8 +33,8 @@ using NPZ
 end
 
 mesh = get_mesh(tentative_nnode)
-npzwrite("cells.npz", mesh.cell' .- 1)
-npzwrite("points.npz", mesh.point')
+npzwrite("cells_$(tentative_nnode)DoFs.npz", mesh.cell' .- 1)
+npzwrite("points_$(tentative_nnode)DoFs.npz", mesh.point')
 epart, npart = mesh_partition(mesh, ndom)
 bcast(mesh, procs())
 bcast(epart, procs())
@@ -48,7 +48,7 @@ end
 # Distributed computation of local KL expansion for each subdomain  
 @time domain = @sync @distributed merge! for idom in 1:ndom
   pll_solve_local_kl(mesh, epart, cov, nev, idom, 
-                     forget=forget, relative=.996)
+                     forget=forget, relative=.9996)
 end
 
 energy_expected = 0.
@@ -68,17 +68,16 @@ bcast(md, procs())
   K = @sync @distributed (+) for idom in 1:ndom
   pll_do_global_mass_covariance_reduced_assembly(mesh.cell, mesh.point, 
                                                  domain, idom, md, cov,
-                                                 forget=forget, 
-                                                 relative=.996)
+                                                 forget=forget)
   end
 end
 
 # Solve globally reduced eigenvalue problem, and project eigenfunctions 
 Λ, Ψ = @time solve_global_reduced_kl(mesh, K, energy_expected,
-                                     domain, relative=.995)
-npzwrite("kl-eigvals.npz", Λ)
-npzwrite("kl-eigvecs.npz", Ψ)
+                                     domain, relative=.9995)
+npzwrite("kl-eigvals_$(tentative_nnode)DoFs.npz", Λ)
+npzwrite("kl-eigvecs_$(tentative_nnode)DoFs.npz", Ψ)
 
 # Sample
 ξ, g = @time draw(Λ, Ψ)
-@time npzwrite("greal.npz", g)
+@time npzwrite("greal_$(tentative_nnode)DoFs.npz", g)

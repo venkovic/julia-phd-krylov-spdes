@@ -16,8 +16,7 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                         idom::Int,
                                                         md::Array{Int,1},
                                                         cov::Function;
-                                                        forget=-1.,
-                                                        relative=.99)
+                                                        forget=-1.)
 
     _, nel = size(cells) # Number of elements
     _, nnode = size(points) # Number of nodes
