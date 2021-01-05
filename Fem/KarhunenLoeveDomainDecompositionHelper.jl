@@ -43,7 +43,7 @@ function suggest_parameters(nnode::Int)
   elseif nnode >= 100_000
     relative_local = .99996 
     relative_global = .99995
-  elseif nnode <= 10_000
+  else
     relative_local = .996
     relative_global = .995
   end
@@ -52,7 +52,12 @@ end
 
 
 function get_root_filename(model::String,
-                          sig2::Float64)
-  return
+                           sig2::Float64,
+                           L::Float64,
+                           nnode::Int)
+  fname = model * "_"
+  fname *= "sig2$sig2" * "_"
+  fname *= "L$L" * "_"
+  return fname * "DoF$nnode"
 end
 

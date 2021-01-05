@@ -31,6 +31,7 @@ export pll_solve_local_kl
 export pll_draw
 
 export suggest_parameters
+export get_root_filename
 
 include("Mesh.jl")
 include("EllipticPde.jl")

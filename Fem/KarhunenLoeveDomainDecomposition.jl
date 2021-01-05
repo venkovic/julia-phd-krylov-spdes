@@ -847,3 +847,11 @@ function trim_and_order(Λ::Array{Float64,1},
   return Λ, Φ
 end
 
+
+function get_kl_coordinates(g::Array{Float64,1},
+                            Λ::Array{Float64,1},
+                            Φ::Array{Float64,2},
+                            M)
+  return Φ'(M * g) ./ Λ
+end
+
