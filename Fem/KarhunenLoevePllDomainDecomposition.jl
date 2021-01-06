@@ -1,6 +1,9 @@
 using Distributed
 import Arpack
 
+using LinearAlgebra
+using SparseArrays
+
 struct SubDomain
     inds_g2l::Dict{Int,Int}  #
     inds_l2g::Vector{Int}    #
@@ -161,7 +164,6 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
                             cov::Function,
                             nev::Int,
                             idom::Int;
-                            forget=-1.,
                             relative=.99)
 
   ndom = maximum(epart) # Number of subdomains
@@ -176,7 +178,9 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
   
   # Solve local generalized eigenvalue problem
   λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev, tol=1e-8))
-  
+  #λ, ϕ  = LinearAlgebra.eigen(C, Array(M), sortby=λ->-λ)
+
+  #println(extrema(ϕ'M*ϕ - I))
   # Arpack 0.5.1 does not normalize the vectors properly
   for k in 1:size(ϕ)[2]
     ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
@@ -218,7 +222,7 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
   # Details about truncation
   str = "idom = $idom, $nvec/$nev vectors kept for "
   str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
-  println("$str relative energy")
+  println("$str relative energy, $(sum(λ[1:nvec]) / energy_expected * relative)")
 
   return Dict(idom => SubDomain(inds_g2l,
                                 inds_l2g,
