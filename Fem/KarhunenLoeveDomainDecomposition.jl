@@ -856,9 +856,9 @@ function get_kl_coordinates(g::Array{Float64,1},
   g = M * g
   ξ = zeros(nmode)
   for (α, λ_α) in enumerate(Λ)
-    Sqrt_λ_α = Sqrt(λ_α)
+    sqrt_λ_α = sqrt(λ_α)
     for i in 1:nnode
-      ξ[α] += Φ[i, α] * g[i] / Sqrt_λ_α
+      ξ[α] += Φ[i, α] * g[i] / sqrt_λ_α
     end
   end
   return ξ
