@@ -1,10 +1,11 @@
 using TriangleMesh
 
-function get_mesh(tentative_nnode::Int)
+
+function get_mesh(tentative_nnode::Int; keep_segments=true)
   poly = polygon_unitSquare()
   mesh = create_mesh(poly, voronoi=true, delaunay=true)
   divide_cell_into = ceil(Int, .645 * tentative_nnode)
-  mesh = refine(mesh, divide_cell_into=divide_cell_into)
+  mesh = refine(mesh, divide_cell_into=divide_cell_into, keep_segments=keep_segments)
   return mesh
 end
 

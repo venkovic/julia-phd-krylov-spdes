@@ -5,6 +5,7 @@ export SubDomain
 export do_isotropic_elliptic_assembly
 export get_mass_matrix
 
+export get_dirichlet_inds
 export apply_dirichlet
 
 export do_mass_covariance_assembly

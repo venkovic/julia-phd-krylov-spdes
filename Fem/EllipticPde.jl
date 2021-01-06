@@ -56,14 +56,21 @@ Maximum triangle area: .0000005
 
 ```
 """
-function do_isotropic_elliptic_assembly(cells, points, a, f)
+function do_isotropic_elliptic_assembly(cells::Array{Int,2},
+                                        points::Array{Float64,2},
+                                        point_marker::Array{Int,2},
+                                        a::Function,
+                                        f::Function,
+                                        u_exact::Function)
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
   I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for sparse Galerkin operator
-  b_vec = zeros(nnode, 1) # Right hand side
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
-  
+
+  dirichlet_inds_g2l, not_dirichlet_inds_g2l = get_dirichlet_inds(points, point_marker)
+  b_vec = zeros(length(not_dirichlet_inds_g2l), 1) # Right hand side
+
   # Loop over elements
   for iel in 1:nel
     
@@ -90,19 +97,31 @@ function do_isotropic_elliptic_assembly(cells, points, a, f)
     
     # Loop over vertices of element
     for i in 1:3
-      ii = cells[i, iel]
+      inode = cells[i, iel]
+      i_is_dirichlet = point_marker[inode] == 1
+      i_is_dirichlet ? inode = dirichlet_inds_g2l[inode] : inode = not_dirichlet_inds_g2l[inode]
 
       # Loop over vertices of element
       for j in 1:3
-
         # Store local contribution
         Kij = coeff * (Δy[i] * Δy[j] + Δx[i] * Δx[j]) / 4 / Area
-        jj = cells[j, iel]
-        push!(I, ii)
-        push!(J, jj)
-        push!(V, Kij)
-      end
-    end
+        jnode = cells[j, iel]
+        j_is_dirichlet = point_marker[jnode] == 1
+        j_is_dirichlet ? jnode = dirichlet_inds_g2l[jnode] : jnode = not_dirichlet_inds_g2l[jnode]
+
+        # Add stiffness contribution
+        if !i_is_dirichlet & !j_is_dirichlet
+          push!(I, inode)
+          push!(J, jnode)
+          push!(V, Kij)
+        
+        # Correct right hand side
+        elseif i_is_dirichlet & !j_is_dirichlet
+          b_vec[jnode] -= u_exact(x[i], y[i]) * Kij 
+
+        end
+      end # for j
+    end # for i
     
     # Add right hand side contributions from element
     for i in 1:3
@@ -110,12 +129,15 @@ function do_isotropic_elliptic_assembly(cells, points, a, f)
       j == 0 ? j = 3 : nothing
       k = i + 2 - floor(Int, (i + 2) / 3) * 3
       k == 0 ? k = 3 : nothing
-      ii = cells[i, iel]
-      b_vec[ii] += (2 * f(x[i], y[i]) 
-                      + f(x[j], y[j])
-                      + f(x[k], y[k])) * Area / 12
-    end
-  end
+      inode = cells[i, iel]
+      if point_marker[inode] == 0
+        inode = not_dirichlet_inds_g2l[inode]
+        b_vec[inode] += (2 * f(x[i], y[i]) 
+                           + f(x[j], y[j])
+                           + f(x[k], y[k])) * Area / 12
+      end
+    end 
+  end # for iel
   
   # Assemble sparse array of Galerkin operator
   A_mat = sparse(I, J, V)

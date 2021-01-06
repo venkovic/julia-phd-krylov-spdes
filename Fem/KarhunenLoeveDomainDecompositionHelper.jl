@@ -55,6 +55,6 @@ function get_root_filename(model::String,
   fname = model * "_"
   fname *= "sig2$sig2" * "_"
   fname *= "L$L" * "_"
-  return fname * "DoF$(nnode)_bis"
+  return fname * "DoF$(nnode)"
 end
 

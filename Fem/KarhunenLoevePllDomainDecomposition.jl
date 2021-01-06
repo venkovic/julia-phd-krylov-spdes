@@ -221,7 +221,7 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
   # Details about truncation
   str = "idom = $idom, $nvec/$nev vectors kept for "
   str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
-  println("$str relative energy, $(sum(λ[1:nvec]) / energy_expected * relative)")
+  println("$str relative energy")
 
   return Dict(idom => SubDomain(inds_g2l,
                                 inds_l2g,

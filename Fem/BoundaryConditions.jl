@@ -1,6 +1,43 @@
 using SparseArrays
 
 """
+get_dirichlet_inds(points::Array{Float64,2}, point_marker::Array{Int,2})
+
+Get global to local indices maps for nodes in the boundary with Dirichlet
+boundary condition, and .
+
+Input:
+
+points[1:2, 1:nnode]: coordinates of all nodal points
+points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
+points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
+
+point_marker[inode]: coordinates of all nodal points
+
+Output:
+
+dirichlet_inds_g2l: 
+
+not_dirichlet_inds_g2l:
+
+"""
+function get_dirichlet_inds(points::Array{Float64,2}, point_marker::Array{Int,2})
+  _, nnode = size(points)
+  dirichlet_inds_g2l = Dict{Int,Int}()
+  not_dirichlet_inds_g2l = Dict{Int,Int}()
+  for inode in 1:nnode
+    if point_marker[inode] == 1
+      dirichlet_inds_g2l[inode] = length(dirichlet_inds_g2l) + 1
+    else
+      not_dirichlet_inds_g2l[inode] = length(not_dirichlet_inds_g2l) + 1
+    end
+  end
+  
+  return dirichlet_inds_g2l, not_dirichlet_inds_g2l
+end
+
+
+"""
 apply_dirichlet(segments, points, A_mat, b_vec, uexact)
 
 Applies Dirichlet boundary condition.
@@ -61,7 +98,7 @@ A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
 function apply_dirichlet(segments, points, A_mat, b_vec, uexact)
   _, nnode = size(points) # Number of nodes
   _, nbndseg = size(segments) # Number of boundary segments
-  g1 = zeros(nbndseg)
+  g1 = zeros(nbndseg) # 
   
   # Evaluate solution at starting node of segments
   for i in 1:nbndseg
