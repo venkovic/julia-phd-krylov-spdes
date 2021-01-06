@@ -38,11 +38,11 @@ ndom = 300
 """
 function suggest_parameters(nnode::Int)
   if nnode >= 1_000_000
-    return .99996, .99995
+    return .9996, .9995
   elseif nnode >= 100_000
     return .9996, .9995
   else
-    return .9996, .995
+    return .9996, .9995
   end
   return relative_local, relative_global
 end

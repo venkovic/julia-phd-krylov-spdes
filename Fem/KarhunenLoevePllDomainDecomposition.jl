@@ -177,10 +177,9 @@ function pll_solve_local_kl(mesh::TriangleMesh.TriMesh,
   M = do_local_mass_assembly(mesh.cell, mesh.point, inds_g2l, elems)
   
   # Solve local generalized eigenvalue problem
-  λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev, tol=1e-8))
+  λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
   #λ, ϕ  = LinearAlgebra.eigen(C, Array(M), sortby=λ->-λ)
 
-  #println(extrema(ϕ'M*ϕ - I))
   # Arpack 0.5.1 does not normalize the vectors properly
   for k in 1:size(ϕ)[2]
     ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
