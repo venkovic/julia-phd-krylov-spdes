@@ -27,14 +27,14 @@ using NPZ
 
 @everywhere begin
   ndom = 300
-  nev = 10
-  tentative_nnode = 200_000
+  nev = 30
+  tentative_nnode = 100_000
   forget = 1e-6
 end
 
 mesh = get_mesh(tentative_nnode)
-npzwrite("cells_$(tentative_nnode)DoFs.npz", mesh.cell' .- 1)
-npzwrite("points_$(tentative_nnode)DoFs.npz", mesh.point')
+npzwrite("data/DoF$(tentative_nnode).cells.npz", mesh.cell' .- 1)
+npzwrite("data/DoF$(tentative_nnode).points.npz", mesh.point')
 epart, npart = mesh_partition(mesh, ndom)
 bcast(mesh, procs())
 bcast(epart, procs())
@@ -45,10 +45,16 @@ bcast(epart, procs())
   return sig2 * exp(-((x1 - x2)^ 2 + (y1 - y2)^2) / L^2)
 end
 
+model = "SExp"
+sig2 = 1.
+L = .1
+root_fname = get_root_filename(model, sig2, L, tentative_nnode)
+
 # Distributed computation of local KL expansion for each subdomain  
 @time domain = @sync @distributed merge! for idom in 1:ndom
+  relative_local, _ = suggest_parameters(mesh.n_point)
   pll_solve_local_kl(mesh, epart, cov, nev, idom, 
-                     forget=forget, relative=.9996)
+                     relative=relative_local)
 end
 
 energy_expected = 0.
@@ -72,12 +78,13 @@ bcast(md, procs())
   end
 end
 
-# Solve globally reduced eigenvalue problem, and project eigenfunctions 
-Λ, Ψ = @time solve_global_reduced_kl(mesh, K, energy_expected,
-                                     domain, relative=.9995)
-npzwrite("kl-eigvals_$(tentative_nnode)DoFs.npz", Λ)
-npzwrite("kl-eigvecs_$(tentative_nnode)DoFs.npz", Ψ)
+# Solve globally reduced eigenvalue problem, and project eigenfunctions
+_, relative_global = suggest_parameters(mesh.n_point)
+Λ, Ψ = @time solve_global_reduced_kl(mesh, K, energy_expected, domain, 
+                                     relative=relative_global)
+npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
+npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
 
 # Sample
 ξ, g = @time draw(Λ, Ψ)
-@time npzwrite("greal_$(tentative_nnode)DoFs.npz", g)
+@time npzwrite("data/$root_fname.greal.npz", g)

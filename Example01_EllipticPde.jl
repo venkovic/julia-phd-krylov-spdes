@@ -4,8 +4,9 @@ push!(LOAD_PATH, "./Fem/")
 using Fem
 
 
-poly = polygon_unitSquare()
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
+
+tentative_nnode = 2_000
+mesh = get_mesh(tentative_nnode)
 #fig = plot_TriMesh(mesh)
 
 nnode = mesh.n_point
@@ -20,18 +21,28 @@ function f(x::Float64, y::Float64)
   return -1.
 end
 
-function uexact(xx, yy)
+function uexact(xx::Float64, yy::Float64)
   return .734
 end
 
-A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point, a, f)
 
-# APPLYING BC IS WAY TOO SLOW AS IT IS!!!
-A, b = @time apply_dirichlet(mesh.segment, mesh.point, A, b, uexact)
+dirichlet_inds_g2l, not_dirichlet_inds_g2l,
+dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
+get_dirichlet_inds(mesh.point, mesh.point_marker)
 
-@time npzwrite("cells.npz", mesh.cell' .- 1)
-@time npzwrite("points.npz", mesh.point')
+A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point,
+                                            dirichlet_inds_g2l,
+                                            not_dirichlet_inds_g2l,
+                                            mesh.point_marker,
+                                            a, f, uexact)
+
+#A, b = @time apply_dirichlet(mesh.segment, mesh.point, A, b, uexact)
+
+npzwrite("cells.npz", mesh.cell' .- 1)
+npzwrite("points.npz", mesh.point')
 
 using IterativeSolvers
 u = @time IterativeSolvers.cg(A, b)
-@time npzwrite("u.npz", u)
+
+#u_with_bc = append_bc(u, uexact)
+#@time npzwrite("u.npz", u_with_bc)

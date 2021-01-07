@@ -17,9 +17,14 @@ tentative_nnode = 20_000
 forget = 1e-6
 
 mesh = get_mesh(tentative_nnode)
-npzwrite("cells.npz", mesh.cell' .- 1)
-npzwrite("points.npz", mesh.point')
+npzwrite("data/DoF$tentative_nnode.cells.npz", mesh.cell' .- 1)
+npzwrite("data/DoF$tentative_nnode.points.npz", mesh.point')
 epart, npart = mesh_partition(mesh, ndom)
+
+model = "SExp"
+sig2 = 1.
+L = .1
+root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
   L = .1
@@ -54,10 +59,10 @@ K = @time do_global_mass_covariance_reduced_assembly(mesh.cell, mesh.point, elem
 Λ, Ψ = @time solve_global_reduced_kl(mesh, K, energy_expected,
                                      elemsd, inds_l2gd, ϕd,
                                      relative=.995)
-npzwrite("kl-eigvals.npz", Λ)
-npzwrite("kl-eigvecs.npz", Ψ)
+npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
+npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
 
 # Sample
 ξ, g = @time draw(Λ, Ψ)
 @time draw!(Λ, Ψ, ξ, g)
-npzwrite("greal.npz", g)
+npzwrite("data/$root_fname.greal.npz", g)
