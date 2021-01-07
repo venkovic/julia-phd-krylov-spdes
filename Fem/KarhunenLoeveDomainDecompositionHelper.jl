@@ -38,7 +38,7 @@ ndom = 300
 """
 function suggest_parameters(nnode::Int)
   #return .9996, .995
-  return .9992, .995
+  return .9993, .995
 end
 
 
