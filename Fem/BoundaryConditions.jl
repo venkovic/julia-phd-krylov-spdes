@@ -21,19 +21,33 @@ dirichlet_inds_g2l:
 not_dirichlet_inds_g2l:
 
 """
-function get_dirichlet_inds(points::Array{Float64,2}, point_marker::Array{Int,2})
+function get_dirichlet_inds(points::Array{Float64,2},
+                            point_marker::Array{Int,2})
   _, nnode = size(points)
+
   dirichlet_inds_g2l = Dict{Int,Int}()
   not_dirichlet_inds_g2l = Dict{Int,Int}()
+
+  dirichlet_inds_l2g = Int[]
+  not_dirichlet_inds_l2g = Int[]
+
   for inode in 1:nnode
     if point_marker[inode] == 1
       dirichlet_inds_g2l[inode] = length(dirichlet_inds_g2l) + 1
+      push!(dirichlet_inds_l2g, inode)
     else
       not_dirichlet_inds_g2l[inode] = length(not_dirichlet_inds_g2l) + 1
+      push!(not_dirichlet_inds_l2g, inode)
     end
   end
   
-  return dirichlet_inds_g2l, not_dirichlet_inds_g2l
+  return dirichlet_inds_g2l, not_dirichlet_inds_g2l,
+         dirichlet_inds_l2g, not_dirichlet_inds_l2g 
+end
+
+
+function append_bc()
+  return 
 end
 
 

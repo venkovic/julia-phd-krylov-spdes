@@ -58,22 +58,24 @@ Maximum triangle area: .0000005
 """
 function do_isotropic_elliptic_assembly(cells::Array{Int,2},
                                         points::Array{Float64,2},
+                                        dirichlet_inds_g2l::Dict{Int,Int},
+                                        not_dirichlet_inds_g2l::Dict{Int,Int},
                                         point_marker::Array{Int,2},
                                         a::Function,
                                         f::Function,
                                         u_exact::Function)
+
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
   I, J, V = Int[], Int[], Float64[] # Indices (I, J) and data (V) for sparse Galerkin operator
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
-
-  dirichlet_inds_g2l, not_dirichlet_inds_g2l = get_dirichlet_inds(points, point_marker)
+  
   b_vec = zeros(length(not_dirichlet_inds_g2l), 1) # Right hand side
-
+  
   # Loop over elements
   for iel in 1:nel
-    
+  
     # Get (x, y) coordinates of each element vertex
     # and coefficient at the center of the element
     coeff = 0.
@@ -83,7 +85,7 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
       coeff += a(x[j], y[j])
     end
     coeff /= 3.
-    
+  
     # Terms of the shoelace formula for a triangle
     Δx[1] = x[3] - x[2]
     Δx[2] = x[1] - x[3]
@@ -91,16 +93,16 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
     Δy[1] = y[2] - y[3]
     Δy[2] = y[3] - y[1]
     Δy[3] = y[1] - y[2]
-    
+  
     # Area of element
     Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
-    
+  
     # Loop over vertices of element
     for i in 1:3
       inode = cells[i, iel]
       i_is_dirichlet = point_marker[inode] == 1
       i_is_dirichlet ? inode = dirichlet_inds_g2l[inode] : inode = not_dirichlet_inds_g2l[inode]
-
+    
       # Loop over vertices of element
       for j in 1:3
         # Store local contribution
@@ -114,15 +116,14 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
           push!(I, inode)
           push!(J, jnode)
           push!(V, Kij)
-        
+
         # Correct right hand side
         elseif i_is_dirichlet & !j_is_dirichlet
           b_vec[jnode] -= u_exact(x[i], y[i]) * Kij 
-
         end
       end # for j
     end # for i
-    
+
     # Add right hand side contributions from element
     for i in 1:3
       j = i + 1 - floor(Int, (i + 1) / 3) * 3
@@ -138,12 +139,38 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
       end
     end 
   end # for iel
-  
+
   # Assemble sparse array of Galerkin operator
   A_mat = sparse(I, J, V)
-  
+
   return A_mat, b_vec
 end
+
+function do_isotropic_elliptic_assembly(cells::Array{Int,2},
+                                        points::Array{Float64,2},
+                                        point_marker::Array{Int,2},
+                                        a::Function,
+                                        f::Function,
+                                        uexact::Function)
+
+  dirichlet_inds_g2l, not_dirichlet_inds_g2l = get_dirichlet_inds(points, point_marker)
+
+  do_isotropic_elliptic_assembly(cells, points, dirichlet_inds_g2l,
+                                 not_dirichlet_inds_g2l, a, f,
+                                 uexact)
+end
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 """
