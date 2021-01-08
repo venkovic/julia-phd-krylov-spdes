@@ -45,9 +45,32 @@ function get_dirichlet_inds(points::Array{Float64,2},
          dirichlet_inds_l2g, not_dirichlet_inds_l2g 
 end
 
+"""
+append_bc()
 
-function append_bc()
-  return 
+Appends solution to Dirichlet nodes
+"""
+function append_bc(dirichlet_inds_l2g::Array{Int,1},
+                   not_dirichlet_inds_l2g::Array{Int,1},
+                   u_no_dirichlet::Array{Float64,1},
+                   points::Array{Float64,2},
+                   uexact::Function)
+  
+  nnode_dirichlet = length(dirichlet_inds_l2g)
+  nnode_not_dirichlet = length(not_dirichlet_inds_l2g)
+
+  u = Array{Float64,1}(undef, nnode_dirichlet +
+                              nnode_not_dirichlet)
+
+  for (i, ind) in enumerate(dirichlet_inds_l2g)
+    u[ind] = uexact(points[1, ind], points[2, ind])
+  end
+
+  for (i, ind) in enumerate(not_dirichlet_inds_l2g)
+    u[ind] = u_no_dirichlet[i] 
+  end
+
+  return u
 end
 
 
@@ -109,10 +132,15 @@ A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
 
 ```
 """
-function apply_dirichlet(segments, points, A_mat, b_vec, uexact)
+function apply_dirichlet(segments::Array{Int,2},
+                         points::Array{Float64,2},
+                         A_mat::SparseMatrixCSC{Float64},
+                         b_vec::Array{Float64,1},
+                         uexact::Function)
+
   _, nnode = size(points) # Number of nodes
   _, nbndseg = size(segments) # Number of boundary segments
-  g1 = zeros(nbndseg) # 
+  g1 = zeros(nbndseg)
   
   # Evaluate solution at starting node of segments
   for i in 1:nbndseg

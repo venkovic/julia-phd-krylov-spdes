@@ -7,6 +7,7 @@ export get_mass_matrix
 
 export get_dirichlet_inds
 export apply_dirichlet
+export append_bc
 
 export do_mass_covariance_assembly
 
