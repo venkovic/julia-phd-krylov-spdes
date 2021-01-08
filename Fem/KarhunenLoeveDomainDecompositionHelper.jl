@@ -1,44 +1,8 @@
-
-
-"""
-suggest_parameters()
-  
-Returns helper data structures for non-overlaping domain decomposition using the mesh 
-partition defined by epart and npart. 
-  
-Input:
-  
-mesh: Instance of TriangleMesh.TriMesh.
-
-nel = mesh.n_cell
-epart[iel, 1]: subdomain idom ∈ [1, ndom] to which element iel ∈ [1, nel] belongs.
-
-nn = mesh.n_point
-npart[inode, 1]: subdomain idom ∈ [1, ndom] to which node inode ∈ [1, nn] belongs.
-
-Output:
-
-elemd[idom][:]: 1D array of all the elements contained in subdomain idom ∈ [1, ndom].
-
-node_Γ[:]: 1D array of global indices of the nodes at the interface of the mesh
-           partition.
-  
-# Examples
-```jldoctest
-julia>
-using TriangleMesh
-using NPZ
-using Fem
-
-poly = polygon_unitSquare()
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
-
-ndom = 300
-```
-"""
 function suggest_parameters(nnode::Int)
-  #return .9996, .995
-  return .9993, .995
+  # Works well for:
+  #  ndom = 400, dev = 25, tentative_nnode = 200_000, forget=1e-6
+  #  ndom = 400, dev = 25, tentative_nnode = 400_000, forget=1e-6
+  return .9993, .995 
 end
 
 
