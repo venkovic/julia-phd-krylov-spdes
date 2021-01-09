@@ -156,8 +156,8 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
   dirichlet_inds_g2l, not_dirichlet_inds_g2l = get_dirichlet_inds(points, point_marker)
 
   do_isotropic_elliptic_assembly(cells, points, dirichlet_inds_g2l,
-                                 not_dirichlet_inds_g2l, a, f,
-                                 uexact)
+                                 not_dirichlet_inds_g2l, 
+                                 point_marker, a, f, uexact)
 end
 
 
