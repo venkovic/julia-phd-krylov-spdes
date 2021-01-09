@@ -16,6 +16,11 @@ export mesh_partition
 export get_total_area
 
 export set_subdomain
+export set_subdomains
+
+export do_schur_assembly
+export apply_schur
+
 export do_local_mass_covariance_assembly
 export do_local_mass_assembly
 export do_global_mass_reduced_assembly

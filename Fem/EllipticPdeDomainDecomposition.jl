@@ -58,7 +58,9 @@ elemd, node_Γ, node_Id, ind_Id, nn_Id, is_on_Γ = set_subdomains(mesh, epart, n
 
 ```
 """
-function set_subdomains(mesh::TriangleMesh.TriMesh, epart::Array{Int64,2}, npart::Array{Int64,2})
+function set_subdomains(mesh::TriangleMesh.TriMesh, 
+                        epart::Array{Int64,1},
+                        npart::Array{Int64,1})
     nel = mesh.n_cell # Number of elements
     nn = mesh.n_point # Number of nodes
     ndom = maximum(epart) # Number of subdomains
@@ -137,7 +139,14 @@ function set_subdomains(mesh::TriangleMesh.TriMesh, epart::Array{Int64,2}, npart
 end
 
 
-function do_schur_assembly(cells, points, epart, ind_Id, ind_Γ, is_on_Γ, a, f)
+function do_schur_assembly(cells::Array{Int,2},
+                           points::Array{Float64,2},
+                           epart::Array{Int,1},
+                           ind_Id::Array{Dict{Int,Int},1},
+                           ind_Γ::Dict{Int,Int},
+                           is_on_Γ::Array{Bool,1},
+                           a::Function,
+                           f::Function)
   ndom = length(ind_Id) # Number of subdomains  
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
@@ -240,7 +249,10 @@ function do_schur_assembly(cells, points, epart, ind_Id, ind_Γ, is_on_Γ, a, f)
 end
 
 
-function apply_schur(A_IId, A_IΓd, A_ΓΓ, x)
+function apply_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                     A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                     A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                     x::Array{Float64,1})
   ndom = length(A_IId)
   Sx = A_ΓΓ * x
   for idom in 1:ndom
