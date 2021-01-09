@@ -3,9 +3,7 @@ using NPZ
 push!(LOAD_PATH, "./Fem/")
 using Fem
 
-
-
-tentative_nnode = 2_000
+tentative_nnode = 100_000
 mesh = get_mesh(tentative_nnode)
 #fig = plot_TriMesh(mesh)
 
@@ -22,9 +20,8 @@ function f(x::Float64, y::Float64)
 end
 
 function uexact(xx::Float64, yy::Float64)
-  return .734
+  return 3.
 end
-
 
 dirichlet_inds_g2l, not_dirichlet_inds_g2l,
 dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
@@ -36,13 +33,12 @@ A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point,
                                             mesh.point_marker,
                                             a, f, uexact)
 
-#A, b = @time apply_dirichlet(mesh.segment, mesh.point, A, b, uexact)
-
 npzwrite("cells.npz", mesh.cell' .- 1)
 npzwrite("points.npz", mesh.point')
 
 using IterativeSolvers
-u = @time IterativeSolvers.cg(A, b)
+u_no_dirichlet = @time IterativeSolvers.cg(A, b)
 
-#u_with_bc = append_bc(u, uexact)
-#@time npzwrite("u.npz", u_with_bc)
+u = @time append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
+                    u_no_dirichlet, mesh.point, uexact)
+npzwrite("u.npz", u)
