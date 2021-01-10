@@ -1,7 +1,7 @@
 using Distributed
 
 addprocs(([("marcel", 4)]), tunnel=true)
-#addprocs(([("andrew", 4)]), tunnel=true)
+addprocs(([("andrew", 3)]), tunnel=true)
 #addprocs(([("moorcock", 4)]), tunnel=true)
 addprocs(3)
 
@@ -26,9 +26,9 @@ using NPZ
 #   use large ndom and small nev.
 
 @everywhere begin
-  ndom = 300
-  nev = 30
-  tentative_nnode = 100_000
+  ndom = 400
+  nev = 25
+  tentative_nnode = 400_000
   forget = 1e-6
 end
 

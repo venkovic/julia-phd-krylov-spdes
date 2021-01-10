@@ -3,8 +3,9 @@ import pylab as pl
 from postproc_utils import to_axis
 
 
-mesh = "DoF20000"
-model = "SExp_sig21.0_L0.1_DoF20000"
+tentative_node = 400_000
+mesh = "DoF%s" % tentative_node
+model = "SExp_sig21.0_L0.1_DoF%s" % tentative_node
 
 cells = np.load('data/%s.cells.npz' % mesh)
 points = np.load('data/%s.points.npz' % mesh)

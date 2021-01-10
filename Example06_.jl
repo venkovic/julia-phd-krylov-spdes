@@ -8,7 +8,7 @@ using NPZ
 model = "SExp"
 sig2 = 1.
 L = .1
-tentative_nnode = 20_000
+tentative_nnode = 400_000
 
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
@@ -23,18 +23,4 @@ g = npzread("data/$root_fname.kl-eigvecs.npz")
 
 χ = get_kl_coordinates(g, Λ, Ψ, M)
 
-
-using Statistics
-nsim = 10
-mu = 0.
-for i in 1:nsim
-  draw!(Λ, Ψ, ξ, g)
-  global mu = ((i - 1) * mu + mean(g)) / i
-  println("$i, $mu")
-end
-
-# Compare χ and ξ
-# Assemble (FAST)
-# Apply BCs (FAST)
-# Cg solve
-# Preconditioning
+@time draw!(Λ, Ψ, ξ, g)
