@@ -30,8 +30,6 @@ function uexact(xx::Float64, yy::Float64)
   return .734
 end
 
-
-
 A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point,
                                             dirichlet_inds_g2l,
                                             not_dirichlet_inds_g2l,
@@ -50,24 +48,18 @@ A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(mesh.cell,
 
 n_Γ, _ = size(A_ΓΓ)
 S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
-b_schur = get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
+b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
-u_Γ = IterativeSolvers.cg(S, b_schur)
-u_Id = get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
+u_Γ = @time IterativeSolvers.cg(S, b_schur)
+u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
 
-u = merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
-                              dirichlet_inds_l2g, uexact,
-                              mesh.point)
+u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
+                                    dirichlet_inds_l2g, uexact,
+                                    mesh.point)
 
-u_ref = IterativeSolvers.cg(A, b)
+u_no_dirichlet = @time IterativeSolvers.cg(A, b)
 
+u_no_dd = @time append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
+                    u_no_dirichlet, mesh.point, uexact)
 
-
-#@time npzwrite("cells.npz", mesh.cell' .- 1)
-#@time npzwrite("points.npz", mesh.point')
-#@time npzwrite("epart.npz", epart .- 1)
-#@time npzwrite("nodes_at_interface.npz", node_Γ .- 1)
-#for id in 1:ndom
-#  npzwrite("nodes_inside_$id.npz", node_Id[id] .- 1)
-#end
-
+println(extrema(u_with_dd - u_no_dd))
