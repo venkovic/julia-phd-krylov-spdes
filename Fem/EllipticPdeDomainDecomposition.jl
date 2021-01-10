@@ -300,6 +300,7 @@ function apply_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                      A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
                      A_ΓΓ::SparseMatrixCSC{Float64,Int},
                      x::Array{Float64,1})
+
   ndom = length(A_IId)
   Sx = A_ΓΓ * x
   for idom in 1:ndom
@@ -336,8 +337,7 @@ function get_subdomain_solutions(u_Γ::Array{Float64,1},
   ndom = length(b_Id)
   u_Id = [Array{Float64,1}(undef, length(b_Id[idom])) for idom in 1:ndom]
   for idom in 1:ndom
-    u_Id[idom] .= b_Id[idom] .- A_IΓd[idom] * u_Γ
-    u_Id[idom] .-= IterativeSolvers.cg(A_IId[idom], u_Id[idom])
+    u_Id[idom] .= IterativeSolvers.cg(A_IId[idom], b_Id[idom] .- A_IΓd[idom] * u_Γ)
   end
 
   return u_Id
