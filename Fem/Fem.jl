@@ -20,6 +20,9 @@ export set_subdomains
 
 export do_schur_assembly
 export apply_schur
+export get_schur_rhs
+export get_subdomain_solutions
+export merge_subdomain_solutions
 
 export do_local_mass_covariance_assembly
 export do_local_mass_assembly

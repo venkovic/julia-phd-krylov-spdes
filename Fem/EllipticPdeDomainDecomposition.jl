@@ -308,3 +308,69 @@ function apply_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
   end
   return Sx
 end
+
+
+function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
+                       A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                       A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                       b_Γ::Array{Float64,1})
+  ndom = length(b_Id)
+  n_Γ = length(b_Γ)
+  n_Id = [length(b_Id[idom]) for idom in 1:ndom]
+
+  b_schur = Array{Float64,1}(undef, length(b_Γ))
+  b_schur .= b_Γ
+
+  for idom in 1:ndom
+    v = IterativeSolvers.cg(A_IId[idom], b_Id[idom])
+    b_schur .-= A_IΓd[idom]'v
+  end
+
+  return b_schur
+end
+
+function get_subdomain_solutions(u_Γ::Array{Float64,1},
+                                 A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                                 A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                                 b_Id::Array{Array{Float64,1},1})
+  ndom = length(b_Id)
+  u_Id = [Array{Float64,1}(undef, length(b_Id[idom])) for idom in 1:ndom]
+  for idom in 1:ndom
+    u_Id[idom] .= b_Id[idom] .- A_IΓd[idom] * u_Γ
+    u_Id[idom] .-= IterativeSolvers.cg(A_IId[idom], u_Id[idom])
+  end
+
+  return u_Id
+end
+
+function merge_subdomain_solutions(u_Γ::Array{Float64,1},
+                                   u_Id::Array{Array{Float64,1},1},
+                                   node_Γ::Array{Int,1},
+                                   node_Id::Array{Array{Int,1},1},
+                                   dirichlet_inds_l2g::Array{Int,1},
+                                   uexact::Function,
+                                   points::Array{Float64,2})
+  
+  ndom = length(u_Id)
+  n_Γ = length(u_Γ)
+  n_Id = [length(u_Id[idom]) for idom in 1:ndom]
+  u = Array{Float64,1}(undef, n_Γ 
+                            + sum(n_Id) 
+                            + length(dirichlet_inds_l2g))
+
+  for (i, inode) in enumerate(node_Γ)
+    u[inode] = u_Γ[i]
+  end
+
+  for idom in 1:ndom
+    for (i, inode) in enumerate(node_Id[idom])
+      u[inode] = u_Id[idom][i]
+    end
+  end
+
+  for (i, inode) in enumerate(dirichlet_inds_l2g)
+    u[inode] = uexact(points[1, inode], points[2, inode])
+  end
+
+  return u
+end
