@@ -16,8 +16,8 @@ mesh: Instance of TriangleMesh.TriMesh.
 nel = mesh.n_cell
 epart[iel, 1]: subdomain idom ∈ [1, ndom] to which element iel ∈ [1, nel] belongs.
 
-nn = mesh.n_point
-npart[inode, 1]: subdomain idom ∈ [1, ndom] to which node inode ∈ [1, nn] belongs.
+nnode = mesh.n_point
+npart[inode, 1]: subdomain idom ∈ [1, ndom] to which node inode ∈ [1, nnode] belongs.
 
 Output:
 
@@ -37,10 +37,11 @@ node_Id[idom]: 1D array of global indices of the nodes strictly inside subdomain
 ind_Id[idom]: Conversion table (i.e. dictionary) from global to local indices of 
               nodes strictly inside subdomain idom ∈ [1, ndom].
 
-nn_Id[idom]: Number of nodes strictly inside subdomain idom ∈ [1, ndom].
+nnode_Id[idom]: Number of nodes strictly inside subdomain idom ∈ [1, ndom].
 
-is_on_Γ[inode]: True if node inode ∈ [1, nn] is on the interface of the mesh 
-                partition, and false otherwise.
+node_owner[inode]:    -1 if node inode ∈ [1, nnode] in Γ is not Dirchlet.
+                       0 if node inode is Dirichlet.
+                    idom ∈ [1, ndom] if node inode in (Ω_idom ∖ Γ) is not Dirichlet.
   
 # Examples
 ```jldoctest
@@ -54,104 +55,111 @@ mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_ar
 
 ndom = 400
 epart, npart = mesh_partition(mesh, ndom)
-elemd, node_Γ, node_Id, ind_Id, nn_Id, is_on_Γ = set_subdomains(mesh, epart, npart)
+elemd, node_Γ, node_Id, ind_Id, nnode_Id, node_owner = set_subdomains(mesh, epart, npart)
 
 ```
 """
 function set_subdomains(mesh::TriangleMesh.TriMesh, 
                         epart::Array{Int64,1},
-                        npart::Array{Int64,1})
+                        npart::Array{Int64,1},
+                        dirichlet_inds_g2l::Dict{Int,Int})
+
     nel = mesh.n_cell # Number of elements
-    nn = mesh.n_point # Number of nodes
+    nnode = mesh.n_point # Number of nodes
     ndom = maximum(epart) # Number of subdomains
 
     # Essential data structures
-    ind_Id = [Dict{Int, Int}() for _ in 1:ndom] # Conversion table from global to local indices of 
-                                                # nodes strictly inside each subdomain
-    ind_Γ = Dict{Int, Int}() # Conversion table from global to local indices of 
-                             # nodes on the interface of the mesh partition
-    is_on_Γ = zeros(Bool, nn) # Says if a node is on the interface of the mesh partition, or not 
+    ind_Id_g2l = [Dict{Int, Int}() for _ in 1:ndom] # Conversion table from global to local indices of 
+                                                    # nodes strictly inside each subdomain
+    ind_Γ_g2l = Dict{Int, Int}() # Conversion table from global to local indices of 
+                                 # nodes on the interface of the mesh partition
+    node_owner = zeros(Int, nnode) # Indicates each node's owner 
 
     # Extra data structures
     elemd = [Int[] for _ in 1:ndom] # Elements contained inside each subdomain 
-    node_Γ = Int[] # Nodes at the interface of the mesh partition
-    node_Id = [Int[] for _ in 1:ndom] # Nodes strictly inside each subdomain
-    nn_Id = zeros(Int, ndom) # Number of nodes strictly inside each subdomain
+    node_Γ = Int[] # Nodes at the interface of the mesh partition which are not Dirichlet
+    node_Id = [Int[] for _ in 1:ndom] # Non-Dirichlet nodes strictly inside each subdomain
+    nnode_Id = zeros(Int, ndom) # Number of non-Dirchlet nodes strictly inside each subdomain
 
     # Correct potential indexing error of TriangleMesh.jl
     bnd_tag, iel_max = extrema(mesh.cell_neighbor)
     if iel_max > nel
       mesh.cell_neighbor .-= 1
-      bnd_tag -= 1
+      bnd_tag = -1
     end
-  
+
     # Loop over elements in mesh
     iel_cell, jel_cell = zeros(Int, 3), zeros(Int, 3)
     for iel in 1:nel
   
       # Get global nodes and subdomain of element
-      iel_cell = mesh.cell[:, iel]
+      iel_cell .= mesh.cell[:, iel]
       idom = epart[iel]
       push!(elemd[idom], iel)
   
-      # Loop over neighbors
+      # Loop over segments of element iel
       for j in 1:3
-  
-        # If this is not a boundary segment 
         jel = mesh.cell_neighbor[j, iel]
+
+        # If segment is not on boundary
         if jel != bnd_tag
           
           # If neighbor belongs to another subdomain
           jdom = epart[jel]
           if jdom != idom
-            jel_cell = mesh.cell[:, jel]
+            jel_cell .= mesh.cell[:, jel]
   
             # Store common nodes in nodes_Γ
             for node in iel_cell
               if (node in jel_cell) & !(node in node_Γ)
-                push!(node_Γ, node)
-                is_on_Γ[node] = true
-                ind_Γ[node] = ind_Γ.count + 1
+                if !haskey(dirichlet_inds_g2l, node)
+                  push!(node_Γ, node)
+                  ind_Γ_g2l[node] = ind_Γ_g2l.count + 1
+                  node_owner[node] = -1
+                end
               end
-            end
+            end # for node
           end
         end
-      end
+      end # end for j
     end
 
-    # Store inside nodes for each subdomain
-    for inode in 1:nn
-      if !(is_on_Γ[inode])
+    # Store non-Dirichlet nodes in (Ω_d ∖ Γ)
+    for inode in 1:nnode
+      if !(haskey(dirichlet_inds_g2l, inode)) & (node_owner[inode] != -1)
         idom = npart[inode]
-        inode in node_Id[idom] ? nothing : push!(node_Id[idom], inode) 
+        push!(node_Id[idom], inode)
+        node_owner[inode] = idom
       end
     end
 
-    # Indexing of interior for each subdomain 
+    # Indexing of non-Dirichlet nodes in (Ω_d ∖ Γ)
     for idom in 1:ndom
-      nn_Id[idom] = length(node_Id[idom])
-      for i in 1:nn_Id[idom]
-        ind_Id[idom][node_Id[idom][i]] = i
+      nnode_Id[idom] = length(node_Id[idom])
+      for i in 1:nnode_Id[idom]
+        ind_Id_g2l[idom][node_Id[idom][i]] = i
       end
     end
 
-    return ind_Id, ind_Γ, is_on_Γ, elemd, node_Γ, node_Id, nn_Id
+    return ind_Id_g2l, ind_Γ_g2l, node_owner, elemd, node_Γ, node_Id, nnode_Id
 end
 
 
 function do_schur_assembly(cells::Array{Int,2},
                            points::Array{Float64,2},
                            epart::Array{Int,1},
-                           ind_Id::Array{Dict{Int,Int},1},
-                           ind_Γ::Dict{Int,Int},
-                           is_on_Γ::Array{Bool,1},
+                           ind_Id_g2l::Array{Dict{Int,Int},1},
+                           ind_Γ_g2l::Dict{Int,Int},
+                           node_owner::Array{Int,1},
                            a::Function,
-                           f::Function)
-  ndom = length(ind_Id) # Number of subdomains  
+                           f::Function,
+                           uexact::Function)
+
+  ndom = length(ind_Id_g2l) # Number of subdomains
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
-  n_Γ = ind_Γ.count # Number of nodes on the interface of the mesh partition
-  #b_vec = zeros(nnode, 1) # Right hand side
+  n_Γ = ind_Γ_g2l.count # Number of non-Dirichlet nodes on the interface of the mesh partition
+  n_Id = [ind_Id_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes strictly inside each subdomain
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
 
@@ -169,19 +177,20 @@ function do_schur_assembly(cells::Array{Int,2},
   ΓΓ_I, ΓΓ_J, ΓΓ_V =  Int[], Int[], Float64[] 
 
   # Right hand sides
-  b_I, b_Γ = Int[], Int[]
+  b_Id = [zeros(Float64, n_Id[idom]) for idom in 1:ndom]
+  b_Γ = zeros(Float64, n_Γ)
 
   # Loop over elements
   for iel in 1:nel
+
     # Get subdomain of element
     idom = epart[iel]
 
     # Get (x, y) coordinates of each element vertex
     # and coefficient at the center of the element
     coeff = 0.
-    for j in 1:3
-      jj = cells[j, iel]
-      x[j], y[j] = points[1, jj], points[2, jj]
+    for (j, jnode) in enumerate(cells[:, iel])
+      x[j], y[j] = points[1, jnode], points[2, jnode]
       coeff += a(x[j], y[j])
     end
     coeff /= 3.
@@ -197,55 +206,93 @@ function do_schur_assembly(cells::Array{Int,2},
     # Area of element
     Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
     
-    # Loop over vertices of element
-    for i in 1:3
-      ii = cells[i, iel]
-      ii_is_on_Γ = is_on_Γ[ii]
+    # Compute stiffness contributions
+    for (i, inode) in enumerate(cells[:, iel])
+      i_owner = node_owner[inode]
+      i_is_dirichlet = i_owner == 0
 
       # Loop over vertices of element
-      for j in 1:3
+      for (j, jnode) in enumerate(cells[:, iel])
+        j_owner = node_owner[jnode]
+        j_is_dirichlet = j_owner == 0
 
-        # Store local contribution
-        Kij = coeff * (Δy[i] * Δy[j] + Δx[i] * Δx[j]) / 4 / Area
-        jj = cells[j, iel]
+        # Evaluate contribution
+        ΔKij = coeff * (Δy[i] * Δy[j] + Δx[i] * Δx[j]) / 4 / Area
 
-        if ii_is_on_Γ
-          if is_on_Γ[jj]
+        if !i_is_dirichlet & !j_is_dirichlet
 
-            # Both nodes are on the interface of the mesh partition, 
+          # inode, jnode ∈ Γ
+          if (i_owner == -1) & (j_owner == -1)
+
             # Add contribution to A_ΓΓ:
-            push!(ΓΓ_I, ind_Γ[ii])
-            push!(ΓΓ_J, ind_Γ[jj])
-            push!(ΓΓ_V, Kij)
-          end
-        else
-          if is_on_Γ[jj]
+            push!(ΓΓ_I, ind_Γ_g2l[inode])
+            push!(ΓΓ_J, ind_Γ_g2l[jnode])
+            push!(ΓΓ_V, ΔKij)
 
-            # First node is inside subdomain idom, and second is on the interface 
-            # of the mesh partition,
-            # Add contribution to A_IΓ:
-            push!(IΓd_I[idom], ind_Id[idom][ii])
-            push!(IΓd_J[idom], ind_Γ[jj])
-            push!(IΓd_V[idom], Kij)
-          else
+          # inode, jnode ∈ (Ω_idom \ Γ)
+          elseif (i_owner > 0) & (j_owner > 0)
 
-            # Both nodes are strictly inside the subdomain idom,
+            # Add contribution to A_II:
+            push!(IId_I[idom], ind_Id_g2l[idom][inode])
+            push!(IId_J[idom], ind_Id_g2l[idom][jnode])
+            push!(IId_V[idom], ΔKij)
+        
+          # inode ∉ Γ, jnode ∈ Γ
+          elseif (i_owner > 0) & (j_owner == -1)
+
             # Add contribution to A_IΓ:
-            push!(IId_I[idom], ind_Id[idom][ii])
-            push!(IId_J[idom], ind_Id[idom][jj])
-            push!(IId_V[idom], Kij)
+            push!(IΓd_I[idom], ind_Id_g2l[idom][inode])
+            push!(IΓd_J[idom], ind_Γ_g2l[jnode])
+            push!(IΓd_V[idom], ΔKij)
           end
-        end
+
+        elseif i_is_dirichlet & !j_is_dirichlet
+
+          # jnode ∈ Γ
+          if j_owner == -1
+            b_Γ[ind_Γ_g2l[jnode]] -= ΔKij * uexact(x[i], y[i])
+
+          # jnode ∈ (Ω_idom \ Γ)
+          elseif j_owner > 0
+            b_Id[idom][ind_Id_g2l[idom][jnode]] -= ΔKij * uexact(x[i], y[i])
+          end
+        end # if
+
+      end # for (j, jnode)
+    end # for (i, inode)
+
+    # Compute right hand side contributions
+    for (i, inode) in enumerate(cells[:, iel])
+      i_owner = node_owner[inode]
+      i_is_dirichlet = i_owner == 0
+
+      j = i + 1 - floor(Int, (i + 1) / 3) * 3
+      j == 0 ? j = 3 : nothing
+      k = i + 2 - floor(Int, (i + 2) / 3) * 3
+      k == 0 ? k = 3 : nothing
+
+      Δb = (2 * f(x[i], y[i]) 
+         + f(x[j], y[j])
+         + f(x[k], y[k])) * Area / 12
+      
+      # inode ∈ Γ
+      if !i_is_dirichlet & (i_owner == -1)
+        b_Γ[ind_Γ_g2l[inode]] += Δb
+
+      # inode ∈ (Ω_idom \ Γ)
+      elseif !i_is_dirichlet & (i_owner > 0)
+        b_Id[idom][ind_Id_g2l[idom][inode]] += Δb
       end
-    end
-  end
+
+    end # for (i, inode)
+  end # for iel
 
   # Assemble csc sparse arrays
   A_IId = [sparse(IId_I[idom], IId_J[idom], IId_V[idom]) for idom in 1:ndom]
   A_IΓd = [sparse(IΓd_I[idom], IΓd_J[idom], IΓd_V[idom], size(A_IId[idom])[1], n_Γ) for idom in 1:ndom]
   A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
 
-  return A_IId, A_IΓd, A_ΓΓ, b_I, b_Γ
+  return A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ
 end
 
 
