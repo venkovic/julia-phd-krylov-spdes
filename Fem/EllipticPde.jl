@@ -100,6 +100,7 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
     # Loop over vertices of element
     for i in 1:3
       inode = cells[i, iel]
+      
       i_is_dirichlet = point_marker[inode] == 1
       i_is_dirichlet ? inode = dirichlet_inds_g2l[inode] : inode = not_dirichlet_inds_g2l[inode]
     
