@@ -30,12 +30,14 @@ function uexact(xx::Float64, yy::Float64)
   return .734
 end
 
+print("do_isotropic_elliptic_assembly ...")
 A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point,
                                             dirichlet_inds_g2l,
                                             not_dirichlet_inds_g2l,
                                             mesh.point_marker,
                                             a, f, uexact)
 
+print("do_schur_assembly ...")
 A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(mesh.cell,
                                                        mesh.point,
                                                        epart,
@@ -48,18 +50,22 @@ A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(mesh.cell,
 
 n_Γ, _ = size(A_ΓΓ)
 S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
+print("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
+print("solve for u_Γ ...")
 u_Γ = @time IterativeSolvers.cg(S, b_schur)
+print("get_subdomain_solutions ...")
 u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
 
-u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
-                                    dirichlet_inds_l2g, uexact,
-                                    mesh.point)
+u_with_dd = merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
+                                      dirichlet_inds_l2g, uexact,
+                                      mesh.point)
 
-u_no_dirichlet = @time IterativeSolvers.cg(A, b)
+print("solve for u_no_dd_no_dirichlet ...")
+u_no_dd_no_dirichlet = @time IterativeSolvers.cg(A, b)
 
-u_no_dd = @time append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
-                    u_no_dirichlet, mesh.point, uexact)
+u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
+                    u_no_dd_no_dirichlet, mesh.point, uexact)
 
-println(extrema(u_with_dd - u_no_dd))
+print("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
