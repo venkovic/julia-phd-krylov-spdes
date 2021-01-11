@@ -1,5 +1,5 @@
 using TriangleMesh
-
+using NPZ
 
 function get_mesh(tentative_nnode::Int; keep_segments=true)
   poly = polygon_unitSquare()
@@ -9,6 +9,19 @@ function get_mesh(tentative_nnode::Int; keep_segments=true)
   return mesh
 end
 
+function save_mesh(mesh::TriangleMesh.TriMesh,
+                   tentative_nnode::Int)
+  npzwrite("data/DoF$tentative_nnode.cells.npz", mesh.cell' .- 1)
+  npzwrite("data/DoF$tentative_nnode.points.npz", mesh.point')
+  npzwrite("data/DoF$tentative_nnode.point_markers.npz", mesh.point_marker')
+end
+
+function load_mesh(tentative_nnode::Int)
+  cells = Array(npzread("data/DoF$tentative_nnode.cells.npz")') .+ 1
+  points = Array(npzread("data/DoF$tentative_nnode.points.npz")')
+  point_markers = Array(npzread("data/DoF$tentative_nnode.point_markers.npz")')
+  return cells, points, point_markers
+end
 
 function get_total_area(cells, points)
   _, nel = size(cells) # Number of elements

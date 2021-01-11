@@ -12,6 +12,8 @@ export append_bc
 export do_mass_covariance_assembly
 
 export get_mesh
+export save_mesh
+export load_mesh
 export mesh_partition
 export get_total_area
 
