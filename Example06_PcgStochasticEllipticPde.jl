@@ -4,6 +4,7 @@ Pkg.activate(".")
 using Fem
 using NPZ
 using IterativeSolvers
+using Preconditioners
 
 model = "SExp"
 sig2 = 1.
@@ -59,5 +60,11 @@ A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             point_markers,
                                             a, f, uexact)
 
+print("assemble AMG preconditioner ...")
+Π = @time AMGPreconditioner{SmoothedAggregation}(A);
+
 print("solve for u_no_dirichlet ...")
-u_no_dirichlet = @time IterativeSolvers.cg(A, b)
+u_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π)
+
+print("update AMG preconditioner ...")
+@time UpdatePreconditioner!(Π, A);
