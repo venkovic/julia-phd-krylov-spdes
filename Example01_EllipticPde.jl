@@ -35,6 +35,7 @@ A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point,
 
 npzwrite("cells.npz", mesh.cell' .- 1)
 npzwrite("points.npz", mesh.point')
+npzwrite("point_markers.npz", mesh.point_marker')
 
 using IterativeSolvers
 u_no_dirichlet = @time IterativeSolvers.cg(A, b)

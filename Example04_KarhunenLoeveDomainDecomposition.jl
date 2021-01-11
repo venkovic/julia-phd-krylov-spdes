@@ -17,8 +17,7 @@ tentative_nnode = 20_000
 forget = 1e-6
 
 mesh = get_mesh(tentative_nnode)
-npzwrite("data/DoF$tentative_nnode.cells.npz", mesh.cell' .- 1)
-npzwrite("data/DoF$tentative_nnode.points.npz", mesh.point')
+save_mesh(tentative_nnode)
 epart, npart = mesh_partition(mesh, ndom)
 
 model = "SExp"
