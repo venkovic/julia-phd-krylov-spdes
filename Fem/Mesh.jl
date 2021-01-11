@@ -1,7 +1,9 @@
 using TriangleMesh
 using NPZ
 
-function get_mesh(tentative_nnode::Int; keep_segments=true)
+function get_mesh(tentative_nnode::Int;
+                  keep_segments=true)
+                  
   poly = polygon_unitSquare()
   mesh = create_mesh(poly, voronoi=true, delaunay=true)
   divide_cell_into = ceil(Int, .645 * tentative_nnode)
