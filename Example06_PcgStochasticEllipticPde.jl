@@ -58,13 +58,16 @@ A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             dirichlet_inds_g2l,
                                             not_dirichlet_inds_g2l,
                                             point_markers,
-                                            a, f, uexact)
+                                            exp.(g), f, uexact)
 
 print("assemble AMG preconditioner ...")
-Π = @time AMGPreconditioner{SmoothedAggregation}(A);
+Π1 = @time AMGPreconditioner{SmoothedAggregation}(A);
 
 print("solve for u_no_dirichlet ...")
-u_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π)
+u_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π1)
 
-print("update AMG preconditioner ...")
-@time UpdatePreconditioner!(Π, A);
+draw!(Λ, Ψ, ξ, g)
+Π2 = @time AMGPreconditioner{SmoothedAggregation}(A);
+
+# Compare AMG for different realizations
+# AMG interpolation can become a pull request for Preconditioners.jl
