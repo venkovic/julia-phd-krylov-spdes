@@ -310,6 +310,33 @@ function apply_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
   return Sx
 end
 
+#using Preconditioners
+#const TAmg = AMGPreconditioner{SmoothedAggregation,AlgebraicMultigrid.MultiLevel{AlgebraicMultigrid.Pinv{Float64},AlgebraicMultigrid.GaussSeidel{AlgebraicMultigrid.SymmetricSweep},AlgebraicMultigrid.GaussSeidel{AlgebraicMultigrid.SymmetricSweep},SparseArrays.SparseMatrixCSC{Float64,Int64},SparseArrays.SparseMatrixCSC{Float64,Int64},LinearAlgebra.Adjoint{Float64,SparseArrays.SparseMatrixCSC{Float64,Int64}},AlgebraicMultigrid.MultiLevelWorkspace{Array{Float64,1},1}}}
+
+function apply_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                     A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                     A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                     x::Array{Float64,1},
+                     Π_IId;
+                     verbose=true)
+
+  ndom = length(A_IId)
+  Sx = A_ΓΓ * x
+  for idom in 1:ndom
+    if verbose
+      print("cg solve ...")
+      v = @time IterativeSolvers.cg(A_IId[idom], A_IΓd[idom] * x, Pl=Π_IId[idom])
+      print("SpMV ...")
+      Sx .-= @time A_IΓd[idom]' * v
+    else
+      v = IterativeSolvers.cg(A_IId[idom], A_IΓd[idom] * x, Pl=Π_IId[idom])
+      Sx .-= A_IΓd[idom]' * v
+    end
+  end
+  
+  return Sx
+end
+
 
 function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
                        A_IId::Array{SparseMatrixCSC{Float64,Int},1},
