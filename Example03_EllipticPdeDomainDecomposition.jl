@@ -1,9 +1,14 @@
-using TriangleMesh
-using NPZ
+#using TriangleMesh
+#using NPZ
 push!(LOAD_PATH, "./Fem/")
+
+import Pkg
+Pkg.activate(".")
+
 using Fem
 using LinearMaps
 using IterativeSolvers
+using Preconditioners
 
 tentative_nnode = 100_000
 mesh = get_mesh(tentative_nnode)
@@ -48,8 +53,14 @@ A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(mesh.cell,
                                                        f,
                                                        uexact)
 
+
+print("assemble AMG preconditioners ...")
+Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
+               for idom in 1:ndom];
+
 n_Γ, _ = size(A_ΓΓ)
-S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
+#S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
+S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x, Π_IId), n_Γ, issymmetric=true)
 print("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
@@ -69,3 +80,8 @@ u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, mesh.point, uexact)
 
 print("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
+
+
+
+
+
