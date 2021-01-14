@@ -1,39 +1,36 @@
-using TriangleMesh
 push!(LOAD_PATH, "./Fem/")
+import Pkg
+Pkg.activate(".")
 using Fem
-using Arpack
-using Distributions
 using NPZ
+using Distributions
 
-poly = polygon_Lshape()
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
+tentative_nnode = 10_000
+load_existing_mesh = false
 
+if load_existing_mesh
+  cells, points, _, _ = load_mesh(tentative_nnode)
+else
+  mesh = get_mesh(tentative_nnode)
+  save_mesh(mesh, tentative_nnode)
+  cells = mesh.cell
+  points = mesh.point
+end
+
+model = "SExp"
 L = .1
 sig2 = 1.
+nev = 500
+
+root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
+  L = .1
+  sig2 = 1.
   return sig2 * exp(-((x1 - x2)^ 2 + (y1 - y2)^2) / L^2)
 end
-  
-C = @time do_mass_covariance_assembly(mesh.cell, mesh.point, cov)
-M = @time get_mass_matrix(mesh.cell, mesh.point)
 
-λ, Φ = map(x -> real(x), eigs(C, M, nev=400))
-
-function draw(λ, Φ)
-  n, nmode = size(Φ)
-  ξ = rand(Normal(), nmode)
-  g = zeros(n)
-  for k in 1:nmode
-    g .+= sqrt(λ[k]) * ξ[k] * Φ[:, k]
-  end
-  return ξ, g
-end
-
-area = get_total_area(mesh.cell, mesh.point)
+λ, Φ = solve_kl(cells, points, cov, nev, verbose=true)
 
 ξ, g = draw(λ, Φ)
-
-@time npzwrite("cells.npz", mesh.cell' .- 1)
-@time npzwrite("points.npz", mesh.point')
-@time npzwrite("g.npz", g)
+npzwrite("data/$root_fname.greal.npz", g)
