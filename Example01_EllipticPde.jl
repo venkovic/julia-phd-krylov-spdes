@@ -1,15 +1,26 @@
-using TriangleMesh
-using NPZ
 push!(LOAD_PATH, "./Fem/")
+import Pkg
+Pkg.activate(".")
 using Fem
+using NPZ
 
-tentative_nnode = 100_000
-mesh = get_mesh(tentative_nnode)
-#fig = plot_TriMesh(mesh)
+tentative_nnode = 1_000_000
+load_existing_mesh = true
 
-nnode = mesh.n_point
-nbdnseg = mesh.n_segment
-nel = mesh.n_cell
+if load_existing_mesh
+  cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
+else
+  mesh = get_mesh(tentative_nnode)
+  save_mesh(mesh, tentative_nnode)
+  cells = mesh.cell
+  points = mesh.point
+  point_markers = mesh.point_marker
+  cell_neighbors = mesh.cell_neighbor
+end
+
+dirichlet_inds_g2l, not_dirichlet_inds_g2l,
+dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
+get_dirichlet_inds(points, point_markers)
 
 function a(x::Float64, y::Float64)
   return .1 + .0001 * x * y
@@ -23,23 +34,27 @@ function uexact(xx::Float64, yy::Float64)
   return 3.
 end
 
-dirichlet_inds_g2l, not_dirichlet_inds_g2l,
-dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
-get_dirichlet_inds(mesh.point, mesh.point_marker)
+println("nnode = $(size(points)[2])")
+println("nel = $(size(cells)[2])")
 
-A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point,
+print("assemble linear system ...")
+A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             dirichlet_inds_g2l,
                                             not_dirichlet_inds_g2l,
-                                            mesh.point_marker,
+                                            point_markers,
                                             a, f, uexact)
 
-npzwrite("cells.npz", mesh.cell' .- 1)
-npzwrite("points.npz", mesh.point')
-npzwrite("point_markers.npz", mesh.point_marker')
 
 using IterativeSolvers
-u_no_dirichlet = @time IterativeSolvers.cg(A, b)
+using Preconditioners
 
+print("assemble amg preconditioner ...")
+Π = @time AMGPreconditioner{SmoothedAggregation}(A);
+
+print("cg solve ...")
+u_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π)
+
+print("append dirchlet nodes to solution ...")
 u = @time append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
-                    u_no_dirichlet, mesh.point, uexact)
-npzwrite("u.npz", u)
+                    u_no_dirichlet, points, uexact)
+npzwrite("data/DoF$tentative_nnode.u.npz", u)
