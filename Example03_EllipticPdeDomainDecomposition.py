@@ -2,10 +2,12 @@ import numpy as np
 import pylab as pl
 from postproc_utils import to_axis
 
-cells = np.load('cells.npz')
-epart = np.load('epart.npz')[:, 0]
-points = np.load('points.npz')
-#u = np.load('u.npz')
+tentative_nnode = 100_000
+ndom = 400
+
+cells = np.load('data/DoF%d-ndom%d.cells.npz' % (tentative_nnode, ndom))
+epart = np.load('data/DoF%d-ndom%d.epart.npz' % tentative_nnode, ndom))[:, 0]
+points = np.load('data/DoF%d.points.npz' % tentative_nnode)
 
 nd = epart.max() + 1
 
