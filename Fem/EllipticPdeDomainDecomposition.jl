@@ -1,10 +1,12 @@
-import TriangleMesh
 using DelimitedFiles
 using IterativeSolvers
   
 
 """
-set_subdomains(mesh::TriangleMesh.TriMesh, epart::Array{Int64,2}, npart::Array{Int64,2})
+set_subdomains(cells::Array{Int,2}, 
+               cell_neighbors::Array{Int,2}, 
+               epart::Array{Int64,2}, 
+               npart::Array{Int64,2})
   
 Returns helper data structures for non-overlaping domain decomposition using the mesh 
 partition defined by epart and npart. 

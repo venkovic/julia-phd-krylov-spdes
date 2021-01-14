@@ -10,6 +10,7 @@ export apply_dirichlet
 export append_bc
 
 export do_mass_covariance_assembly
+export solve_kl
 
 export get_mesh
 export save_mesh

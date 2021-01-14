@@ -60,11 +60,12 @@ elemd, node_Γ, node_Id, ind_Id, nn_Id, is_on_Γ = set_subdomains(mesh, epart, n
 
 ```
 """
-function set_subdomain(mesh::TriangleMesh.TriMesh, 
+function set_subdomain(cells::Array{Int,2},
+                       points::Array{Float64,2},
                        epart::Array{Int64,1},
                        idom::Int)
 
-  nel = mesh.n_cell # Number of elements
+  _, nel = size(cells) # Number of elements
   inds_l2g = Int[]  # Conversion table from local to global indices of the
                     # nodes of the idom-th subdomain
   inds_g2l = Dict{Int, Int}() # Conversion table from global to local indices of the 
@@ -83,7 +84,7 @@ function set_subdomain(mesh::TriangleMesh.TriMesh,
       push!(elems, iel)
 
       # Set-up local indices and conversion tables for nodes in element
-      for node in mesh.cell[:, iel]
+      for node in cells[:, iel]
         if !haskey(inds_g2l, node)
           push!(inds_l2g, node)
           inds_g2l[node] = length(inds_l2g)
@@ -93,8 +94,8 @@ function set_subdomain(mesh::TriangleMesh.TriMesh,
   end
 
   for inode in inds_l2g
-    center[1] += mesh.point[1, inode]
-    center[2] += mesh.point[2, inode]
+    center[1] += points[1, inode]
+    center[2] += points[2, inode]
   end
   center ./= length(inds_l2g)
 
@@ -623,7 +624,8 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
 end
 
 
-function solve_local_kl(mesh::TriangleMesh.TriMesh,
+function solve_local_kl(cells::Array{Int,2},
+                        points::Array{Float64,2},
                         epart::Array{Int,1},
                         cov::Function,
                         nev::Int,
@@ -631,12 +633,12 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
                         relative=.99)
 
   ndom = maximum(epart) # Number of subdomains
-  inds_l2g, inds_g2l, elems, center = set_subdomain(mesh, epart, idom)
+  inds_l2g, inds_g2l, elems, center = set_subdomain(cells, points, epart, idom)
   
   # Assemble local generalized eigenvalue problem
-  C = do_local_mass_covariance_assembly(mesh.cell, mesh.point, inds_l2g, 
+  C = do_local_mass_covariance_assembly(cells, points, inds_l2g, 
                                         inds_g2l, elems, cov)
-  M = do_local_mass_assembly(mesh.cell, mesh.point, inds_g2l, elems)
+  M = do_local_mass_assembly(cells, points, inds_g2l, elems)
   
   # Solve local generalized eigenvalue problem
   λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
@@ -647,8 +649,8 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
   Area = 0.
   for el in elems
     for r in 1:3
-      rnode = mesh.cell[r, el]
-      x[r], y[r] = mesh.point[1, rnode], mesh.point[2, rnode]
+      rnode = cells[r, el]
+      x[r], y[r] = points[1, rnode], points[2, rnode]
     end  
     Δx[1] = x[3] - x[2]
     Δx[2] = x[1] - x[3]
@@ -693,7 +695,7 @@ function solve_local_kl(mesh::TriangleMesh.TriMesh,
 end
 
 
-function solve_global_reduced_kl(mesh::TriangleMesh.TriMesh,
+function solve_global_reduced_kl(nnode::Int,
                                  K::Array{Float64,2},
                                  energy_expected::Float64,
                                  elemsd::Array{Array{Int,1},1},
@@ -712,7 +714,7 @@ function solve_global_reduced_kl(mesh::TriangleMesh.TriMesh,
     nvec += 1 
     energy_achieved >= energy_expected ? break : nothing
   end
-  Ψ = project_on_mesh(mesh, Φ[:, 1:nvec], elemsd, inds_l2gd, ϕd)
+  Ψ = project_on_mesh(nnode, Φ[:, 1:nvec], elemsd, inds_l2gd, ϕd)
 
   # Details about truncation
   str = "$nvec/$(length(Λ)) vectors kept for "
@@ -758,16 +760,22 @@ function draw(mesh::TriangleMesh.TriMesh,
 end
 
 
-function project_on_mesh(mesh::TriangleMesh.TriMesh,
+function project_on_mesh(nnodes::Int,
                          Φ::Array{Float64,2},
                          elemsd::Array{Array{Int,1},1},
                          inds_l2gd::Array{Array{Int,1},1},
                          ϕd::Array{Array{Float64,2},1})
 
+
+
+  println(size(Φ))
+  println(size(elemsd))
+  println(size(inds_l2gd))
+  println(size(ϕd))
+
   ndom = length(elemsd) # Number of subdomains
   _, nmodes = size(Φ) # Number of reduced modes
   md = Int[] # Number of local modes in each subdomain
-  nnodes = mesh.n_point # Number of mesh nodes
   Ψ = zeros(nnodes, nmodes) # Eigenfunction projection at the mesh nodes
   cnt = zeros(Int, nnodes) # Number of subdomains to which each node belongs
 

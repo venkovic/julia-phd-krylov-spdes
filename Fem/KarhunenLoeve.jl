@@ -1,4 +1,6 @@
 using SparseArrays
+import Arpack
+using Printf
 
 """
 do_covariance_mass_assembly(cells, points, cov)
@@ -124,4 +126,77 @@ function do_mass_covariance_assembly(cells, points, cov)
   end
   
   return C
+end
+
+
+function solve_kl(cells::Array{Int,2},
+                  points::Array{Float64,2},
+                  cov::Function,
+                  nev::Int;
+                  relative=.99,
+                  verbose=false)
+  
+  _, n_el = size(cells) # number of elements
+
+  if verbose
+    print("assemble covariance mass matrix ...")
+    C = @time do_mass_covariance_assembly(cells, points, cov)
+    print("assemble rhs mass matrix ...")
+    M = @time get_mass_matrix(cells, points)
+    print("solve for $nev dominant eigenpairs ...")
+    λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
+  else    
+    C = @time do_mass_covariance_assembly(cells, points, cov)
+    M = @time get_mass_matrix(cells, points)
+    λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
+  end
+
+  # Integrate variance over domain
+  center = zeros(2)
+  x, y = zeros(3), zeros(3)
+  Δx, Δy = zeros(3), zeros(3)
+  Area = 0.
+  for el in 1:n_el
+    for r in 1:3
+      rnode = cells[r, el]
+      x[r], y[r] = points[1, rnode], points[2, rnode]
+      center[1] += points[1, rnode] / 3
+      center[2] += points[2, rnode] / 3
+    end  
+    Δx[1] = x[3] - x[2]
+    Δx[2] = x[1] - x[3]
+    Δx[3] = x[2] - x[1]
+    Δy[1] = y[2] - y[3]
+    Δy[2] = y[3] - y[1]
+    Δy[3] = y[1] - y[2]   
+    Area += (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+  end
+  center ./= n_el
+  energy_expected = relative * Area * cov(center[1], center[2],
+                    center[1], center[2])
+
+  # Keep dominant eigenpairs with positive eigenvalues
+  energy_achieved = 0.
+  nvec = 0
+  for i in 1:nev
+    if λ[i] > 0 
+      nvec += 1
+      energy_achieved += λ[i]
+    else
+      break
+    end
+    energy_achieved >= energy_expected ? break : nothing
+  end
+
+  # Arpack 0.5.1 does not normalize the vectors properly
+  for k in 1:nvec
+    ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
+  end
+
+  # Details about truncation
+  str = "$nvec/$nev vectors kept for "
+  str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
+  println("$str relative energy")
+
+  return λ[1:nvec], ϕ[:, 1:nvec]
 end
