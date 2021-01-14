@@ -59,13 +59,14 @@ elemd, node_Γ, node_Id, ind_Id, nnode_Id, node_owner = set_subdomains(mesh, epa
 
 ```
 """
-function set_subdomains(mesh::TriangleMesh.TriMesh, 
+function set_subdomains(cells::Array{Int,2},
+                        cell_neighbors::Array{Int,2},
                         epart::Array{Int64,1},
                         npart::Array{Int64,1},
                         dirichlet_inds_g2l::Dict{Int,Int})
 
-    nel = mesh.n_cell # Number of elements
-    nnode = mesh.n_point # Number of nodes
+    _, nel = size(cells) # Number of elements
+    nnode = maximum(cells) # Number of nodes
     ndom = maximum(epart) # Number of subdomains
 
     # Essential data structures
@@ -82,9 +83,9 @@ function set_subdomains(mesh::TriangleMesh.TriMesh,
     nnode_Id = zeros(Int, ndom) # Number of non-Dirchlet nodes strictly inside each subdomain
 
     # Correct potential indexing error of TriangleMesh.jl
-    bnd_tag, iel_max = extrema(mesh.cell_neighbor)
+    bnd_tag, iel_max = extrema(cell_neighbors)
     if iel_max > nel
-      mesh.cell_neighbor .-= 1
+      cell_neighbors .-= 1
       bnd_tag = -1
     end
 
@@ -93,13 +94,13 @@ function set_subdomains(mesh::TriangleMesh.TriMesh,
     for iel in 1:nel
   
       # Get global nodes and subdomain of element
-      iel_cell .= mesh.cell[:, iel]
+      iel_cell .= cells[:, iel]
       idom = epart[iel]
       push!(elemd[idom], iel)
   
       # Loop over segments of element iel
       for j in 1:3
-        jel = mesh.cell_neighbor[j, iel]
+        jel = cell_neighbors[j, iel]
 
         # If segment is not on boundary
         if jel != bnd_tag
@@ -107,7 +108,7 @@ function set_subdomains(mesh::TriangleMesh.TriMesh,
           # If neighbor belongs to another subdomain
           jdom = epart[jel]
           if jdom != idom
-            jel_cell .= mesh.cell[:, jel]
+            jel_cell .= cells[:, jel]
   
             # Store common nodes in nodes_Γ
             for node in iel_cell
@@ -275,6 +276,157 @@ function do_schur_assembly(cells::Array{Int,2},
          + f(x[j], y[j])
          + f(x[k], y[k])) * Area / 12
       
+      # inode ∈ Γ
+      if !i_is_dirichlet & (i_owner == -1)
+        b_Γ[ind_Γ_g2l[inode]] += Δb
+
+      # inode ∈ (Ω_idom \ Γ)
+      elseif !i_is_dirichlet & (i_owner > 0)
+        b_Id[idom][ind_Id_g2l[idom][inode]] += Δb
+      end
+
+    end # for (i, inode)
+  end # for iel
+
+  # Assemble csc sparse arrays
+  A_IId = [sparse(IId_I[idom], IId_J[idom], IId_V[idom]) for idom in 1:ndom]
+  A_IΓd = [sparse(IΓd_I[idom], IΓd_J[idom], IΓd_V[idom], size(A_IId[idom])[1], n_Γ) for idom in 1:ndom]
+  A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
+
+  return A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ
+end
+
+
+
+function do_schur_assembly(cells::Array{Int,2},
+                           points::Array{Float64,2},
+                           epart::Array{Int,1},
+                           ind_Id_g2l::Array{Dict{Int,Int},1},
+                           ind_Γ_g2l::Dict{Int,Int},
+                           node_owner::Array{Int,1},
+                           coeff::Array{Float64,1},
+                           f::Function,
+                           uexact::Function)
+
+  ndom = length(ind_Id_g2l) # Number of subdomains
+  _, nel = size(cells) # Number of elements
+  _, nnode = size(points) # Number of nodes
+  n_Γ = ind_Γ_g2l.count # Number of non-Dirichlet nodes on the interface of the mesh partition
+  n_Id = [ind_Id_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes strictly inside each subdomain
+  x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
+  Δx, Δy = zeros(3), zeros(3), zeros(3)
+
+  # Indices (I, J) and data (V) for sparse Galerkin operator A_IId
+  IId_I = [Int[] for _ in 1:ndom]
+  IId_J = [Int[] for _ in 1:ndom]
+  IId_V = [Float64[] for _ in 1:ndom]
+
+  # Indices (I, J) and data (V) for sparse Galerkin operators A_IΓd
+  IΓd_I = [Int[] for _ in 1:ndom]
+  IΓd_J = [Int[] for _ in 1:ndom]
+  IΓd_V = [Float64[] for _ in 1:ndom]
+
+  # Indices (I, J) and data (V) for sparse Galerkin operator A_ΓΓ
+  ΓΓ_I, ΓΓ_J, ΓΓ_V =  Int[], Int[], Float64[] 
+
+  # Right hand sides
+  b_Id = [zeros(Float64, n_Id[idom]) for idom in 1:ndom]
+  b_Γ = zeros(Float64, n_Γ)
+
+  # Loop over elements
+  for iel in 1:nel
+
+    # Get subdomain of element
+    idom = epart[iel]
+
+    # Get (x, y) coordinates of each element vertex
+    # and coefficient at the center of the element
+    Δa = 0.
+    for (j, jnode) in enumerate(cells[:, iel])
+      x[j], y[j] = points[1, jnode], points[2, jnode]
+      Δa += coeff[jnode]
+    end
+    Δa /= 3.
+
+    # Terms of the shoelace formula for a triangle
+    Δx[1] = x[3] - x[2]
+    Δx[2] = x[1] - x[3]
+    Δx[3] = x[2] - x[1]
+    Δy[1] = y[2] - y[3]
+    Δy[2] = y[3] - y[1]
+    Δy[3] = y[1] - y[2]
+
+    # Area of element
+    Area = (Δx[3] * Δy[2] - Δx[2] * Δy[3]) / 2.
+
+    # Compute stiffness contributions
+   for (i, inode) in enumerate(cells[:, iel])
+     i_owner = node_owner[inode]
+     i_is_dirichlet = i_owner == 0
+
+      # Loop over vertices of element
+      for (j, jnode) in enumerate(cells[:, iel])
+        j_owner = node_owner[jnode]
+        j_is_dirichlet = j_owner == 0
+
+        # Evaluate contribution
+        ΔKij = Δa * (Δy[i] * Δy[j] + Δx[i] * Δx[j]) / 4 / Area
+
+        if !i_is_dirichlet & !j_is_dirichlet
+
+          # inode, jnode ∈ Γ
+          if (i_owner == -1) & (j_owner == -1)
+
+            # Add contribution to A_ΓΓ:
+            push!(ΓΓ_I, ind_Γ_g2l[inode])
+            push!(ΓΓ_J, ind_Γ_g2l[jnode])
+            push!(ΓΓ_V, ΔKij)
+
+          # inode, jnode ∈ (Ω_idom \ Γ)
+          elseif (i_owner > 0) & (j_owner > 0)
+
+            # Add contribution to A_II:
+            push!(IId_I[idom], ind_Id_g2l[idom][inode])
+            push!(IId_J[idom], ind_Id_g2l[idom][jnode])
+            push!(IId_V[idom], ΔKij)
+
+          # inode ∉ Γ, jnode ∈ Γ
+          elseif (i_owner > 0) & (j_owner == -1)
+
+            # Add contribution to A_IΓ:
+            push!(IΓd_I[idom], ind_Id_g2l[idom][inode])
+            push!(IΓd_J[idom], ind_Γ_g2l[jnode])
+            push!(IΓd_V[idom], ΔKij)
+          end
+
+        elseif i_is_dirichlet & !j_is_dirichlet
+
+          # jnode ∈ Γ
+          if j_owner == -1
+            b_Γ[ind_Γ_g2l[jnode]] -= ΔKij * uexact(x[i], y[i])
+
+          # jnode ∈ (Ω_idom \ Γ)
+          elseif j_owner > 0
+            b_Id[idom][ind_Id_g2l[idom][jnode]] -= ΔKij * uexact(x[i], y[i])
+          end
+        end # if
+      end # for (j, jnode)
+    end # for (i, inode)
+
+    # Compute right hand side contributions
+    for (i, inode) in enumerate(cells[:, iel])
+      i_owner = node_owner[inode]
+      i_is_dirichlet = i_owner == 0
+
+      j = i + 1 - floor(Int, (i + 1) / 3) * 3
+      j == 0 ? j = 3 : nothing
+      k = i + 2 - floor(Int, (i + 2) / 3) * 3
+      k == 0 ? k = 3 : nothing
+
+      Δb = (2 * f(x[i], y[i]) 
+              + f(x[j], y[j])
+              + f(x[k], y[k])) * Area / 12
+
       # inode ∈ Γ
       if !i_is_dirichlet & (i_owner == -1)
         b_Γ[ind_Γ_g2l[inode]] += Δb
