@@ -16,13 +16,15 @@ function save_mesh(mesh::TriangleMesh.TriMesh,
   npzwrite("data/DoF$tentative_nnode.cells.npz", mesh.cell' .- 1)
   npzwrite("data/DoF$tentative_nnode.points.npz", mesh.point')
   npzwrite("data/DoF$tentative_nnode.point_markers.npz", mesh.point_marker')
+  npzwrite("data/DoF$tentative_nnode.cell_neighbors.npz", mesh.cell_neighbor')
 end
 
 function load_mesh(tentative_nnode::Int)
   cells = Array(npzread("data/DoF$tentative_nnode.cells.npz")') .+ 1
   points = Array(npzread("data/DoF$tentative_nnode.points.npz")')
   point_markers = Array(npzread("data/DoF$tentative_nnode.point_markers.npz")')
-  return cells, points, point_markers
+  cell_neighbors = Array(npzread("data/DoF$tentative_nnode.cell_neighbors.npz")')
+  return cells, points, point_markers, cell_neighbors
 end
 
 function get_total_area(cells, points)
@@ -57,9 +59,9 @@ function get_total_area(cells, points)
 end
 
 
-function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
-  nel = mesh.n_cell # Number of elements
-  nnode = mesh.n_point # Number of mesh nodes
+function mesh_partition(cells::Array{Int,2}, ndom::Int)
+  _, nel = size(cells) # Number of elements
+  nnode = maximum(cells) # Number of mesh nodes
 
   # Write mesh for mpmetis
   open("mesh.metis", "w") do io
@@ -67,7 +69,7 @@ function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
     for el in 1:nel
       
       # Metis starts indexing nodes at 1 
-      print(io, "$(mesh.cell[1, el]) $(mesh.cell[2, el]) $(mesh.cell[3, el])\n")
+      print(io, "$(cells[1, el]) $(cells[2, el]) $(cells[3, el])\n")
     end
   end
   
@@ -83,6 +85,24 @@ function mesh_partition(mesh::TriangleMesh.TriMesh, ndom::Int)
 
   return epart, npart 
 end
+
+
+function save_partition(epart::Array{Int,1},
+                        npart::Array{Int,1},
+                        tentative_nnode::Int,
+                        ndom::Int)
+  npzwrite("data/DoF$tentative_nnode-ndom$ndom.epart.npz", epart .- 1)
+  npzwrite("data/DoF$tentative_nnode-ndom$ndom.npart.npz", npart .- 1)
+end
+
+
+function load_partition(tentative_nnode::Int,
+                        ndom::Int)
+  epart = Array(npzread("data/DoF$tentative_nnode-ndom$ndom.epart.npz")) .+ 1
+  npart = Array(npzread("data/DoF$tentative_nnode-ndom$ndom.npart.npz")) .+ 1
+  return epart, npart
+end
+
 
 """
 using PyPlot

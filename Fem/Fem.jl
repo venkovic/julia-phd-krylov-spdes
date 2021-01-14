@@ -15,6 +15,8 @@ export get_mesh
 export save_mesh
 export load_mesh
 export mesh_partition
+export save_partition
+export load_partition
 export get_total_area
 
 export set_subdomain
