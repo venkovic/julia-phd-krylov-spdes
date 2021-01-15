@@ -74,6 +74,8 @@ function set_subdomains(cells::Array{Int,2},
     # Essential data structures
     ind_Id_g2l = [Dict{Int, Int}() for _ in 1:ndom] # Conversion table from global to local indices of 
                                                     # nodes strictly inside each subdomain
+    ind_Γd_g2l = [Dict{Int, Int}() for _ in 1:ndom] # Conversion table from global to local indices of 
+                                                    # nodes on the interface of each subdomain
     ind_Γ_g2l = Dict{Int, Int}() # Conversion table from global to local indices of 
                                  # nodes on the interface of the mesh partition
     node_owner = zeros(Int, nnode) # Indicates each node's owner 
@@ -114,8 +116,15 @@ function set_subdomains(cells::Array{Int,2},
   
             # Store common nodes in nodes_Γ
             for node in iel_cell
-              if (node in jel_cell) & !(node in node_Γ)
-                if !haskey(dirichlet_inds_g2l, node)
+
+              # Pick non-dirichlet node on subdomain interface
+              if (node in jel_cell) & !haskey(dirichlet_inds_g2l, node)
+                
+                if !haskey(ind_Γd_g2l[idom], node)
+                  ind_Γd_g2l[idom][node] = ind_Γd_g2l[idom].count + 1
+                end
+
+                if !(node in node_Γ)
                   push!(node_Γ, node)
                   ind_Γ_g2l[node] = ind_Γ_g2l.count + 1
                   node_owner[node] = -1
@@ -144,7 +153,9 @@ function set_subdomains(cells::Array{Int,2},
       end
     end
 
-    return ind_Id_g2l, ind_Γ_g2l, node_owner, elemd, node_Γ, node_Id, nnode_Id
+    return ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l,
+           node_owner, elemd, 
+           node_Γ, node_Id, nnode_Id
 end
 
 
@@ -152,6 +163,7 @@ function do_schur_assembly(cells::Array{Int,2},
                            points::Array{Float64,2},
                            epart::Array{Int,1},
                            ind_Id_g2l::Array{Dict{Int,Int},1},
+                           ind_Γd_g2l::Array{Dict{Int,Int},1},
                            ind_Γ_g2l::Dict{Int,Int},
                            node_owner::Array{Int,1},
                            a::Function,
@@ -161,8 +173,9 @@ function do_schur_assembly(cells::Array{Int,2},
   ndom = length(ind_Id_g2l) # Number of subdomains
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
-  n_Γ = ind_Γ_g2l.count # Number of non-Dirichlet nodes on the interface of the mesh partition
   n_Id = [ind_Id_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes strictly inside each subdomain
+  n_Γd = [ind_Γd_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes on the interface of each subdomain
+  n_Γ = ind_Γ_g2l.count # Number of non-Dirichlet nodes on the interface of the mesh partition
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
 
@@ -175,6 +188,11 @@ function do_schur_assembly(cells::Array{Int,2},
   IΓd_I = [Int[] for _ in 1:ndom]
   IΓd_J = [Int[] for _ in 1:ndom]
   IΓd_V = [Float64[] for _ in 1:ndom]
+
+  # Indices (I, J) and data (V) for sparse Galerkin operators A_ΓΓd
+  ΓΓd_I = [Int[] for _ in 1:ndom]
+  ΓΓd_J = [Int[] for _ in 1:ndom]
+  ΓΓd_V = [Float64[] for _ in 1:ndom]
   
   # Indices (I, J) and data (V) for sparse Galerkin operator A_ΓΓ
   ΓΓ_I, ΓΓ_J, ΓΓ_V =  Int[], Int[], Float64[] 
@@ -231,6 +249,11 @@ function do_schur_assembly(cells::Array{Int,2},
             push!(ΓΓ_I, ind_Γ_g2l[inode])
             push!(ΓΓ_J, ind_Γ_g2l[jnode])
             push!(ΓΓ_V, ΔKij)
+
+            # Add contribution to A_ΓΓd:
+            push!(ΓΓd_I[idom], ind_Γd_g2l[idom][inode])
+            push!(ΓΓd_J[idom], ind_Γd_g2l[idom][jnode])
+            push!(ΓΓd_V[idom], ΔKij)
 
           # inode, jnode ∈ (Ω_idom \ Γ)
           elseif (i_owner > 0) & (j_owner > 0)
@@ -293,9 +316,10 @@ function do_schur_assembly(cells::Array{Int,2},
   # Assemble csc sparse arrays
   A_IId = [sparse(IId_I[idom], IId_J[idom], IId_V[idom]) for idom in 1:ndom]
   A_IΓd = [sparse(IΓd_I[idom], IΓd_J[idom], IΓd_V[idom], size(A_IId[idom])[1], n_Γ) for idom in 1:ndom]
+  A_ΓΓd = [sparse(ΓΓd_I[idom], ΓΓd_J[idom], ΓΓd_V[idom]) for idom in 1:ndom]
   A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
 
-  return A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ
+  return A_IId, A_IΓd, A_ΓΓd, A_ΓΓ, b_Id, b_Γ
 end
 
 
@@ -304,6 +328,7 @@ function do_schur_assembly(cells::Array{Int,2},
                            points::Array{Float64,2},
                            epart::Array{Int,1},
                            ind_Id_g2l::Array{Dict{Int,Int},1},
+                           ind_Γd_g2l::Array{Dict{Int,Int},1},
                            ind_Γ_g2l::Dict{Int,Int},
                            node_owner::Array{Int,1},
                            coeff::Array{Float64,1},
@@ -313,8 +338,9 @@ function do_schur_assembly(cells::Array{Int,2},
   ndom = length(ind_Id_g2l) # Number of subdomains
   _, nel = size(cells) # Number of elements
   _, nnode = size(points) # Number of nodes
-  n_Γ = ind_Γ_g2l.count # Number of non-Dirichlet nodes on the interface of the mesh partition
   n_Id = [ind_Id_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes strictly inside each subdomain
+  n_Γd = [ind_Γd_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes on the interface of each subdomain
+  n_Γ = ind_Γ_g2l.count # Number of non-Dirichlet nodes on the interface of the mesh partition  
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
 
@@ -327,6 +353,11 @@ function do_schur_assembly(cells::Array{Int,2},
   IΓd_I = [Int[] for _ in 1:ndom]
   IΓd_J = [Int[] for _ in 1:ndom]
   IΓd_V = [Float64[] for _ in 1:ndom]
+
+  # Indices (I, J) and data (V) for sparse Galerkin operators A_ΓΓd
+  ΓΓd_I = [Int[] for _ in 1:ndom]
+  ΓΓd_J = [Int[] for _ in 1:ndom]
+  ΓΓd_V = [Float64[] for _ in 1:ndom]
 
   # Indices (I, J) and data (V) for sparse Galerkin operator A_ΓΓ
   ΓΓ_I, ΓΓ_J, ΓΓ_V =  Int[], Int[], Float64[] 
@@ -383,6 +414,11 @@ function do_schur_assembly(cells::Array{Int,2},
             push!(ΓΓ_I, ind_Γ_g2l[inode])
             push!(ΓΓ_J, ind_Γ_g2l[jnode])
             push!(ΓΓ_V, ΔKij)
+
+            # Add contribution to A_ΓΓd:
+            push!(ΓΓd_I[idom], ind_Γd_g2l[idom][inode])
+            push!(ΓΓd_J[idom], ind_Γd_g2l[idom][jnode])
+            push!(ΓΓd_V[idom], ΔKij)
 
           # inode, jnode ∈ (Ω_idom \ Γ)
           elseif (i_owner > 0) & (j_owner > 0)
@@ -444,9 +480,10 @@ function do_schur_assembly(cells::Array{Int,2},
   # Assemble csc sparse arrays
   A_IId = [sparse(IId_I[idom], IId_J[idom], IId_V[idom]) for idom in 1:ndom]
   A_IΓd = [sparse(IΓd_I[idom], IΓd_J[idom], IΓd_V[idom], size(A_IId[idom])[1], n_Γ) for idom in 1:ndom]
+  A_ΓΓd = [sparse(ΓΓd_I[idom], ΓΓd_J[idom], ΓΓd_V[idom]) for idom in 1:ndom]
   A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
 
-  return A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ
+  return A_IId, A_IΓd, A_ΓΓd, A_ΓΓ, b_Id, b_Γ
 end
 
 
@@ -463,6 +500,19 @@ function apply_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
   end
   return Sx
 end
+
+
+function apply_local_schur(A_IId::SparseMatrixCSC{Float64,Int},
+                           A_IΓd::SparseMatrixCSC{Float64,Int},
+                           A_ΓΓd::SparseMatrixCSC{Float64,Int},
+                           x::Array{Float64,1})
+ 
+  Sx = A_ΓΓd * x
+  v = IterativeSolvers.cg(A_IId, A_IΓd * x)
+  Sx .-= A_IΓd' * v
+  return Sx
+end
+
 
 #using Preconditioners
 #const TAmg = AMGPreconditioner{SmoothedAggregation,AlgebraicMultigrid.MultiLevel{AlgebraicMultigrid.Pinv{Float64},AlgebraicMultigrid.GaussSeidel{AlgebraicMultigrid.SymmetricSweep},AlgebraicMultigrid.GaussSeidel{AlgebraicMultigrid.SymmetricSweep},SparseArrays.SparseMatrixCSC{Float64,Int64},SparseArrays.SparseMatrixCSC{Float64,Int64},LinearAlgebra.Adjoint{Float64,SparseArrays.SparseMatrixCSC{Float64,Int64}},AlgebraicMultigrid.MultiLevelWorkspace{Array{Float64,1},1}}}

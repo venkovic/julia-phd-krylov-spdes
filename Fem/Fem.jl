@@ -25,6 +25,7 @@ export set_subdomains
 
 export do_schur_assembly
 export apply_schur
+export apply_local_schur
 export get_schur_rhs
 export get_subdomain_solutions
 export merge_subdomain_solutions
