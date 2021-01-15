@@ -766,13 +766,6 @@ function project_on_mesh(nnodes::Int,
                          inds_l2gd::Array{Array{Int,1},1},
                          ϕd::Array{Array{Float64,2},1})
 
-
-
-  println(size(Φ))
-  println(size(elemsd))
-  println(size(inds_l2gd))
-  println(size(ϕd))
-
   ndom = length(elemsd) # Number of subdomains
   _, nmodes = size(Φ) # Number of reduced modes
   md = Int[] # Number of local modes in each subdomain
