@@ -51,6 +51,9 @@ function uexact(xx::Float64, yy::Float64)
   return .734
 end
 
+println("nnode = $(size(points)[2])")
+println("nel = $(size(cells)[2])")
+
 print("do_isotropic_elliptic_assembly ...")
 A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             dirichlet_inds_g2l,

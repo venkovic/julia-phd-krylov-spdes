@@ -1,9 +1,9 @@
 using Distributed
 
-#addprocs(([("marcel", 4)]), tunnel=true)
-#addprocs(([("andrew", 3)]), tunnel=true)
+addprocs(([("marcel", 4)]), tunnel=true)
+addprocs(([("andrew", 3)]), tunnel=true)
 #addprocs(([("moorcock", 4)]), tunnel=true)
-addprocs(2)
+addprocs(2) # Add procs after remote hosts due to issue with ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
@@ -23,7 +23,7 @@ using NPZ
 @everywhere begin
   ndom = 400
   nev = 35
-  tentative_nnode = 80_000
+  tentative_nnode = 800_000
   forget = 1e-6
 end
 
@@ -69,6 +69,9 @@ model = "SExp"
 sig2 = 1.
 L = .1
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
+
+println("nnode = $(size(points)[2])")
+println("nel = $(size(cells)[2])")
 
 println("pll_solve_local_kl ...")
 @time domain = @sync @distributed merge! for idom in 1:ndom

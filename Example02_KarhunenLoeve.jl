@@ -30,7 +30,12 @@ function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
   return sig2 * exp(-((x1 - x2)^ 2 + (y1 - y2)^2) / L^2)
 end
 
-λ, Φ = solve_kl(cells, points, cov, nev, verbose=true)
+println("nnode = $(size(points)[2])")
+println("nel = $(size(cells)[2])")
 
-ξ, g = draw(λ, Φ)
+print("solve_kl ...")
+λ, Φ = @time solve_kl(cells, points, cov, nev, verbose=true)
+
+print("sample ...")
+ξ, g = @time draw(λ, Φ)
 npzwrite("data/$root_fname.greal.npz", g)

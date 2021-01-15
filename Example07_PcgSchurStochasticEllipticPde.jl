@@ -41,10 +41,9 @@ else
   save_partition(epart, npart, tentative_nnode, ndom)
 end
 
-ind_Id_g2l, ind_Γ_g2l, node_owner, 
+ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, node_owner, 
 elemd, node_Γ, node_Id, nnode_Id = set_subdomains(cells, cell_neighbors, epart,
                                                   npart, dirichlet_inds_g2l)
-
 
 function f(x::Float64, y::Float64)
   return -1.
@@ -68,34 +67,41 @@ println("extrema(ξ - χ) = $(extrema(ξ - χ))")
 print("in-place draw ...")
 @time draw!(Λ, Ψ, ξ, g)
 
-
 print("do_schur_assembly ...")
-A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(cells,
-                                                       points,
-                                                       epart,
-                                                       ind_Id_g2l,
-                                                       ind_Γ_g2l,
-                                                       node_owner,
-                                                       exp.(g),
-                                                       f,
-                                                       uexact)
+A_IId, A_IΓd, A_ΓΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(cells,
+                                                               points,
+                                                               epart,
+                                                               ind_Id_g2l,
+                                                               ind_Γd_g2l,
+                                                               ind_Γ_g2l,
+                                                               node_owner,
+                                                               exp.(g),
+                                                               f,
+                                                               uexact)
 
 
-print("assemble AMG preconditioners ...")
+print("assemble amg preconditioners ...")
 Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
                for idom in 1:ndom];
 
 n_Γ, _ = size(A_ΓΓ)
 S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
+
+n_Γd = [size(A_ΓΓd[idom])[1] for idom in 1:ndom]
+Sd = [LinearMap(x -> apply_local_schur(A_IId[idom], A_IΓd[idom], A_ΓΓd[idom], x), 
+                     n_Γ, issymmetric=true) for idom in 1:ndom]
+
 #S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x, Π_IId), n_Γ, issymmetric=true)
+
 print("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
-#print("solve for u_Γ ...")
-#u_Γ = @time IterativeSolvers.cg(S, b_schur)
-#print("get_subdomain_solutions ...")
-#u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
+print("solve for u_Γ ...")
+u_Γ = @time IterativeSolvers.cg(S, b_schur)
 
-#u_with_dd = merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
-#                                      dirichlet_inds_l2g, uexact,
-#                                      mesh.point)
+print("get_subdomain_solutions ...")
+u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
+
+u_with_dd = merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
+                                      dirichlet_inds_l2g, uexact,
+                                      points)

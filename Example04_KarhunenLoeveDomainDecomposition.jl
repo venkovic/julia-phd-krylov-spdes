@@ -57,6 +57,9 @@ elemsd = Array{Int,1}[]
 centerd = Array{Float64,1}[]
 energy_expected = 0.
 
+println("nnode = $(size(points)[2])")
+println("nel = $(size(cells)[2])")
+
 println("solve_local_kl ...")
 @time for idom in 1:ndom
   subdom = solve_local_kl(cells, points, epart, cov, nev, idom, relative=relative_local)

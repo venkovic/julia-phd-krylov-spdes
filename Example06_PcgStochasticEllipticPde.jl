@@ -15,12 +15,13 @@ load_existing_mesh = true
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 if load_existing_mesh
-  cells, points, point_markers = load_mesh(tentative_nnode)
+  cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
 else
   mesh = get_mesh(tentative_nnode)
   cells = mesh.cell
   points = mesh.point
   point_markers = mesh.point_marker
+  cell_neighbors = mesh.cell_neighbor
 end
 
 dirichlet_inds_g2l, not_dirichlet_inds_g2l,
@@ -34,6 +35,9 @@ end
 function uexact(xx::Float64, yy::Float64)
   return .734
 end
+
+println("nnode = $(size(points)[2])")
+println("nel = $(size(cells)[2])")
 
 M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
