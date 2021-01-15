@@ -27,16 +27,12 @@ dirichlet_inds_g2l, not_dirichlet_inds_g2l,
 dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
 get_dirichlet_inds(points, point_markers)
 
-function a(x::Float64, y::Float64)
-    return .1 + .0001 * x * y
-  end
-    
 function f(x::Float64, y::Float64)
-    return -1.
+  return -1.
 end
   
 function uexact(xx::Float64, yy::Float64)
-    return .734
+  return .734
 end
 
 M = get_mass_matrix(cells, points)
@@ -60,7 +56,7 @@ A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             point_markers,
                                             exp.(g), f, uexact)
 
-print("assemble AMG preconditioner ...")
+print("assemble amg preconditioner ...")
 Π1 = @time AMGPreconditioner{SmoothedAggregation}(A);
 
 print("solve for u_no_dirichlet ...")
@@ -68,6 +64,3 @@ u_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π1)
 
 draw!(Λ, Ψ, ξ, g)
 Π2 = @time AMGPreconditioner{SmoothedAggregation}(A);
-
-# Compare AMG for different realizations
-# AMG interpolation can become a pull request for Preconditioners.jl

@@ -73,7 +73,7 @@ println("do_global_mass_covariance_reduced_assembly ...")
 K = @time do_global_mass_covariance_reduced_assembly(cells, points, elemsd,
                                                      inds_g2ld, inds_l2gd, ϕd,
                                                      centerd, cov, forget=forget)
-println("done with do_global_mass_covariance_reduced_assembly.")
+println("... done with do_global_mass_covariance_reduced_assembly.")
 
 println("solve_global_reduced_kl ...")
 Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected,
