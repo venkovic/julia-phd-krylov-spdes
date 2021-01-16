@@ -332,6 +332,7 @@ function prepare_local_schurs(cells::Array{Int,2},
                               epart::Array{Int,1},
                               ind_Id_g2l::Array{Dict{Int,Int},1},
                               ind_Γd_g2l::Array{Dict{Int,Int},1},
+                              ind_Γ_g2l::Dict{Int,Int},
                               node_owner::Array{Int,1},
                               coeff::Union{Array{Float64,1},
                                            Function},
@@ -363,7 +364,7 @@ function prepare_local_schurs(cells::Array{Int,2},
 
   # Right hand sides
   b_Id = [zeros(Float64, n_Id[idom]) for idom in 1:ndom]
-  b_Γd = [zeros(Float64, n_Γd[idom]) for idom in 1:ndom]
+  b_Γ = zeros(Float64, sum(n_Γd))
 
   # Loop over elements
   for iel in 1:nel
@@ -379,7 +380,7 @@ function prepare_local_schurs(cells::Array{Int,2},
       if isa(coeff, Array{Float64,1})
         Δa += coeff[jnode]
       elseif isa(coeff, Function)
-        Δa += coeff(x[jnode], y[jnode])
+        Δa += coeff(x[j], y[j])
       end
     end
     Δa /= 3.
@@ -439,8 +440,8 @@ function prepare_local_schurs(cells::Array{Int,2},
 
           # jnode ∈ Γ
           if j_owner == -1
-            b_Γd[idom][ind_Γd_g2l[jnode]] -= ΔKij * uexact(x[i], y[i])
-
+            b_Γ[ind_Γ_g2l[jnode]] -= ΔKij * uexact(x[i], y[i])
+  
           # jnode ∈ (Ω_idom \ Γ)
           elseif j_owner > 0
             b_Id[idom][ind_Id_g2l[idom][jnode]] -= ΔKij * uexact(x[i], y[i])
@@ -465,7 +466,7 @@ function prepare_local_schurs(cells::Array{Int,2},
 
       # inode ∈ Γ
       if !i_is_dirichlet & (i_owner == -1)
-        b_Γd[idom][ind_Γd_g2l[inode]] += Δb
+        b_Γ[ind_Γ_g2l[inode]] += Δb
 
       # inode ∈ (Ω_idom \ Γ)
       elseif !i_is_dirichlet & (i_owner > 0)
@@ -481,7 +482,7 @@ function prepare_local_schurs(cells::Array{Int,2},
            for idom in 1:ndom]
   A_ΓΓd = [sparse(ΓΓd_I[idom], ΓΓd_J[idom], ΓΓd_V[idom]) for idom in 1:ndom]
 
-  return A_IId, A_IΓd, A_ΓΓd, b_Id, b_Γd
+  return A_IId, A_IΓd, A_ΓΓd, b_Id, b_Γ
 end
 
 
@@ -520,14 +521,9 @@ end
 function apply_local_schur(A_IId::SparseMatrixCSC{Float64,Int},
                            A_IΓd::SparseMatrixCSC{Float64,Int},
                            A_ΓΓd::SparseMatrixCSC{Float64,Int},
-                           ind_Γd_Γ2l::Dict{Int,Int},
-                           x::Array{Float64,1};
-                           Π_IId=nothing)
+                           xd::Array{Float64,1};
+                           precond=nothing)
   
-  xd = Array{Float64,1}(undef, ind_Γd_Γ2l.count)
-  for (node_in_Γ, inode) in ind_Γd_Γ2l
-    xd[inode] = x[node_in_Γ]
-  end
   Sdxd = A_ΓΓd * xd
   if isnothing(preconds)
     v = IterativeSolvers.cg(A_IId, A_IΓd * xd)
@@ -535,8 +531,32 @@ function apply_local_schur(A_IId::SparseMatrixCSC{Float64,Int},
     v = IterativeSolvers.cg(A_IId, A_IΓd * xd, Pl=preconds[idom])
   end
   Sdxd .-= A_IΓd' * v
-  return Sxd
+  return Sdxd
 end
+
+
+function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                               A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                               A_ΓΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                               x::Array{Float64,1};
+                               preconds=nothing)
+
+xd = Array{Float64,1}(undef, ind_Γd_Γ2l.count)
+for (node_in_Γ, inode) in ind_Γd_Γ2l
+xd[inode] = x[node_in_Γ]
+end
+Sdxd = A_ΓΓd * xd
+if isnothing(preconds)
+v = IterativeSolvers.cg(A_IId, A_IΓd * xd)
+else
+v = IterativeSolvers.cg(A_IId, A_IΓd * xd, Pl=preconds[idom])
+end
+Sdxd .-= A_IΓd' * v
+return Sxd
+end
+
+
 
 
 function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
