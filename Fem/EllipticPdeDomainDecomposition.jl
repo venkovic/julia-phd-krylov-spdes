@@ -1,6 +1,7 @@
 using DelimitedFiles
 using IterativeSolvers
-  
+using LinearAlgebra
+using SparseArrays
 
 """
 set_subdomains(cells::Array{Int,2}, 
@@ -85,6 +86,7 @@ function set_subdomains(cells::Array{Int,2},
     # Extra data structures
     elemd = [Int[] for _ in 1:ndom] # Elements contained inside each subdomain 
     node_Γ = Int[] # Nodes at the interface of the mesh partition which are not Dirichlet
+    node_Γ_cnt = Int[] # Number of subdomains owning each local node ∈ Γ
     node_Id = [Int[] for _ in 1:ndom] # Non-Dirichlet nodes strictly inside each subdomain
     nnode_Id = zeros(Int, ndom) # Number of non-Dirchlet nodes strictly inside each subdomain
 
@@ -128,8 +130,11 @@ function set_subdomains(cells::Array{Int,2},
 
                 if !(node in node_Γ)
                   push!(node_Γ, node)
+                  push!(node_Γ_cnt, 1)
                   ind_Γ_g2l[node] = ind_Γ_g2l.count + 1
                   node_owner[node] = -1
+                else
+                  node_Γ_cnt[ind_Γ_g2l[node]] += 1
                 end
               end
             end # for node
@@ -163,7 +168,7 @@ function set_subdomains(cells::Array{Int,2},
     end
 
     return ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l,
-           node_owner, elemd, node_Γ, node_Id, nnode_Id
+           node_owner, elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id
 end
 
 
@@ -539,24 +544,83 @@ function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                                A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
                                A_ΓΓd::Array{SparseMatrixCSC{Float64,Int},1},
                                ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                               node_Γ_cnt::Array{Int,1},
                                x::Array{Float64,1};
                                preconds=nothing)
+  
+  ndom = length(A_IId)
+  Sx = zeros(Int, length(node_Γ_cnt))
 
-xd = Array{Float64,1}(undef, ind_Γd_Γ2l.count)
-for (node_in_Γ, inode) in ind_Γd_Γ2l
-xd[inode] = x[node_in_Γ]
-end
-Sdxd = A_ΓΓd * xd
-if isnothing(preconds)
-v = IterativeSolvers.cg(A_IId, A_IΓd * xd)
-else
-v = IterativeSolvers.cg(A_IId, A_IΓd * xd, Pl=preconds[idom])
-end
-Sdxd .-= A_IΓd' * v
-return Sxd
+  for idom in 1:ndom
+
+    xd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
+    Sdxd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
+
+    for (node_in_Γ, inode) in ind_Γd_Γ2l[idom]
+      xd[inode] = x[node_in_Γ] / node_Γ_cnt[node_in_Γ]
+    end
+  
+    Sdxd .= A_ΓΓd[idom] * xd
+
+    if isnothing(preconds)
+      v = IterativeSolvers.cg(A_IId[idom], A_IΓd[idom] * xd)
+    else
+      v = IterativeSolvers.cg(A_IId[idom], A_IΓd[idom] * xd, Pl=preconds[idom])
+    end
+  
+    Sdxd .-= A_IΓd[idom]' * v
+
+    for (node_in_Γ, inode) in ind_Γd_Γ2l[idom]
+      Sx[node_in_Γ] += Sdxd[inode] / node_Γ_cnt[node_in_Γ]
+    end
+
+  end # for idom
+  return Sx
 end
 
 
+struct NeumannNeumannSchurPreconditioner
+  A_IId::Array{SparseMatrixCSC{Float64,Int},1}
+  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
+  A_ΓΓd::Array{SparseMatrixCSC{Float64,Int},1}
+  ind_Γd_Γ2l::Array{Dict{Int,Int},1}
+  node_Γ_cnt::Array{Int,1}
+end
+
+
+import Base: \
+function (\)(Πnn::NeumannNeumannSchurPreconditioner, x::Array{Float64,1}) 
+  apply_neumann_neumann(Πnn.A_IId,
+                        Πnn.A_IΓd,
+                        Πnn.A_ΓΓd,
+                        Πnn.ind_Γd_Γ2l,
+                        Πnn.node_Γ_cnt,
+                        x)
+end
+
+
+function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
+                             Πnn::NeumannNeumannSchurPreconditioner,
+                             r::Array{Float64,1})
+
+  z .= apply_neumann_neumann(Πnn.A_IId,
+                             Πnn.A_IΓd,
+                             Πnn.A_ΓΓd,
+                             Πnn.ind_Γd_Γ2l,
+                             Πnn.node_Γ_cnt,
+                             r)
+end
+
+function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
+                             r::Array{Float64,1})
+
+r .= apply_neumann_neumann(Πnn.A_IId,
+                Πnn.A_IΓd,
+                Πnn.A_ΓΓd,
+                Πnn.ind_Γd_Γ2l,
+                Πnn.node_Γ_cnt,
+                copy(r))
+end
 
 
 function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
@@ -621,15 +685,4 @@ function merge_subdomain_solutions(u_Γ::Array{Float64,1},
   end
 
   return u
-end
-
-struct DdPrecondNeumannNeumann
-  inds_g2l::Dict{Int,Int}  #
-  inds_l2g::Vector{Int}    #
-  elems::Vector{Int}       #
-  ϕ::Array{Float64,2}      #
-  center::Array{Float64,1} #
-  energy::Float64          #
-
-  
 end
