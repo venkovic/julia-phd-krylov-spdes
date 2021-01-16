@@ -23,8 +23,9 @@ export get_total_area
 export set_subdomain
 export set_subdomains
 
-export do_schur_assembly
-export apply_schur
+export prepare_global_schur
+export prepare_local_schurs
+export apply_global_schur
 export apply_local_schur
 export get_schur_rhs
 export get_subdomain_solutions
