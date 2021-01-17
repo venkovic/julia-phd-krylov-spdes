@@ -81,7 +81,6 @@ print("assemble amg preconditioners of A_IId ...")
                for idom in 1:ndom];
 
 n_Γ, _ = size(A_ΓΓ)
-#S = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
 S = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x, preconds=Π_IId), n_Γ, issymmetric=true)
 
 print("get_schur_rhs ...")
@@ -121,11 +120,6 @@ A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           f,
                                                           uexact)
 
-n_Γd = [ind_Γd_g2l[idom].count for idom in 1:ndom]
-
-Π_IIdd = @time [AMGPreconditioner{SmoothedAggregation}(A_IIdd[idom])
-                for idom in 1:ndom];
-
 ΠSnn = prepare_neumann_neumann_schur_precond(A_IIdd,
                                              A_IΓdd,
                                              A_ΓΓdd,
@@ -139,16 +133,20 @@ S2 = LinearMap(x -> apply_local_schurs(A_IIdd,
                                        ind_Γd_Γ2l,
                                        node_Γ_cnt,
                                        x,
-                                       preconds=Π_IIdd),
+                                       preconds=Π_IId),
                                        n_Γ, issymmetric=true)
 
 Sd = [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                         A_IΓdd[idom],
                                         A_ΓΓdd[idom],
                                         xd,
-                                        precond=Π_IIdd[idom]),
+                                        precond=Π_IId[idom]),
                                         n_Γd[idom], issymmetric=true)
                                         for idom in 1:ndom]
+
+using LinearAlgebra
+isposdef(A)
+isposdef(S)
 
 println("extrema(S * b_schur - S2 * b_schur) = $(extrema(S * b_schur - S2 * b_schur))")
 
