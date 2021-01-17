@@ -152,3 +152,6 @@ println("extrema(S * b_schur - S2 * b_schur) = $(extrema(S * b_schur - S2 * b_sc
 
 print("solve for u_Γ with neumann-neumann preconditioner ...")
 u_Γ = @time IterativeSolvers.cg(S, b_schur, Pl=ΠSnn)
+
+A_ΓΓ2 = assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd, ind_Γd_Γ2l)
+println(extrema(A_ΓΓ - A_ΓΓ2))
