@@ -2,6 +2,8 @@ using DelimitedFiles
 using IterativeSolvers
 using LinearAlgebra
 using SparseArrays
+using LinearMaps
+
 
 """
 set_subdomains(cells::Array{Int,2}, 
@@ -482,12 +484,12 @@ function prepare_local_schurs(cells::Array{Int,2},
   end # for iel
 
   # Assemble csc sparse arrays
-  A_IId = [sparse(IId_I[idom], IId_J[idom], IId_V[idom]) for idom in 1:ndom]
-  A_IΓd = [sparse(IΓd_I[idom], IΓd_J[idom], IΓd_V[idom], n_Id[idom], n_Γd[idom]) 
+  A_IIdd = [sparse(IId_I[idom], IId_J[idom], IId_V[idom]) for idom in 1:ndom]
+  A_IΓdd = [sparse(IΓd_I[idom], IΓd_J[idom], IΓd_V[idom], n_Id[idom], n_Γd[idom]) 
            for idom in 1:ndom]
-  A_ΓΓd = [sparse(ΓΓd_I[idom], ΓΓd_J[idom], ΓΓd_V[idom]) for idom in 1:ndom]
+  A_ΓΓdd = [sparse(ΓΓd_I[idom], ΓΓd_J[idom], ΓΓd_V[idom]) for idom in 1:ndom]
 
-  return A_IId, A_IΓd, A_ΓΓd, b_Id, b_Γ
+  return A_IIdd, A_IΓdd, A_ΓΓdd, b_Id, b_Γ
 end
 
 
@@ -523,32 +525,32 @@ function apply_global_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
 end
 
 
-function apply_local_schur(A_IId::SparseMatrixCSC{Float64,Int},
-                           A_IΓd::SparseMatrixCSC{Float64,Int},
-                           A_ΓΓd::SparseMatrixCSC{Float64,Int},
+function apply_local_schur(A_IIdd::SparseMatrixCSC{Float64,Int},
+                           A_IΓdd::SparseMatrixCSC{Float64,Int},
+                           A_ΓΓdd::SparseMatrixCSC{Float64,Int},
                            xd::Array{Float64,1};
                            precond=nothing)
   
-  Sdxd = A_ΓΓd * xd
+  Sdxd = A_ΓΓdd * xd
   if isnothing(precond)
-    v = IterativeSolvers.cg(A_IId, A_IΓd * xd)
+    v = IterativeSolvers.cg(A_IIdd, A_IΓdd * xd, reltol=1e-9)
   else
-    v = IterativeSolvers.cg(A_IId, A_IΓd * xd, Pl=precond)
+    v = IterativeSolvers.cg(A_IIdd, A_IΓdd * xd, Pl=precond, reltol=1e-9)
   end
-  Sdxd .-= A_IΓd' * v
+  Sdxd .-= A_IΓdd' * v
   return Sdxd
 end
 
 
-function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                               A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                               A_ΓΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                               node_Γ_cnt::Array{Int,1},
-                               x::Array{Float64,1};
-                               preconds=nothing)
+function apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                            A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                            A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                            ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                            node_Γ_cnt::Array{Int,1},
+                            x::Array{Float64,1};
+                            preconds=nothing)
   
-  ndom = length(A_IId)
+  ndom = length(A_IIdd)
   Sx = zeros(Float64, length(node_Γ_cnt))
 
   for idom in 1:ndom
@@ -557,45 +559,99 @@ function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
     Sdxd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
 
     for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
-      xd[lnode_in_Γd] = x[lnode_in_Γ] / node_Γ_cnt[lnode_in_Γ]
+      xd[lnode_in_Γd] = x[lnode_in_Γ]
     end
-  
-    Sdxd .= A_ΓΓd[idom] * xd
 
     if isnothing(preconds)
-      v = IterativeSolvers.cg(A_IId[idom], A_IΓd[idom] * xd)
+      Sdxd .= apply_local_schur(A_IIdd[idom], A_IΓdd[idom], A_ΓΓdd[idom], xd)
     else
-      v = IterativeSolvers.cg(A_IId[idom], A_IΓd[idom] * xd, Pl=preconds[idom])
+      Sdxd .= apply_local_schur(A_IIdd[idom], A_IΓdd[idom], A_ΓΓdd[idom], xd,
+                                precond=preconds[idom])
     end
-  
-    Sdxd .-= A_IΓd[idom]' * v
 
     for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
-      Sx[lnode_in_Γ] += Sdxd[lnode_in_Γd] / node_Γ_cnt[lnode_in_Γ]
+      Sx[lnode_in_Γ] += Sdxd[lnode_in_Γd]
     end
 
   end # for idom
+
   return Sx
 end
 
 
 struct NeumannNeumannSchurPreconditioner
-  A_IId::Array{SparseMatrixCSC{Float64,Int},1}
-  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
-  A_ΓΓd::Array{SparseMatrixCSC{Float64,Int},1}
+  ΠSd::Array{Cholesky{Float64,Array{Float64,2}},1}
   ind_Γd_Γ2l::Array{Dict{Int,Int},1}
   node_Γ_cnt::Array{Int,1}
 end
 
 
+function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                               A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                               A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                               node_Γ_cnt::Array{Int,1};
+                                               preconds=nothing)
+
+  ndom = length(A_IIdd)
+  ΠSd = Cholesky{Float64,Array{Float64,2}}[]
+
+  for idom in 1:ndom
+    if isnothing(preconds)
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
+    else
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             precond=preconds[idom]),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
+    end
+
+    push!(ΠSd, cholesky(Symmetric(sparse(Sd))))
+  end
+
+  return NeumannNeumannSchurPreconditioner(ΠSd,
+                                           ind_Γd_Γ2l,
+                                           node_Γ_cnt)
+end
+
+
+function apply_neumann_neumann(Πnn::NeumannNeumannSchurPreconditioner,
+                               r::Array{Float64,1})
+
+  ndom = length(Πnn.ΠSd)
+  z = zeros(Float64, length(Πnn.node_Γ_cnt))
+
+  for idom in 1:ndom
+
+    n_Γd = Πnn.ind_Γd_Γ2l[idom].count
+    rd = Array{Float64,1}(undef, n_Γd)
+    ΠSdrd = Array{Float64,1}(undef, n_Γd)
+
+    for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      rd[lnode_in_Γd] = r[lnode_in_Γ] / Πnn.node_Γ_cnt[lnode_in_Γ]
+    end
+
+    ΠSdrd .= Πnn.ΠSd[idom] \ rd
+
+    for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      z[lnode_in_Γ] += ΠSdrd[lnode_in_Γd] / node_Γ_cnt[lnode_in_Γ]
+    end
+
+   end # for idom
+
+   return z
+end
+
+
 import Base: \
-function (\)(Πnn::NeumannNeumannSchurPreconditioner, x::Array{Float64,1}) 
-  apply_neumann_neumann(Πnn.A_IId,
-                        Πnn.A_IΓd,
-                        Πnn.A_ΓΓd,
-                        Πnn.ind_Γd_Γ2l,
-                        Πnn.node_Γ_cnt,
-                        x)
+function (\)(Πnn::NeumannNeumannSchurPreconditioner, x::Array{Float64,1})
+  apply_neumann_neumann(Πnn, x)
 end
 
 
@@ -603,23 +659,14 @@ function LinearAlgebra.ldiv!(z::Array{Float64,1},
                              Πnn::NeumannNeumannSchurPreconditioner,
                              r::Array{Float64,1})
 
-  z .= apply_neumann_neumann(Πnn.A_IId,
-                             Πnn.A_IΓd,
-                             Πnn.A_ΓΓd,
-                             Πnn.ind_Γd_Γ2l,
-                             Πnn.node_Γ_cnt,
-                             r)
+  z .= apply_neumann_neumann(Πnn, r)
 end
+
 
 function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
                              r::Array{Float64,1})
 
-r .= apply_neumann_neumann(Πnn.A_IId,
-                Πnn.A_IΓd,
-                Πnn.A_ΓΓd,
-                Πnn.ind_Γd_Γ2l,
-                Πnn.node_Γ_cnt,
-                copy(r))
+r .= apply_neumann_neumann(Πnn, copy(r))
 end
 
 
@@ -642,6 +689,7 @@ function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
   return b_schur
 end
 
+
 function get_subdomain_solutions(u_Γ::Array{Float64,1},
                                  A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                                  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -654,6 +702,7 @@ function get_subdomain_solutions(u_Γ::Array{Float64,1},
 
   return u_Id
 end
+
 
 function merge_subdomain_solutions(u_Γ::Array{Float64,1},
                                    u_Id::Array{Array{Float64,1},1},

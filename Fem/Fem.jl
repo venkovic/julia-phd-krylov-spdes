@@ -27,8 +27,10 @@ export prepare_global_schur
 export prepare_local_schurs
 export apply_global_schur
 export apply_local_schur
+export apply_local_schurs
 export apply_neumann_neumann
 export NeumannNeumannSchurPreconditioner
+export prepare_neumann_neumann_schur_precond
 export get_schur_rhs
 export get_subdomain_solutions
 export merge_subdomain_solutions
