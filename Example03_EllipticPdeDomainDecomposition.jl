@@ -125,7 +125,7 @@ A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                              A_ΓΓdd,
                                              ind_Γd_Γ2l,
                                              node_Γ_cnt,
-                                             preconds=Π_IIdd)
+                                             preconds=Π_IId)
 
 S2 = LinearMap(x -> apply_local_schurs(A_IIdd,
                                        A_IΓdd,
@@ -141,7 +141,7 @@ Sd = [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                         A_ΓΓdd[idom],
                                         xd,
                                         precond=Π_IId[idom]),
-                                        n_Γd[idom], issymmetric=true)
+                                        ind_Γd_g2l[idom].count, issymmetric=true)
                                         for idom in 1:ndom]
 
 using LinearAlgebra
