@@ -41,9 +41,12 @@ else
   save_partition(epart, npart, tentative_nnode, ndom)
 end
 
-ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, node_owner, 
-elemd, node_Γ, node_Id, nnode_Id = set_subdomains(cells, cell_neighbors, epart,
-                                                  npart, dirichlet_inds_g2l)
+ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l,
+node_owner, elemd, node_Γ, node_Id, nnode_Id = set_subdomains(cells,
+                                                              cell_neighbors,
+                                                              epart,
+                                                              npart,
+                                                              dirichlet_inds_g2l)
 
 function f(x::Float64, y::Float64)
   return -1.
@@ -61,7 +64,7 @@ g = npzread("data/$root_fname.kl-eigvecs.npz")
 
 # The eigenfunctions obtained by domain 
 # decomposition are not perfectly orthogonal
-χ = get_kl_coordinates(g, Λ, Ψ, M)  
+χ = get_kl_coordinates(g, Λ, Ψ, M)
 println("extrema(ξ - χ) = $(extrema(ξ - χ))")
 
 print("in-place draw ...")
@@ -89,7 +92,7 @@ S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true
 
 n_Γd = [size(A_ΓΓd[idom])[1] for idom in 1:ndom]
 Sd = [LinearMap(x -> apply_local_schur(A_IId[idom], A_IΓd[idom], A_ΓΓd[idom], x), 
-                     n_Γ, issymmetric=true) for idom in 1:ndom]
+                     n_Γd[idom], issymmetric=true) for idom in 1:ndom]
 
 #S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x, Π_IId), n_Γ, issymmetric=true)
 

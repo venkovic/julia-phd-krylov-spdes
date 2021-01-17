@@ -35,9 +35,12 @@ else
   save_partition(epart, npart, tentative_nnode, ndom)
 end
 
-ind_Id_g2l, ind_Γ_g2l, node_owner, 
-elemd, node_Γ, node_Id, nnode_Id = set_subdomains(cells, cell_neighbors, epart, 
-                                                  npart, dirichlet_inds_g2l)
+ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
+elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
+                                                              cell_neighbors,
+                                                              epart, 
+                                                              npart,
+                                                              dirichlet_inds_g2l)
 
 function a(x::Float64, y::Float64)
   return .1 + .0001 * x * y
@@ -61,30 +64,32 @@ A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             point_markers,
                                             a, f, uexact)
 
-print("do_schur_assembly ...")
-A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time do_schur_assembly(cells,
-                                                       points,
-                                                       epart,
-                                                       ind_Id_g2l,
-                                                       ind_Γ_g2l,
-                                                       node_owner,
-                                                       a,
-                                                       f,
-                                                       uexact)
+print("prepare_global_schur ...")
+A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
+                                                           points,
+                                                           epart,
+                                                           ind_Id_g2l,
+                                                           ind_Γ_g2l,
+                                                           node_owner,
+                                                           a,
+                                                           f,
+                                                           uexact)
 
 
-print("assemble amg preconditioners ...")
+print("assemble amg preconditioners of A_IId ...")
 Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
                for idom in 1:ndom];
 
 n_Γ, _ = size(A_ΓΓ)
-S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
-#S = LinearMap(x -> apply_schur(A_IId, A_IΓd, A_ΓΓ, x, Π_IId), n_Γ, issymmetric=true)
+#S = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x), n_Γ, issymmetric=true)
+S = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x, preconds=Π_IId), n_Γ, issymmetric=true)
+
 print("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
 print("solve for u_Γ ...")
 u_Γ = @time IterativeSolvers.cg(S, b_schur)
+
 print("get_subdomain_solutions ...")
 u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
 
@@ -92,7 +97,7 @@ u_with_dd = merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
                                       dirichlet_inds_l2g, uexact,
                                       points)
 
-print("assemble amg preconditioner ...")
+print("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
 print("solve for u_no_dd_no_dirichlet ...")
@@ -101,4 +106,51 @@ u_no_dd_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π)
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, points, uexact)
 
-print("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
+println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
+
+
+print("prepare_local_schurs ...")
+A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
+                                                          points,
+                                                          epart,
+                                                          ind_Id_g2l,
+                                                          ind_Γd_g2l,
+                                                          ind_Γ_g2l,
+                                                          node_owner,
+                                                          a,
+                                                          f,
+                                                          uexact)
+
+n_Γd = [ind_Γd_g2l[idom].count for idom in 1:ndom]
+
+Π_IIdd = @time [AMGPreconditioner{SmoothedAggregation}(A_IIdd[idom])
+                for idom in 1:ndom];
+
+ΠSnn = prepare_neumann_neumann_schur_precond(A_IIdd,
+                                             A_IΓdd,
+                                             A_ΓΓdd,
+                                             ind_Γd_Γ2l,
+                                             node_Γ_cnt,
+                                             preconds=Π_IIdd)
+
+S2 = LinearMap(x -> apply_local_schurs(A_IIdd,
+                                       A_IΓdd,
+                                       A_ΓΓdd,
+                                       ind_Γd_Γ2l,
+                                       node_Γ_cnt,
+                                       x,
+                                       preconds=Π_IIdd),
+                                       n_Γ, issymmetric=true)
+
+Sd = [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                        A_IΓdd[idom],
+                                        A_ΓΓdd[idom],
+                                        xd,
+                                        precond=Π_IIdd[idom]),
+                                        n_Γd[idom], issymmetric=true)
+                                        for idom in 1:ndom]
+
+println("extrema(S * b_schur - S2 * b_schur) = $(extrema(S * b_schur - S2 * b_schur))")
+
+print("solve for u_Γ with neumann-neumann preconditioner ...")
+u_Γ = @time IterativeSolvers.cg(S, b_schur, Pl=ΠSnn)
