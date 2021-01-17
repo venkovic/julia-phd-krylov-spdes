@@ -735,3 +735,33 @@ function merge_subdomain_solutions(u_Γ::Array{Float64,1},
 
   return u
 end
+
+
+function assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+  ind_Γd_Γ2l::Array{Dict{Int,Int},1})
+
+ndom = length(ind_Γd_Γ2l)
+ΓΓ_I = Int[]
+ΓΓ_J = Int[]
+ΓΓ_V = Float64[]
+
+for idom in 1:ndom
+
+n_Γd = length(ind_Γd_Γ2l[idom])
+ind_Γd_l2Γ = Array{Float64,1}(undef, n_Γd)
+
+for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+ind_Γd_l2Γ[lnode_in_Γd] = lnode_in_Γ
+end
+
+jnode = 1
+for (i, inode) in enumerate(A_ΓΓdd[idom].rowval)
+push!(ΓΓ_I, ind_Γd_l2Γ[inode])
+push!(ΓΓ_J, ind_Γd_l2Γ[jnode])
+push!(ΓΓ_V, A_ΓΓdd[idom][inode, jnode])
+i == A_ΓΓdd[idom].colptr[jnode + 1] ? jnode += 1 : nothing
+end
+end
+A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
+return A_ΓΓ
+end

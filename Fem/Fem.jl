@@ -34,6 +34,7 @@ export prepare_neumann_neumann_schur_precond
 export get_schur_rhs
 export get_subdomain_solutions
 export merge_subdomain_solutions
+export assemble_A_ΓΓ_from_local_blocks
 
 export do_local_mass_covariance_assembly
 export do_local_mass_assembly
