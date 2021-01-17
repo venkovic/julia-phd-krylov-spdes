@@ -130,11 +130,9 @@ function set_subdomains(cells::Array{Int,2},
 
                 if !(node in node_Γ)
                   push!(node_Γ, node)
-                  push!(node_Γ_cnt, 1)
+                  push!(node_Γ_cnt, 0)
                   ind_Γ_g2l[node] = ind_Γ_g2l.count + 1
                   node_owner[node] = -1
-                else
-                  node_Γ_cnt[ind_Γ_g2l[node]] += 1
                 end
               end
             end # for node
@@ -163,6 +161,7 @@ function set_subdomains(cells::Array{Int,2},
     # Create indexing conversion table from Γ to Γ_d for each subdomain
     for idom in 1:ndom
       for (node, inode) in enumerate(ind_Γd_g2l[idom])
+        node_Γ_cnt[node] += 1
         ind_Γd_Γ2l[idom][node] = ind_Γd_Γ2l[idom].count + 1
       end
     end
@@ -549,7 +548,7 @@ function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                                preconds=nothing)
   
   ndom = length(A_IId)
-  Sx = zeros(Int, length(node_Γ_cnt))
+  Sx = zeros(Float64, length(node_Γ_cnt))
 
   for idom in 1:ndom
 
