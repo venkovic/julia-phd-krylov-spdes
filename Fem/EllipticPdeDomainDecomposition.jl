@@ -160,9 +160,10 @@ function set_subdomains(cells::Array{Int,2},
 
     # Create indexing conversion table from Γ to Γ_d for each subdomain
     for idom in 1:ndom
-      for (node, inode) in enumerate(ind_Γd_g2l[idom])
-        node_Γ_cnt[node] += 1
-        ind_Γd_Γ2l[idom][node] = ind_Γd_Γ2l[idom].count + 1
+      for (gnode, _) in ind_Γd_g2l[idom]
+        lnode_in_Γ = ind_Γ_g2l[gnode]
+        node_Γ_cnt[lnode_in_Γ] += 1
+        ind_Γd_Γ2l[idom][lnode_in_Γ] = ind_Γd_Γ2l[idom].count + 1
       end
     end
 
@@ -529,10 +530,10 @@ function apply_local_schur(A_IId::SparseMatrixCSC{Float64,Int},
                            precond=nothing)
   
   Sdxd = A_ΓΓd * xd
-  if isnothing(preconds)
+  if isnothing(precond)
     v = IterativeSolvers.cg(A_IId, A_IΓd * xd)
   else
-    v = IterativeSolvers.cg(A_IId, A_IΓd * xd, Pl=preconds[idom])
+    v = IterativeSolvers.cg(A_IId, A_IΓd * xd, Pl=precond)
   end
   Sdxd .-= A_IΓd' * v
   return Sdxd
@@ -555,8 +556,8 @@ function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
     xd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
     Sdxd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
 
-    for (node_in_Γ, inode) in ind_Γd_Γ2l[idom]
-      xd[inode] = x[node_in_Γ] / node_Γ_cnt[node_in_Γ]
+    for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+      xd[lnode_in_Γd] = x[lnode_in_Γ] / node_Γ_cnt[lnode_in_Γ]
     end
   
     Sdxd .= A_ΓΓd[idom] * xd
@@ -569,8 +570,8 @@ function apply_neumann_neumann(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
   
     Sdxd .-= A_IΓd[idom]' * v
 
-    for (node_in_Γ, inode) in ind_Γd_Γ2l[idom]
-      Sx[node_in_Γ] += Sdxd[inode] / node_Γ_cnt[node_in_Γ]
+    for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+      Sx[lnode_in_Γ] += Sdxd[lnode_in_Γd] / node_Γ_cnt[lnode_in_Γ]
     end
 
   end # for idom
