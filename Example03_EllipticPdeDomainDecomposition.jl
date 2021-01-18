@@ -144,14 +144,7 @@ Sd = [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                         ind_Γd_g2l[idom].count, issymmetric=true)
                                         for idom in 1:ndom]
 
-using LinearAlgebra
-isposdef(A)
-isposdef(S)
-
 println("extrema(S * b_schur - S2 * b_schur) = $(extrema(S * b_schur - S2 * b_schur))")
 
 print("solve for u_Γ with neumann-neumann preconditioner ...")
 u_Γ = @time IterativeSolvers.cg(S, b_schur, Pl=ΠSnn)
-
-A_ΓΓ2 = assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd, ind_Γd_Γ2l)
-println(extrema(A_ΓΓ - A_ΓΓ2))
