@@ -612,7 +612,7 @@ function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Flo
                                              ind_Γd_Γ2l[idom].count, issymmetric=true)
     end
 
-    push!(ΠSd, cholesky(Symmetric(sparse(Sd))))
+    push!(ΠSd, cholesky(Symmetric(Array(Sd) + 1e-9 * I)))
   end
 
   return NeumannNeumannSchurPreconditioner(ΠSd,
@@ -640,7 +640,7 @@ function apply_neumann_neumann(Πnn::NeumannNeumannSchurPreconditioner,
     ΠSdrd .= Πnn.ΠSd[idom] \ rd
 
     for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      z[lnode_in_Γ] += ΠSdrd[lnode_in_Γd] / node_Γ_cnt[lnode_in_Γ]
+      z[lnode_in_Γ] += ΠSdrd[lnode_in_Γd] / Πnn.node_Γ_cnt[lnode_in_Γ]
     end
 
    end # for idom
