@@ -162,10 +162,10 @@ function set_subdomains(cells::Array{Int,2},
 
     # Create indexing conversion table from Γ to Γ_d for each subdomain
     for idom in 1:ndom
-      for (gnode, _) in ind_Γd_g2l[idom]
+      for (gnode, lnode_in_Γd) in ind_Γd_g2l[idom]
         lnode_in_Γ = ind_Γ_g2l[gnode]
         node_Γ_cnt[lnode_in_Γ] += 1
-        ind_Γd_Γ2l[idom][lnode_in_Γ] = ind_Γd_Γ2l[idom].count + 1
+        ind_Γd_Γ2l[idom][lnode_in_Γ] = lnode_in_Γd
       end
     end
 
@@ -738,30 +738,30 @@ end
 
 
 function assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-  ind_Γd_Γ2l::Array{Dict{Int,Int},1})
+                                         ind_Γd_Γ2l::Array{Dict{Int,Int},1})
 
-ndom = length(ind_Γd_Γ2l)
-ΓΓ_I = Int[]
-ΓΓ_J = Int[]
-ΓΓ_V = Float64[]
+  ndom = length(ind_Γd_Γ2l)
+  ΓΓ_I = Int[]
+  ΓΓ_J = Int[]
+  ΓΓ_V = Float64[]
 
-for idom in 1:ndom
+  for idom in 1:ndom
 
-n_Γd = length(ind_Γd_Γ2l[idom])
-ind_Γd_l2Γ = Array{Float64,1}(undef, n_Γd)
+    n_Γd = length(ind_Γd_Γ2l[idom])
+    ind_Γd_l2Γ = Array{Float64,1}(undef, n_Γd)
 
-for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
-ind_Γd_l2Γ[lnode_in_Γd] = lnode_in_Γ
-end
+    for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+      ind_Γd_l2Γ[lnode_in_Γd] = lnode_in_Γ
+    end
 
-jnode = 1
-for (i, inode) in enumerate(A_ΓΓdd[idom].rowval)
-push!(ΓΓ_I, ind_Γd_l2Γ[inode])
-push!(ΓΓ_J, ind_Γd_l2Γ[jnode])
-push!(ΓΓ_V, A_ΓΓdd[idom][inode, jnode])
-i == A_ΓΓdd[idom].colptr[jnode + 1] ? jnode += 1 : nothing
-end
-end
-A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
-return A_ΓΓ
+    jnode = 1
+    for (i, inode) in enumerate(A_ΓΓdd[idom].rowval)
+      push!(ΓΓ_I, ind_Γd_l2Γ[inode])
+      push!(ΓΓ_J, ind_Γd_l2Γ[jnode])
+      push!(ΓΓ_V, A_ΓΓdd[idom][inode, jnode])
+      i + 1 == A_ΓΓdd[idom].colptr[jnode + 1] ? jnode += 1 : nothing
+    end
+  end
+  A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
+  return A_ΓΓ
 end
