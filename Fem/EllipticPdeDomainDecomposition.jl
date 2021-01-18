@@ -3,6 +3,7 @@ using IterativeSolvers
 using LinearAlgebra
 using SparseArrays
 using LinearMaps
+import Arpack
 
 
 """
@@ -529,13 +530,14 @@ function apply_local_schur(A_IIdd::SparseMatrixCSC{Float64,Int},
                            A_IΓdd::SparseMatrixCSC{Float64,Int},
                            A_ΓΓdd::SparseMatrixCSC{Float64,Int},
                            xd::Array{Float64,1};
-                           precond=nothing)
+                           precond=nothing,
+                           reltol=1e-9)
   
   Sdxd = A_ΓΓdd * xd
   if isnothing(precond)
-    v = IterativeSolvers.cg(A_IIdd, A_IΓdd * xd, reltol=1e-9)
+    v = IterativeSolvers.cg(A_IIdd, A_IΓdd * xd, reltol=reltol)
   else
-    v = IterativeSolvers.cg(A_IIdd, A_IΓdd * xd, Pl=precond, reltol=1e-9)
+    v = IterativeSolvers.cg(A_IIdd, A_IΓdd * xd, Pl=precond, reltol=reltol)
   end
   Sdxd .-= A_IΓdd' * v
   return Sdxd
@@ -548,7 +550,8 @@ function apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
                             ind_Γd_Γ2l::Array{Dict{Int,Int},1},
                             node_Γ_cnt::Array{Int,1},
                             x::Array{Float64,1};
-                            preconds=nothing)
+                            preconds=nothing,
+                            reltol=1e-9)
   
   ndom = length(A_IIdd)
   Sx = zeros(Float64, length(node_Γ_cnt))
@@ -563,10 +566,11 @@ function apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
     end
 
     if isnothing(preconds)
-      Sdxd .= apply_local_schur(A_IIdd[idom], A_IΓdd[idom], A_ΓΓdd[idom], xd)
+      Sdxd .= apply_local_schur(A_IIdd[idom], A_IΓdd[idom], A_ΓΓdd[idom], xd,
+                                reltol=reltol)
     else
       Sdxd .= apply_local_schur(A_IIdd[idom], A_IΓdd[idom], A_ΓΓdd[idom], xd,
-                                precond=preconds[idom])
+                                precond=preconds[idom], reltol=reltol)
     end
 
     for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
@@ -580,7 +584,7 @@ end
 
 
 struct NeumannNeumannSchurPreconditioner
-  ΠSd::Array{Cholesky{Float64,Array{Float64,2}},1}
+  ΠSd::Array{Array{Float64,2},1}
   ind_Γd_Γ2l::Array{Dict{Int,Int},1}
   node_Γ_cnt::Array{Int,1}
 end
@@ -594,25 +598,40 @@ function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Flo
                                                preconds=nothing)
 
   ndom = length(A_IIdd)
-  ΠSd = Cholesky{Float64,Array{Float64,2}}[]
+  ΠSd = Array{Float64,2}[]
 
   for idom in 1:ndom
     if isnothing(preconds)
       Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                              A_IΓdd[idom],
                                              A_ΓΓdd[idom],
-                                             xd),
+                                             xd,
+                                             reltol=1e-15),
                                              ind_Γd_Γ2l[idom].count, issymmetric=true)
     else
       Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                              A_IΓdd[idom],
                                              A_ΓΓdd[idom],
                                              xd,
-                                             precond=preconds[idom]),
+                                             precond=preconds[idom],
+                                             reltol=1e-15),
                                              ind_Γd_Γ2l[idom].count, issymmetric=true)
     end
 
-    push!(ΠSd, cholesky(Symmetric(Array(Sd) + 1e-9 * I)))
+    #pseudoinv_Sd = zeros(Float64, Sd.N, Sd.N)  
+    #λ, ϕ = Arpack.eigs(Symmetric(Array(Sd) + 1e-8 * I), nev=Sd.N-1)
+    #for (k, λk) in enumerate(λ)
+    #  λk >  ? pseudoinv_Sd .+= λk ^ -1 * ϕ[:, k] * ϕ[:, k]' : break
+    #end
+    #λ, ϕ = LinearAlgebra.eigen(Symmetric(Array(Sd) + 1e-8 * I))    
+    #for k in Sd.N:-1:1
+    #  λ[k] > 1e-6 ? pseudoinv_Sd .+= λ[k] ^ -1 * ϕ[:, k] * ϕ[:, k]' : break
+    #end
+    
+    Sd_mat = Array(Sd)
+    pinv_Sd = pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
+
+    push!(ΠSd, pinv_Sd)
   end
 
   return NeumannNeumannSchurPreconditioner(ΠSd,
@@ -637,7 +656,7 @@ function apply_neumann_neumann(Πnn::NeumannNeumannSchurPreconditioner,
       rd[lnode_in_Γd] = r[lnode_in_Γ] / Πnn.node_Γ_cnt[lnode_in_Γ]
     end
 
-    ΠSdrd .= Πnn.ΠSd[idom] \ rd
+    ΠSdrd .= Πnn.ΠSd[idom] * rd
 
     for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
       z[lnode_in_Γ] += ΠSdrd[lnode_in_Γd] / Πnn.node_Γ_cnt[lnode_in_Γ]
