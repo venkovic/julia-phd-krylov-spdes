@@ -7,11 +7,16 @@ using LinearMaps
 using IterativeSolvers
 using Preconditioners
 
-tentative_nnode = 100_000
-load_existing_mesh = true
+tentative_nnode = 200_000
+load_existing_mesh = false
 
-ndom = 400
-load_existing_partition = true
+ndom = 50
+load_existing_partition = false
+
+# Remarks:
+# - NeumannNeumannSchurPreconditioner performs worse for larger ndom
+# - More CPU time is needed to apply the Schur complement (without
+#   parallelization) than to apply A
 
 if load_existing_mesh
   cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
@@ -87,7 +92,7 @@ print("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
 print("solve for u_Γ ...")
-u_Γ = @time IterativeSolvers.cg(S, b_schur)
+u_Γ = @time IterativeSolvers.cg(S, b_schur, verbose=true)
 
 print("get_subdomain_solutions ...")
 u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
@@ -107,7 +112,6 @@ u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
 
 println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
 
-
 print("prepare_local_schurs ...")
 A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           points,
@@ -119,13 +123,13 @@ A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           a,
                                                           f,
                                                           uexact)
-
-ΠSnn = prepare_neumann_neumann_schur_precond(A_IIdd,
-                                             A_IΓdd,
-                                             A_ΓΓdd,
-                                             ind_Γd_Γ2l,
-                                             node_Γ_cnt,
-                                             preconds=Π_IId)
+print("prepare_neumann_neumann_schur_precond ...")
+ΠSnn = @time prepare_neumann_neumann_schur_precond(A_IIdd,
+                                                   A_IΓdd,
+                                                   A_ΓΓdd,
+                                                   ind_Γd_Γ2l,
+                                                   node_Γ_cnt,
+                                                   preconds=Π_IId)
 
 S2 = LinearMap(x -> apply_local_schurs(A_IIdd,
                                        A_IΓdd,
@@ -136,7 +140,8 @@ S2 = LinearMap(x -> apply_local_schurs(A_IIdd,
                                        preconds=Π_IId),
                                        n_Γ, issymmetric=true)
 
-Sd = [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+print("Define (singular) local Schur operators ...")
+Sd = @time [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                         A_IΓdd[idom],
                                         A_ΓΓdd[idom],
                                         xd,
@@ -147,4 +152,4 @@ Sd = [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
 println("extrema(S * b_schur - S2 * b_schur) = $(extrema(S * b_schur - S2 * b_schur))")
 
 print("solve for u_Γ with neumann-neumann preconditioner ...")
-u_Γ = @time IterativeSolvers.cg(S, b_schur, Pl=ΠSnn)
+u_Γ = @time IterativeSolvers.cg(S, b_schur, Pl=ΠSnn, verbose=true)
