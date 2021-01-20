@@ -86,31 +86,19 @@ print("assemble amg preconditioners of A_IId ...")
                for idom in 1:ndom];
 
 n_Γ, _ = size(A_ΓΓ)
-S = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x, preconds=Π_IId), n_Γ, issymmetric=true)
+S_global = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x, preconds=Π_IId), n_Γ, issymmetric=true)
 
 print("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
-print("solve for u_Γ ...")
-u_Γ = @time IterativeSolvers.cg(S, b_schur, verbose=true)
-
-print("get_subdomain_solutions ...")
-u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id)
-
-u_with_dd = merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
-                                      dirichlet_inds_l2g, uexact,
-                                      points)
-
 print("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
-print("solve for u_no_dd_no_dirichlet ...")
+print("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
 u_no_dd_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π)
 
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, points, uexact)
-
-println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
 
 print("prepare_local_schurs ...")
 A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
@@ -123,33 +111,70 @@ A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           a,
                                                           f,
                                                           uexact)
-print("prepare_neumann_neumann_schur_precond ...")
-ΠSnn = @time prepare_neumann_neumann_schur_precond(A_IIdd,
-                                                   A_IΓdd,
-                                                   A_ΓΓdd,
-                                                   ind_Γd_Γ2l,
-                                                   node_Γ_cnt,
-                                                   preconds=Π_IId)
 
-S2 = LinearMap(x -> apply_local_schurs(A_IIdd,
-                                       A_IΓdd,
-                                       A_ΓΓdd,
-                                       ind_Γd_Γ2l,
-                                       node_Γ_cnt,
-                                       x,
-                                       preconds=Π_IId),
-                                       n_Γ, issymmetric=true)
+print("assemble_local_schurs ...")
+Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
+                                                          
+S_local_mat = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                                ind_Γd_Γ2l,
+                                                node_Γ_cnt,
+                                                x),
+                                                n_Γ, issymmetric=true)
+
+print("prepare_neumann_neumann_schur_precond using S_local_mat ...")
+ΠSnn_local_mat = @time prepare_neumann_neumann_schur_precond(Sd_local_mat,
+                                                             ind_Γd_Γ2l,
+                                                             node_Γ_cnt)
+
+S_local = LinearMap(x -> apply_local_schurs(A_IIdd,
+                                            A_IΓdd,
+                                            A_ΓΓdd,
+                                            ind_Γd_Γ2l,
+                                            node_Γ_cnt,
+                                            x,
+                                            preconds=Π_IId),
+                                            n_Γ, issymmetric=true)
+
+# Kind of slow ...
+#print("prepare_neumann_neumann_schur_precond with local amg-pcg solves ...")
+#ΠSnn_local = @time prepare_neumann_neumann_schur_precond(A_IIdd,
+#                                                         A_IΓdd,
+#                                                         A_ΓΓdd,
+#                                                         ind_Γd_Γ2l,
+#                                                         node_Γ_cnt,
+#                                                         preconds=Π_IId)
 
 print("Define (singular) local Schur operators ...")
 Sd = @time [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
-                                        A_IΓdd[idom],
-                                        A_ΓΓdd[idom],
-                                        xd,
-                                        precond=Π_IId[idom]),
-                                        ind_Γd_g2l[idom].count, issymmetric=true)
-                                        for idom in 1:ndom]
+                                              A_IΓdd[idom],
+                                              A_ΓΓdd[idom],
+                                              xd,
+                                              precond=Π_IId[idom]),
+                                              ind_Γd_g2l[idom].count, issymmetric=true)
+                                              for idom in 1:ndom]
 
-println("extrema(S * b_schur - S2 * b_schur) = $(extrema(S * b_schur - S2 * b_schur))")
+println("extrema(S_global * b_schur - S_local_mat * b_schur) = $(extrema(S_global * b_schur - S_local_mat * b_schur))")
 
-print("solve for u_Γ with neumann-neumann preconditioner ...")
-u_Γ = @time IterativeSolvers.cg(S, b_schur, Pl=ΠSnn, verbose=true)
+print("S * b_schur ...")
+@time S_global * b_schur;
+print("S_local * b_schur ...")
+@time S_local * b_schur;
+print("S_local_mat * b_schur ...")
+@time S_local_mat * b_schur;
+
+# Kind of slow ...
+#print("cg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+#u_Γ__global = @time IterativeSolvers.cg(S_global, b_schur, verbose=true)
+
+print("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+u_Γ = @time IterativeSolvers.cg(S_local_mat, b_schur, Pl=ΠSnn_local_mat, verbose=true);
+
+print("get_subdomain_solutions ...")
+u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id);
+
+print("merge_subdomain_solutions ...")
+u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
+                                            dirichlet_inds_l2g, uexact,
+                                            points);
+
+println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
