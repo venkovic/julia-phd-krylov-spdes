@@ -28,6 +28,7 @@ export prepare_local_schurs
 export apply_global_schur
 export apply_local_schur
 export apply_local_schurs
+export assemble_local_schurs
 export apply_neumann_neumann
 export NeumannNeumannSchurPreconditioner
 export prepare_neumann_neumann_schur_precond

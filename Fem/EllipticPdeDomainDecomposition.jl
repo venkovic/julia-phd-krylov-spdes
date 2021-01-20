@@ -544,6 +544,37 @@ function apply_local_schur(A_IIdd::SparseMatrixCSC{Float64,Int},
 end
 
 
+function assemble_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                               A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                               A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1};
+                               preconds=nothing,
+                               reltol=1e-9)
+
+  Sd_sp = SparseMatrixCSC{Float64,Int}[]
+  ndom = length(A_ΓΓdd)
+  for idom = 1:ndom
+    if isnothing(preconds)
+      Sd_map = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                                 A_IΓdd[idom],
+                                                 A_ΓΓdd[idom],
+                                                 xd,
+                                                 precond=preconds[idom],
+                                                 reltol=reltol),
+                                                 A_ΓΓdd[idom].n, issymmetric=true)
+    else
+      Sd_map = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                                 A_IΓdd[idom],
+                                                 A_ΓΓdd[idom],
+                                                 xd,
+                                                 reltol=reltol),
+                                                 A_ΓΓdd[idom].n, issymmetric=true)
+    end
+    push!(Sd_sp, sparse(Symmetric(Array(Sd_map))))
+  end
+return Sd_sp
+end
+
+
 function apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
                             A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
                             A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -577,6 +608,33 @@ function apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
       Sx[lnode_in_Γ] += Sdxd[lnode_in_Γd]
     end
 
+  end # for idom
+
+  return Sx
+end
+
+
+function apply_local_schurs(Sd::Union{Array{SparseMatrixCSC{Float64,Int},1},
+                                      Array{SparseMatrixCSC{Float64,Int},1}},
+                            ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                            node_Γ_cnt::Array{Int,1},
+                            x::Array{Float64,1};
+                            reltol=1e-9)
+
+  ndom = length(Sd)
+  Sx = zeros(Float64, length(node_Γ_cnt))
+
+  for idom in 1:ndom
+    xd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
+    Sdxd = Array{Float64,1}(undef, ind_Γd_Γ2l[idom].count)
+
+    for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+      xd[lnode_in_Γd] = x[lnode_in_Γ]
+    end
+    Sdxd .= Sd[idom] * xd
+    for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+      Sx[lnode_in_Γ] += Sdxd[lnode_in_Γd]
+    end
   end # for idom
 
   return Sx
@@ -627,7 +685,7 @@ function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Flo
     #for k in Sd.N:-1:1
     #  λ[k] > 1e-6 ? pseudoinv_Sd .+= λ[k] ^ -1 * ϕ[:, k] * ϕ[:, k]' : break
     #end
-    
+
     Sd_mat = Array(Sd)
     pinv_Sd = pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
 
@@ -677,15 +735,13 @@ end
 function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
                              Πnn::NeumannNeumannSchurPreconditioner,
                              r::Array{Float64,1})
-
   z .= apply_neumann_neumann(Πnn, r)
 end
 
 
 function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
                              r::Array{Float64,1})
-
-r .= apply_neumann_neumann(Πnn, copy(r))
+  r .= apply_neumann_neumann(Πnn, copy(r))
 end
 
 
@@ -781,6 +837,7 @@ function assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float
       i + 1 == A_ΓΓdd[idom].colptr[jnode + 1] ? jnode += 1 : nothing
     end
   end
+
   A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
   return A_ΓΓ
 end
