@@ -698,6 +698,28 @@ function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Flo
 end
 
 
+function prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
+                                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                               node_Γ_cnt::Array{Int,1})
+
+  ndom = length(Sd_local_mat)
+  ΠSd = Array{Float64,2}[]
+
+  for idom in 1:ndom
+    rtol = sqrt(eps(real(float(one(eltype(Sd_local_mat[idom]))))))
+    if isa(Sd_local_mat[idom], SparseMatrixCSC)
+      push!(ΠSd, pinv(Array(Sd_local_mat[idom]), rtol=rtol))
+    else
+      push!(ΠSd, pinv(Sd_local_mat[idom], rtol=rtol))
+    end
+  end
+
+  return NeumannNeumannSchurPreconditioner(ΠSd,
+                                           ind_Γd_Γ2l,
+                                           node_Γ_cnt)
+end
+
+
 function apply_neumann_neumann(Πnn::NeumannNeumannSchurPreconditioner,
                                r::Array{Float64,1})
 
