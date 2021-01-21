@@ -5,6 +5,8 @@ Pkg.activate(".")
 using Fem
 using RecyclingKrylovSolvers
 
+using Utils: space_println, printlnln
+
 using LinearMaps
 using Preconditioners
 
@@ -62,17 +64,17 @@ function uexact(xx::Float64, yy::Float64)
   return .734
 end
 
-println("nnode = $(size(points)[2])")
-println("nel = $(size(cells)[2])")
+space_println("nnode = $(size(points)[2])")
+space_println("nel = $(size(cells)[2])")
 
-print("do_isotropic_elliptic_assembly ...")
+printlnln("do_isotropic_elliptic_assembly ...")
 A, b = @time do_isotropic_elliptic_assembly(cells, points,
                                             dirichlet_inds_g2l,
                                             not_dirichlet_inds_g2l,
                                             point_markers,
                                             a, f, uexact)
 
-print("prepare_global_schur ...")
+printlnln("prepare_global_schur ...")
 A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
                                                            points,
                                                            epart,
@@ -83,27 +85,27 @@ A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
                                                            f,
                                                            uexact)
 
-print("assemble amg preconditioners of A_IId ...")
+printlnln("assemble amg preconditioners of A_IId ...")
 Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
                for idom in 1:ndom];
 
 n_Γ, _ = size(A_ΓΓ)
 S_global = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x, preconds=Π_IId), n_Γ, issymmetric=true)
 
-print("get_schur_rhs ...")
+printlnln("get_schur_rhs ...")
 b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
 
-print("assemble amg preconditioner of A ...")
+printlnln("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
-print("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
+printlnln("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
 u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=Π)
-println("n = $(A.n), n_iter = $it")
+space_println("n = $(A.n), iter = $it")
 
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, points, uexact)
 
-print("prepare_local_schurs ...")
+printlnln("prepare_local_schurs ...")
 A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           points,
                                                           epart,
@@ -115,7 +117,7 @@ A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           f,
                                                           uexact)
 
-print("assemble_local_schurs ...")
+printlnln("assemble_local_schurs ...")
 Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
                                                           
 S_local_mat = LinearMap(x -> apply_local_schurs(Sd_local_mat,
@@ -124,7 +126,7 @@ S_local_mat = LinearMap(x -> apply_local_schurs(Sd_local_mat,
                                                 x),
                                                 n_Γ, issymmetric=true)
 
-print("prepare_neumann_neumann_schur_precond using S_local_mat ...")
+printlnln("prepare_neumann_neumann_schur_precond using S_local_mat ...")
 ΠSnn_local_mat = @time prepare_neumann_neumann_schur_precond(Sd_local_mat,
                                                              ind_Γd_Γ2l,
                                                              node_Γ_cnt)
@@ -139,7 +141,7 @@ S_local = LinearMap(x -> apply_local_schurs(A_IIdd,
                                             n_Γ, issymmetric=true)
 
 # Kind of slow ...
-#print("prepare_neumann_neumann_schur_precond with local amg-pcg solves ...")
+#printlnln("prepare_neumann_neumann_schur_precond with local amg-pcg solves ...")
 #ΠSnn_local = @time prepare_neumann_neumann_schur_precond(A_IIdd,
 #                                                         A_IΓdd,
 #                                                         A_ΓΓdd,
@@ -147,7 +149,7 @@ S_local = LinearMap(x -> apply_local_schurs(A_IIdd,
 #                                                         node_Γ_cnt,
 #                                                         preconds=Π_IId)
 
-print("define (singular) local Schur operators ...")
+printlnln("define (singular) local Schur operators ...")
 Sd = @time [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                               A_IΓdd[idom],
                                               A_ΓΓdd[idom],
@@ -156,50 +158,50 @@ Sd = @time [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                               ind_Γd_g2l[idom].count, issymmetric=true)
                                               for idom in 1:ndom]
 
-println("extrema(S_global * b_schur - S_local_mat * b_schur) = $(extrema(S_global * b_schur - S_local_mat * b_schur))")
+space_println("extrema(S_global * b_schur - S_local_mat * b_schur) = $(extrema(S_global * b_schur - S_local_mat * b_schur))")
 
-print("S * b_schur ...")
+printlnln("S * b_schur ...")
 @time S_global * b_schur;
-print("S_local * b_schur ...")
+printlnln("S_local * b_schur ...")
 @time S_local * b_schur;
-print("S_local_mat * b_schur ...")
+printlnln("S_local_mat * b_schur ...")
 @time S_local_mat * b_schur;
 
 # Kind of slow ...
-#print("cg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+#printlnln("cg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
 #u_Γ__global, it, _ = @time cg(S_global, b_schur)
 #println("n = $(S_global.N), iter = $it")
 
-print("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+printlnln("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time pcg(S_local_mat, b_schur, M=ΠSnn_local_mat);
-println("n = $(S_local_mat.N), iter = $it")
+space_println("n = $(S_local_mat.N), iter = $it")
 
-print("get_subdomain_solutions ...")
+printlnln("get_subdomain_solutions ...")
 u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id);
 
-print("merge_subdomain_solutions ...")
+printlnln("merge_subdomain_solutions ...")
 u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
                                             dirichlet_inds_l2g, uexact,
                                             points);
 
-println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
+space_println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
 
 # There's gotta be a betta way!
 using SparseArrays
-print("assemble global schur ...")
+printlnln("assemble global schur ...")
 S_sp = @time sparse(S_local_mat)
 
 nev = ndom + 10
 
 using Arpack
-print("solve for least dominant eigvecs of schur complement ...")
+printlnln("solve for least dominant eigvecs of schur complement ...")
 λ, ϕ = @time Arpack.eigs(S_sp, nev=nev, which=:SM)
-print("ld-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+printlnln("ld-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
-println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (ld), iter = $it")
+space_println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (ld), iter = $it")
 
-print("solve for most dominant eigvecs of schur complement ...")
+printlnln("solve for most dominant eigvecs of schur complement ...")
 λ, ϕ = @time Arpack.eigs(S_sp, nev=nev, which=:LM)
-print("md-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+printlnln("md-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
-println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (md), iter = $it")
+space_println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (md), iter = $it")
