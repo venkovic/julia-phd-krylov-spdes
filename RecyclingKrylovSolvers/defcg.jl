@@ -351,46 +351,63 @@ Def-PCG: 71, PCG: 258
 Def-PCG: 70, PCG: 259
 ```
 """
-function defpcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, M, W::Array{T,2})
-  r, Ap, res_norm, p, z = similar(x), similar(x), similar(x), similar(x), similar(x)
-  #
-  WtA = W' * A
+function defpcg(A::Union{SparseMatrixCSC{T},
+                         FunctionMap},
+                b::Vector{T},
+                W::Array{T,2};
+                x=nothing,
+                M=nothing)
+
+  n, nev = size(W)
+
+  isnothing(x) ? x = zeros(n) : nothing
+
+  r = Array{T,1}(undef, n)
+  Ap = Array{T,1}(undef, n)
+  res_norm = Array{T,1}(undef, n)
+  p = Array{T,1}(undef, n)
+  z = Array{T,1}(undef, n)
+  mu = Array{T,1}(undef, nev)
+  WtA = Array{T,2}(undef, nev, n)
+  AW = Array{T,2}(undef, n, nev)
+  WtAW = Array{T,2}(undef, nev, nev)
+
+  for ivec in 1:nev 
+    AW[:, ivec] = A * W[:, ivec]
+  end
+  WtA .= AW'
   WtAW = WtA * W
-  #
   if iszero(x)
     r .= b
   else
-    r = b - A * x
+    r .= b .- A * x
   end
-  mu = W' * r
-  mu = WtAW \ mu
-  x += W * mu
-  #
+  mu .= W' * r
+  mu .= WtAW \ mu
+  x .+= W * mu
   it = 1
-  r = b - A * x
+  r .= b .- A * x
   rTr = dot(r, r)
-  z = (M \ r)::Vector{T}
+  z .= M \ r
   rTz = dot(r, z)
-  mu = WtAW \ (WtA * z)
-  p = z - (W * mu)
+  mu .= WtAW \ (WtA * z)
+  p .= z .- (W * mu)
   res_norm[it] = sqrt(rTr)
-  #
   bnorm = norm2(b)
   tol = eps * bnorm
-  #
-  while (it < A.n) && (res_norm[it] > tol)
-    mul!(Ap, A, p) # Ap = A * p
+  while (it < n) && (res_norm[it] > tol)
+    mul!(Ap, A, p) # Ap .= A * p
     d = dot(p, Ap)
     alpha = rTz / d
     beta = 1. / rTz
-    axpy!(alpha, p, x) # x += alpha * p
-    axpy!(-alpha, Ap, r) # r -= alpha * Ap
+    axpy!(alpha, p, x) # x .+= alpha * p
+    axpy!(-alpha, Ap, r) # r .-= alpha * Ap
     rTr = dot(r, r)
-    z = (M \ r)::Vector{T}
+    z .= M \ r
     rTz = dot(r, z)
     beta *= rTz
-    mu = WtAW \ (WtA * z)
-    p = beta * p + z - (W * mu)
+    mu .= WtAW \ (WtA * z)
+    p .= beta * p .+ z .- (W * mu)
     it += 1
     res_norm[it] = sqrt(rTr)
   end
