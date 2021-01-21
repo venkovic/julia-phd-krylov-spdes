@@ -1,8 +1,8 @@
-using DelimitedFiles
-using IterativeSolvers
-using LinearAlgebra
-using SparseArrays
-using LinearMaps
+using DelimitedFiles: readdlm
+using SparseArrays: sparse
+using LinearMaps: LinearMap
+import LinearAlgebra
+import IterativeSolvers
 import Arpack
 
 
@@ -687,7 +687,7 @@ function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Flo
     #end
 
     Sd_mat = Array(Sd)
-    pinv_Sd = pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
+    pinv_Sd = LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
 
     push!(ΠSd, pinv_Sd)
   end
@@ -708,9 +708,9 @@ function prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixC
   for idom in 1:ndom
     rtol = sqrt(eps(real(float(one(eltype(Sd_local_mat[idom]))))))
     if isa(Sd_local_mat[idom], SparseMatrixCSC)
-      push!(ΠSd, pinv(Array(Sd_local_mat[idom]), rtol=rtol))
+      push!(ΠSd, LinearAlgebra.pinv(Array(Sd_local_mat[idom]), rtol=rtol))
     else
-      push!(ΠSd, pinv(Sd_local_mat[idom], rtol=rtol))
+      push!(ΠSd, LinearAlgebra.pinv(Sd_local_mat[idom], rtol=rtol))
     end
   end
 
@@ -755,14 +755,13 @@ end
 
 
 function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
-                             Πnn::NeumannNeumannSchurPreconditioner,
-                             r::Array{Float64,1})
+                            Πnn::NeumannNeumannSchurPreconditioner,
+               r::Array{Float64,1})
   z .= apply_neumann_neumann(Πnn, r)
 end
 
-
 function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
-                             r::Array{Float64,1})
+               r::Array{Float64,1})
   r .= apply_neumann_neumann(Πnn, copy(r))
 end
 
