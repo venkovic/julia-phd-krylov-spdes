@@ -1,10 +1,11 @@
 push!(LOAD_PATH, "./Fem/")
+push!(LOAD_PATH, "./RecyclingKrylovSolvers/")
 import Pkg
 Pkg.activate(".")
 using Fem
+using RecyclingKrylovSolvers
 
 using LinearMaps
-using IterativeSolvers
 using Preconditioners
 
 tentative_nnode = 200_000
@@ -14,9 +15,11 @@ ndom = 50
 load_existing_partition = false
 
 # Remarks:
-# - NeumannNeumannSchurPreconditioner performs worse for larger ndom
-# - More CPU time is needed to apply the Schur complement (without
-#   parallelization) than to apply A
+# - Use assemble_local_schurs() for a faster set-up and application
+#   of the NeumannNeumannSchurPreconditioner
+# - NeumannNeumannSchurPreconditioner-pcg performs worse for larger ndom
+# - def-NeumannNeumannSchurPreconditioner-pcg works very well with least
+#   dominant (ld) eigenvectors
 
 if load_existing_mesh
   cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
@@ -80,7 +83,6 @@ A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
                                                            f,
                                                            uexact)
 
-
 print("assemble amg preconditioners of A_IId ...")
 Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
                for idom in 1:ndom];
@@ -95,7 +97,8 @@ print("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
 print("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
-u_no_dd_no_dirichlet = @time IterativeSolvers.cg(A, b, Pl=Π)
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=Π)
+println("n = $(A.n), n_iter = $it")
 
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, points, uexact)
@@ -144,7 +147,7 @@ S_local = LinearMap(x -> apply_local_schurs(A_IIdd,
 #                                                         node_Γ_cnt,
 #                                                         preconds=Π_IId)
 
-print("Define (singular) local Schur operators ...")
+print("define (singular) local Schur operators ...")
 Sd = @time [LinearMap(xd -> apply_local_schur(A_IIdd[idom],
                                               A_IΓdd[idom],
                                               A_ΓΓdd[idom],
@@ -164,10 +167,12 @@ print("S_local_mat * b_schur ...")
 
 # Kind of slow ...
 #print("cg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
-#u_Γ__global = @time IterativeSolvers.cg(S_global, b_schur, verbose=true)
+#u_Γ__global, it, _ = @time cg(S_global, b_schur)
+#println("n = $(S_global.N), iter = $it")
 
 print("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
-u_Γ = @time IterativeSolvers.cg(S_local_mat, b_schur, Pl=ΠSnn_local_mat, verbose=true);
+u_Γ, it, _ = @time pcg(S_local_mat, b_schur, M=ΠSnn_local_mat);
+println("n = $(S_local_mat.N), iter = $it")
 
 print("get_subdomain_solutions ...")
 u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id);
@@ -178,3 +183,23 @@ u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
                                             points);
 
 println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
+
+# There's gotta be a betta way!
+using SparseArrays
+print("assemble global schur ...")
+S_sp = @time sparse(S_local_mat)
+
+nev = ndom + 10
+
+using Arpack
+print("solve for least dominant eigvecs of schur complement ...")
+λ, ϕ = @time Arpack.eigs(S_sp, nev=nev, which=:SM)
+print("ld-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
+println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (ld), iter = $it")
+
+print("solve for most dominant eigvecs of schur complement ...")
+λ, ϕ = @time Arpack.eigs(S_sp, nev=nev, which=:LM)
+print("md-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
+println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (md), iter = $it")
