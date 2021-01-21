@@ -71,3 +71,10 @@ def to_axis(values, cells, points, ax, at='nodes', plot='lognorm', cmap='jet', t
     cbar = fig.colorbar(im, cax=cb_ax)
 
   return im
+
+
+def get_root_filename(model, sig2, L, nnode):
+  fname = model + "_"
+  fname += "sig2%.1f" %sig2 + "_"
+  fname += "L%g" % L + "_"
+  return fname + "DoF%d" % nnode
