@@ -352,6 +352,7 @@ function prepare_local_schurs(cells::Array{Int,2},
   _, nnode = size(points) # Number of nodes
   n_Id = [ind_Id_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes strictly inside each subdomain
   n_Γd = [ind_Γd_g2l[idom].count for idom in 1:ndom] # Number of non-Dirichlet nodes on the interface of each subdomain
+  n_Γ = ind_Γ_g2l.count
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
 
@@ -372,7 +373,7 @@ function prepare_local_schurs(cells::Array{Int,2},
 
   # Right hand sides
   b_Id = [zeros(Float64, n_Id[idom]) for idom in 1:ndom]
-  b_Γ = zeros(Float64, sum(n_Γd))
+  b_Γ = zeros(Float64, n_Γ)
 
   # Loop over elements
   for iel in 1:nel
