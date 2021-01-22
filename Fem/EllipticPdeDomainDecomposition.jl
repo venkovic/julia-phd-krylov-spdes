@@ -1,6 +1,7 @@
 using DelimitedFiles: readdlm
 using SparseArrays: sparse
 using LinearMaps: LinearMap
+import SuiteSparse
 import LinearAlgebra
 import IterativeSolvers
 import Arpack
@@ -720,9 +721,8 @@ function prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixC
                                            node_Γ_cnt)
 end
 
-
-function apply_neumann_neumann(Πnn::NeumannNeumannSchurPreconditioner,
-                               r::Array{Float64,1})
+function apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
+                                     r::Array{Float64,1})
 
   ndom = length(Πnn.ΠSd)
   z = zeros(Float64, length(Πnn.node_Γ_cnt))
@@ -751,19 +751,19 @@ end
 
 import Base: \
 function (\)(Πnn::NeumannNeumannSchurPreconditioner, x::Array{Float64,1})
-  apply_neumann_neumann(Πnn, x)
+  apply_neumann_neumann_schur(Πnn, x)
 end
 
 
 function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
-                            Πnn::NeumannNeumannSchurPreconditioner,
-               r::Array{Float64,1})
-  z .= apply_neumann_neumann(Πnn, r)
+                             Πnn::NeumannNeumannSchurPreconditioner,
+                             r::Array{Float64,1})
+  z .= apply_neumann_neumann_schur(Πnn, r)
 end
 
 function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
-               r::Array{Float64,1})
-  r .= apply_neumann_neumann(Πnn, copy(r))
+                             r::Array{Float64,1})
+  r .= apply_neumann_neumann_schur(Πnn, copy(r))
 end
 
 
@@ -900,4 +900,112 @@ function assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float
 
   A_ΓΓ = sparse(ΓΓ_I, ΓΓ_J, ΓΓ_V)
   return A_ΓΓ
+end
+
+
+struct NeumannNeumannInducedPreconditioner
+  ΠSd::Array{Array{Float64,2},1}
+  A_IIdd::Array{SparseMatrixCSC{Float64,Int},1}
+  chol_A_IId::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
+  A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1}
+  ind_Id_g2l::Array{Dict{Int,Int},1}
+  ind_Γ_g2l::Dict{Int,Int}
+  ind_Γd_Γ2l::Array{Dict{Int,Int},1}
+  node_Γ_cnt::Array{Int,1}
+end
+
+
+function prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                 A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                 A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                 ind_Id_g2l::Array{Dict{Int,Int},1},
+                                                 ind_Γ_g2l::Dict{Int,Int},
+                                                 ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                                 node_Γ_cnt::Array{Int,1};
+                                                 preconds=nothing)
+
+  ndom, = size(A_IIdd)
+  ΠSd = Array{Float64,2}[]
+  chol_A_IId = SuiteSparse.CHOLMOD.Factor{}[]
+
+  for idom in 1:ndom
+    if isnothing(preconds)
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             reltol=1e-12),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
+    else
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             precond=preconds[idom],
+                                             reltol=1e-12),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
+    end
+
+    Sd_mat = Array(Sd)
+    push!(ΠSd, LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat))))))))
+    push!(chol_A_IId, LinearAlgebra.cholesky(A_IIdd[idom]))
+  end
+
+  return NeumannNeumannInducedPreconditioner(ΠSd,
+                                             A_IIdd,
+                                             chol_A_IId,
+                                             A_IΓdd,
+                                             ind_Id_g2l,
+                                             ind_Γ_g2l,
+                                             ind_Γd_Γ2l,
+                                             node_Γ_cnt)
+end
+
+
+function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
+                                       r::Array{Float64,1})
+  
+  n, = size(r)
+  ndom, = size(Πnn.ΠSd)
+  n_Γ, = size(Πnn.node_Γ_cnt)
+
+  r_schur = Array{Float64,1}(undef, n_Γ)
+  r_Γ = Array{Float64,1}(undef, n_Γ)
+  z_Γ = zeros(Float64, n_Γ)
+
+  for (node, node_in_Γ) in Πnn.ind_Γ_g2l
+    r_Γ[node_in_Γ] = r[node]
+  end
+
+  for idom in 1:ndom
+    n_Id = Πnn.A_IIdd[idom].n
+    r_Id = Array{Float64,1}(undef, n_Id)
+    z_Id = Array{Float64,1}(undef, n_Id)
+
+    n_Γd = Πnn.ind_Γd_Γ2l[idom].count
+    r_Γd = Array{Float64,1}(undef, n_Γd)
+    z_Γd = Array{Float64,1}(undef, n_Γd)
+
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      r_Γd[node_in_Γd] = r_Γ[node_in_Γ] / Πnn.node_Γ_cnt[node_in_Γ]
+    end
+    z_Γd .= Πnn.ΠSd[idom] * r_Γd
+
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      z_Γ[node_in_Γ] += z_Γd[node_in_Γd] / Πnn.node_Γ_cnt[node_in_Γ]
+    end
+
+    z_Id .= r_Id .- Πnn.A_IΓdd[idom] * z_Γd
+    z_Id .= Πnn.chol_A_IId[idom] \ z_Id
+
+    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
+      z[node] = z_Id[node_in_Id]
+    end
+  end # for idom
+
+  for (node, node_in_Γ) in Πnn.ind_Γ_g2l
+    z[node] = z_Γ[node_in_Γ] 
+  end
+
+  return z
 end

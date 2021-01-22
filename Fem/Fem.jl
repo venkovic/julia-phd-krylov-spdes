@@ -29,9 +29,12 @@ export apply_global_schur
 export apply_local_schur
 export apply_local_schurs
 export assemble_local_schurs
-export apply_neumann_neumann
+export apply_neumann_neumann_schur
 export NeumannNeumannSchurPreconditioner
 export prepare_neumann_neumann_schur_precond
+export apply_neumann_neumann_induced
+export NeumannNeumannInducedPreconditioner
+export prepare_neumann_neumann_induced_precond
 export get_schur_rhs
 export get_subdomain_solutions
 export merge_subdomain_solutions
