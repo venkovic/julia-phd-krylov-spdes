@@ -1,3 +1,4 @@
+push!(LOAD_PATH, "./Utils/")
 push!(LOAD_PATH, "./Fem/")
 push!(LOAD_PATH, "./RecyclingKrylovSolvers/")
 import Pkg
@@ -93,7 +94,7 @@ n_Γ, _ = size(A_ΓΓ)
 S_global = LinearMap(x -> apply_global_schur(A_IId, A_IΓd, A_ΓΓ, x, preconds=Π_IId), n_Γ, issymmetric=true)
 
 printlnln("get_schur_rhs ...")
-b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
+b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ, preconds=Π_IId)
 
 printlnln("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
