@@ -770,7 +770,8 @@ end
 function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
                        A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                        A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                       b_Γ::Array{Float64,1})
+                       b_Γ::Array{Float64,1};
+                       preconds=nothing)
   ndom = length(b_Id)
   n_Γ = length(b_Γ)
   n_Id = [length(b_Id[idom]) for idom in 1:ndom]
@@ -779,8 +780,45 @@ function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
   b_schur .= b_Γ
 
   for idom in 1:ndom
-    v = IterativeSolvers.cg(A_IId[idom], b_Id[idom])
+    v = Array{Float64,1}(undef, A_IId[idom].n)
+    if isnothing(preconds)
+      v .= IterativeSolvers.cg(A_IId[idom], b_Id[idom])
+    else
+      v .= IterativeSolvers.cg(A_IId[idom], b_Id[idom], Pl=preconds[idom])
+    end
     b_schur .-= A_IΓd[idom]'v
+  end
+
+  return b_schur
+end
+
+
+function get_schur_rhs(b_Id::Array{Array{Float64,1},1},
+                       A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                       A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                       b_Γ::Array{Float64,1},
+                       ind_Γd_Γ2l::Array{Dict{Int,Int}};
+                       preconds=nothing)
+
+  ndom = length(b_Id)
+  n_Γ = length(b_Γ)
+  n_Id = [length(b_Id[idom]) for idom in 1:ndom]
+
+  b_schur = Array{Float64,1}(undef, length(b_Γ))
+  b_schur .= b_Γ
+
+  for idom in 1:ndom
+    v = Array{Float64,1}(undef, A_IId[idom].n)
+    w = Array{Float64,1}(undef, A_IΓd[idom].n)
+    if isnothing(preconds)
+      v .= IterativeSolvers.cg(A_IId[idom], b_Id[idom])
+    else
+      v .= IterativeSolvers.cg(A_IId[idom], b_Id[idom], Pl=preconds[idom])
+    end
+    w .= A_IΓd[idom]'v
+    for (lnode_in_Γ, lnode_in_Γd) in ind_Γd_Γ2l[idom]
+      b_schur[lnode_in_Γ] -= w[lnode_in_Γd]
+    end
   end
 
   return b_schur
