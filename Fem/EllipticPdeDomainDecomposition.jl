@@ -1018,3 +1018,22 @@ function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner
 
   return z
 end
+
+
+
+import Base: \
+function (\)(Πnn::NeumannNeumannInducedPreconditioner, x::Array{Float64,1})
+  apply_neumann_neumann_induced(Πnn, x)
+end
+
+
+function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
+                             Πnn::NeumannNeumannInducedPreconditioner,
+                             r::Array{Float64,1})
+  z .= apply_neumann_neumann_induced(Πnn, r)
+end
+
+function LinearAlgebra.ldiv!(Πnn::NeumannNeumannInducedPreconditioner,
+                             r::Array{Float64,1})
+  r .= apply_neumann_neumann_induced(Πnn, copy(r))
+end
