@@ -975,50 +975,60 @@ function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner
   ndom, = size(Πnn.ΠSd)
   n_Γ, = size(Πnn.node_Γ_cnt)
 
+  n_Id = [Πnn.A_IIdd[idom].n for idom in 1:ndom]
+  r_Id = [Array{Float64,1}(undef, n_Id[idom]) for idom in 1:ndom]
+  z_Id = [Array{Float64,1}(undef, n_Id[idom]) for idom in 1:ndom]
+
+  n_Γd = [Πnn.ind_Γd_Γ2l[idom].count for idom in 1:ndom]
+  r_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
+  z_Γd = [Array{Float64,1}(undef, n_Γd) for idom in 1:ndom]
+
   r_schur = Array{Float64,1}(undef, n_Γ)
   r_Γ = Array{Float64,1}(undef, n_Γ)
   z_Γ = zeros(Float64, n_Γ)
   z = Array{Float64,1}(undef, n)
 
+  for idom in 1:ndom
+    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
+      r_Id[node_in_Id] = r[Πnn.not_dirichlet_inds_g2l[node]]
+    end
+  end
+
   for (node, node_in_Γ) in Πnn.ind_Γ_g2l
     r_Γ[node_in_Γ] = r[Πnn.not_dirichlet_inds_g2l[node]]
   end
 
+  r_schur .= r_Γ
   for idom in 1:ndom
-    n_Id = Πnn.A_IIdd[idom].n
-    r_Id = Array{Float64,1}(undef, n_Id)
-    z_Id = Array{Float64,1}(undef, n_Id)
-
-    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
-      r_Id[node_in_Id] = r[Πnn.not_dirichlet_inds_g2l[node]]
+    r_Id[idom] .= Πnn.chol_A_IId[idom] \ r_Id
+    r_Γd[idom] .= Πnn.A_IΓdd[idom]' * r_Id[idom]
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      r_schur[node_in_Γ] -= r_Γd[idom][node_in_Γd]
     end
+  end
 
-    n_Γd = Πnn.ind_Γd_Γ2l[idom].count
-    r_Γd = Array{Float64,1}(undef, n_Γd)
-    z_Γd = Array{Float64,1}(undef, n_Γd)
+  for idom in 1:ndom
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      r_Γd[idom][node_in_Γd] = r_schur[node_in_Γ] / Πnn.node_Γ_cnt[node_in_Γ]
+    end
+    z_Γd[idom] .= Πnn.ΠSd[idom] * r_Γd[idom]
 
     for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      r_Γd[node_in_Γd] = r_Γ[node_in_Γ] / Πnn.node_Γ_cnt[node_in_Γ]
+      z_Γ[node_in_Γ] += z_Γd[idom][node_in_Γd] / Πnn.node_Γ_cnt[node_in_Γ]
     end
-    z_Γd .= Πnn.ΠSd[idom] * r_Γd
-
-    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      z_Γ[node_in_Γ] += z_Γd[node_in_Γd] / Πnn.node_Γ_cnt[node_in_Γ]
-    end
-    z_Id .= r_Id .- Πnn.A_IΓdd[idom] * z_Γd
-    z_Id .= Πnn.chol_A_IId[idom] \ z_Id
+    z_Id[idom] .= r_Id[idom] .- Πnn.A_IΓdd[idom] * z_Γd[idom]
+    z_Id[idom] .= Πnn.chol_A_IId[idom] \ z_Id[idom]
     for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
-      z[Πnn.not_dirichlet_inds_g2l[node]] = z_Id[node_in_Id]
+      z[Πnn.not_dirichlet_inds_g2l[node]] = z_Id[idom][node_in_Id]
     end
   end # for idom
 
   for (node, node_in_Γ) in Πnn.ind_Γ_g2l
-    z[Πnn.not_dirichlet_inds_g2l[node]] = z_Γ[node_in_Γ] 
+    z[Πnn.not_dirichlet_inds_g2l[node]] = z_Γ[idom][node_in_Γ] 
   end
 
   return z
 end
-
 
 
 import Base: \
