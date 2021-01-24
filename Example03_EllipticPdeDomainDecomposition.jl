@@ -99,7 +99,7 @@ b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ, preconds=Π_IId)
 printlnln("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
-printlnln("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
+printlnln("amg-pcg solve of A * u_no_dd_no_dirichlet = b ...")
 u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=Π)
 space_println("n = $(A.n), iter = $it")
 
@@ -126,6 +126,22 @@ S_local_mat = LinearMap(x -> apply_local_schurs(Sd_local_mat,
                                                 node_Γ_cnt,
                                                 x),
                                                 n_Γ, issymmetric=true)
+
+printlnln("prepare_neumann_neumann_induced_precond using S_local_mat ...")
+ΠInducednn_local_mat = @time prepare_neumann_neumann_induced_precond(A_IIdd,
+                                                                     A_IΓdd,
+                                                                     A_ΓΓdd,
+                                                                     ind_Id_g2l,
+                                                                     ind_Γ_g2l,
+                                                                     ind_Γd_Γ2l,
+                                                                     node_Γ_cnt,
+                                                                     node_Γ,
+                                                                     not_dirichlet_inds_g2l,
+                                                                     preconds=Π_IId)
+
+
+
+
 
 printlnln("prepare_neumann_neumann_schur_precond using S_local_mat ...")
 ΠSnn_local_mat = @time prepare_neumann_neumann_schur_precond(Sd_local_mat,
@@ -173,7 +189,7 @@ printlnln("S_local_mat * b_schur ...")
 #u_Γ__global, it, _ = @time cg(S_global, b_schur)
 #println("n = $(S_global.N), iter = $it")
 
-printlnln("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+printlnln("neumann-neumann-pcg solve of S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time pcg(S_local_mat, b_schur, M=ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), iter = $it")
 
@@ -197,12 +213,28 @@ nev = ndom + 10
 using Arpack
 printlnln("solve for least dominant eigvecs of schur complement ...")
 λ, ϕ = @time Arpack.eigs(S_sp, nev=nev, which=:SM)
-printlnln("ld-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+printlnln("ld-def-neumann-neumann-pcg solve of S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (ld), iter = $it")
 
 printlnln("solve for most dominant eigvecs of schur complement ...")
 λ, ϕ = @time Arpack.eigs(S_sp, nev=nev, which=:LM)
-printlnln("md-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+printlnln("md-def-neumann-neumann-pcg solve of S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (md), iter = $it")
+
+
+
+
+printlnln("cg solve of A * u = b ...")
+u_no_dd_no_dirichlet, it, _ = @time cg(A, b[:, 1])
+space_println("n = $(A.n), iter = $it")
+
+λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:SM)
+printlnln("ld-def-neumann-neumann-induced-pcg solve of A * u = b ...")
+u_Γ, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠInducednn_local_mat);
+space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
+
+printlnln("neumann-neumann-induced-pcg solve of A * u = b ...")
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=ΠInducednn_local_mat)
+space_println("n = $(A.n), ndom = $ndom, iter = $it")
