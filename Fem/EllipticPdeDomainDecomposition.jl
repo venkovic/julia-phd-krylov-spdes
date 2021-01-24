@@ -981,7 +981,7 @@ function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner
 
   n_Γd = [Πnn.ind_Γd_Γ2l[idom].count for idom in 1:ndom]
   r_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
-  z_Γd = [Array{Float64,1}(undef, n_Γd) for idom in 1:ndom]
+  z_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
 
   r_schur = Array{Float64,1}(undef, n_Γ)
   r_Γ = Array{Float64,1}(undef, n_Γ)
@@ -990,7 +990,7 @@ function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner
 
   for idom in 1:ndom
     for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
-      r_Id[node_in_Id] = r[Πnn.not_dirichlet_inds_g2l[node]]
+      r_Id[idom][node_in_Id] = r[Πnn.not_dirichlet_inds_g2l[node]]
     end
   end
 
@@ -1000,8 +1000,8 @@ function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner
 
   r_schur .= r_Γ
   for idom in 1:ndom
-    r_Id[idom] .= Πnn.chol_A_IId[idom] \ r_Id
-    r_Γd[idom] .= Πnn.A_IΓdd[idom]' * r_Id[idom]
+    z_Id[idom] .= Πnn.chol_A_IId[idom] \ r_Id[idom]
+    r_Γd[idom] .= Πnn.A_IΓdd[idom]' * z_Id[idom]
     for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
       r_schur[node_in_Γ] -= r_Γd[idom][node_in_Γd]
     end
@@ -1024,7 +1024,7 @@ function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner
   end # for idom
 
   for (node, node_in_Γ) in Πnn.ind_Γ_g2l
-    z[Πnn.not_dirichlet_inds_g2l[node]] = z_Γ[idom][node_in_Γ] 
+    z[Πnn.not_dirichlet_inds_g2l[node]] = z_Γ[node_in_Γ] 
   end
 
   return z

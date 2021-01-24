@@ -224,17 +224,16 @@ u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (md), iter = $it")
 
 
+#printlnln("cg solve of A * u = b ...")
+#u_no_dd_no_dirichlet, it, _ = @time cg(A, b[:, 1])
+#space_println("n = $(A.n), iter = $it")
 
+#printlnln("solve for least dominant eigvecs of A ...")
+#λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:SM)
+#printlnln("ld-def-neumann-neumann-induced-pcg solve of A * u = b ...")
+#u_no_ddno_dirichlet, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠInducednn_local_mat);
+#space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
 
-printlnln("cg solve of A * u = b ...")
-u_no_dd_no_dirichlet, it, _ = @time cg(A, b[:, 1])
-space_println("n = $(A.n), iter = $it")
-
-λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:SM)
-printlnln("ld-def-neumann-neumann-induced-pcg solve of A * u = b ...")
-u_Γ, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠInducednn_local_mat);
-space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
-
-printlnln("neumann-neumann-induced-pcg solve of A * u = b ...")
-u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=ΠInducednn_local_mat)
-space_println("n = $(A.n), ndom = $ndom, iter = $it")
+#printlnln("neumann-neumann-induced-pcg solve of A * u = b ...")
+#u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=ΠInducednn_local_mat)
+#space_println("n = $(A.n), ndom = $ndom, iter = $it")
