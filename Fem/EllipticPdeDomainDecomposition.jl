@@ -1091,7 +1091,8 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
                                                   Λ[1:nvec])
 end
 
-function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
+function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
+                      A0_Γ::SparseMatrixCSC{Float64,Int},
                       ΠA0_Γ,
                       ind_Id_g2l::Array{Dict{Int,Int},1},
                       ind_Γ_g2l::Dict{Int,Int},
@@ -1106,7 +1107,9 @@ function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
     for (node, node_in_I) in ind_Id_g2l[idom]
       x_I[node_in_I] = x[not_dirichlet_inds_g2l[node]]
     end
+
     x_I .= chol_A0_Id[idom] \ x_I
+
     for (node, node_in_I) in ind_Id_g2l[idom]
       z[not_dirichlet_inds_g2l[node]] = x_I[node_in_I]
     end
@@ -1116,7 +1119,9 @@ function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
   for (node, node_in_Γ) in ind_Γ_g2l
     x_Γ[node_in_Γ] = x[not_dirichlet_inds_g2l[node]]
   end
-  x_Γ
+
+  x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ)
+  
   for (node, node_in_Γ) in ind_Γ_g2l
     z[not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
   end  
