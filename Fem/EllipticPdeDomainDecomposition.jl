@@ -5,6 +5,7 @@ import SuiteSparse
 import LinearAlgebra
 import IterativeSolvers
 import Arpack
+import Preconditioners
 
 
 """
@@ -1046,4 +1047,134 @@ end
 function LinearAlgebra.ldiv!(Πnn::NeumannNeumannInducedPreconditioner,
                              r::Array{Float64,1})
   r .= apply_neumann_neumann_induced(Πnn, copy(r))
+end
+
+
+struct DomainDecompositionLowRankPreconditioner
+  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
+  chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
+  ΠA0_Γ
+  θ::Float64
+  U::Array{Float64,2}
+  Λ::Array{Float64,1}
+end
+
+
+function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                                                       A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                       A_ΓΓ::SparseMatrixCSC{Float64,Int};
+                                                       nvec=5,
+                                                       α=1.)
+  
+  ndom = length(A_IId)
+  n_Γ = A_ΓΓ.n
+  chol_A0_Id = SuiteSparse.CHOLMOD.Factor{Float64}[]
+
+  H = α^2 * (A_ΓΓ + α^2 * LinearAlgebra.I)
+
+  for idom in 1:ndom
+    A0_I = A_IId[idom] + α^-2 * A_IΓd[idom] * A_IΓd[idom]'
+    push!(chol_A0_Id, LinearAlgebra.cholesky(A0_I))
+    H .+= α^-2 * A_IΓd[idom]' * A0_I * A_IΓd[idom]
+  end
+
+  Λ, U = Arpack.eigs(LinearAlgebra.Symmetric(H), nev=nvec+1, which=:LM)
+  θ = Λ[nvec + 1]
+
+  ΠA0_Γ = Preconditioners.AMGPreconditioner(A_ΓΓ + α^2 * LinearAlgebra.I)
+
+  return DomainDecompositionLowRankPreconditioner(A_IΓd,
+                                                  chol_A0_Id,
+                                                  ΠA0_Γ,
+                                                  θ,
+                                                  U[:, 1:nvec],
+                                                  Λ[1:nvec])
+end
+
+function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
+                      ΠA0_Γ,
+                      ind_Id_g2l::Array{Dict{Int,Int},1},
+                      ind_Γ_g2l::Dict{Int,Int},
+                      not_dirichlet_inds_g2l::Dict{Int,Int},
+                      x::Array{Float64,1})
+  n, = size(x)
+  n_Γ = ind_Γ_g2l.count
+  z = Array{Float64,1}(undef, n)
+
+  for idom in 1:ndom
+    x_I = Array{Float64,1}(undef, ind_Id_g2l[idom].count)
+    for (node, node_in_I) in ind_Id_g2l[idom]
+      x_I[node_in_I] = x[not_dirichlet_inds_g2l[node]]
+    end
+    x_I .= chol_A0_Id[idom] \ x_I
+    for (node, node_in_I) in ind_Id_g2l[idom]
+      z[not_dirichlet_inds_g2l[node]] = x_I[node_in_I]
+    end
+  end  
+
+  x_Γ = Array{Float64,1}(undef, n_Γ)
+  for (node, node_in_Γ) in ind_Γ_g2l
+    x_Γ[node_in_Γ] = x[not_dirichlet_inds_g2l[node]]
+  end
+  x_Γ
+  for (node, node_in_Γ) in ind_Γ_g2l
+    z[not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
+  end  
+
+  return z
+end
+
+function apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankPreconditioner,
+                                             x::Array{Float64,1})
+
+  n, = size(x)
+  n_Γ, nvec = size(Πddlr.U)
+
+  z = Array{Float64,1}(undef, n)
+  y = Array{Float64,1}(undef, n_Γ)
+  w = Array{Float64,1}(undef, n_Γ)
+  v = Array{Float64,1}(undef, n)
+  u = Array{Float64,1}(undef, n)
+
+  # Solve A_0 * z = x
+  z .= apply_inv_a0(Πddlr, x)
+
+  # y = E' * z
+  y = 1
+
+  # w = Ginv_approx * y
+  for node in 1:n_Γ
+    w[node] = y[node] / (1 - Πddlr.θ)
+  end
+  for k in 1:nvec
+    val = Πnn.U[:, k]' * y
+    val *= (1 - Πddlr.Λ[k])^-1 - (1 - Πddlr.θ)^-1
+    w .+= val * Πddlr.U[:, k]
+  end
+
+  # v = E * w
+  v = 1
+
+  # Solve A_0 u = x + v
+  u .= apply_inv_a0(Πddlr, x + v)
+
+  return u
+end
+
+
+import Base: \
+function (\)(Πddlr::DomainDecompositionLowRankPreconditioner, x::Array{Float64,1})
+  apply_domain_decomposition_low_rank(Πddlr, x)
+end
+
+
+function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
+                             Πddlr::DomainDecompositionLowRankPreconditioner,
+                             r::Array{Float64,1})
+  z .= apply_domain_decomposition_low_rank(Πddlr, r)
+end
+
+function LinearAlgebra.ldiv!(Πddlr::DomainDecompositionLowRankPreconditioner,
+                             r::Array{Float64,1})
+  r .= apply_domain_decomposition_low_rank(Πddlr, copy(r))
 end
