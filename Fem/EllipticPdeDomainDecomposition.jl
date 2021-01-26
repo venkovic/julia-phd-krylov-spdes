@@ -1053,6 +1053,7 @@ end
 struct DomainDecompositionLowRankPreconditioner
   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
   chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
+  A0_Γ::SparseMatrixCSC{Float64,Int}
   ΠA0_Γ
   θ::Float64
   U::Array{Float64,2}
@@ -1070,8 +1071,10 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
   n_Γ = A_ΓΓ.n
   chol_A0_Id = SuiteSparse.CHOLMOD.Factor{Float64}[]
 
-  H = α^2 * (A_ΓΓ + α^2 * LinearAlgebra.I)
+  A0_Γ = A_ΓΓ + α^2 * LinearAlgebra.I
+  ΠA0_Γ = Preconditioners.AMGPreconditioner(A0_Γ)
 
+  H = α^2 * A_0Γ
   for idom in 1:ndom
     A0_I = A_IId[idom] + α^-2 * A_IΓd[idom] * A_IΓd[idom]'
     push!(chol_A0_Id, LinearAlgebra.cholesky(A0_I))
@@ -1080,15 +1083,37 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
 
   Λ, U = Arpack.eigs(LinearAlgebra.Symmetric(H), nev=nvec+1, which=:LM)
   θ = Λ[nvec + 1]
-
-  ΠA0_Γ = Preconditioners.AMGPreconditioner(A_ΓΓ + α^2 * LinearAlgebra.I)
+  
 
   return DomainDecompositionLowRankPreconditioner(A_IΓd,
                                                   chol_A0_Id,
+                                                  A0_Γ,
                                                   ΠA0_Γ,
                                                   θ,
                                                   U[:, 1:nvec],
                                                   Λ[1:nvec])
+end
+
+
+function apply_hmat(A_IΓd::Array{SparseMatrixCSC,1},
+                    chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
+                    A0_Γ::SparseMatrixCSC{Float64,Int},
+                    ΠA0_Γ,
+                    ind_Id_g2l::Array{Dict{Int,Int},1},
+                    ind_Γ_g2l::Dict{Int,Int},
+                    not_dirichlet_inds_g2l::Dict{Int,Int},
+                    x_Γ::Array{Float64,1})
+
+  n, = size(x)
+  n_Γ = ind_Γ_g2l.count
+  hmat_x_Γ = Array{Float64,1}(undef, n)
+
+  for idom in 1:ndom
+    chol_A0_Id[idom] \ 
+  end
+
+
+
 end
 
 function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
@@ -1098,9 +1123,11 @@ function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
                       ind_Γ_g2l::Dict{Int,Int},
                       not_dirichlet_inds_g2l::Dict{Int,Int},
                       x::Array{Float64,1})
+
   n, = size(x)
   n_Γ = ind_Γ_g2l.count
   z = Array{Float64,1}(undef, n)
+  x_Γ = Array{Float64,1}(undef, n_Γ)
 
   for idom in 1:ndom
     x_I = Array{Float64,1}(undef, ind_Id_g2l[idom].count)
@@ -1115,13 +1142,12 @@ function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
     end
   end  
 
-  x_Γ = Array{Float64,1}(undef, n_Γ)
   for (node, node_in_Γ) in ind_Γ_g2l
     x_Γ[node_in_Γ] = x[not_dirichlet_inds_g2l[node]]
   end
 
   x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ)
-  
+
   for (node, node_in_Γ) in ind_Γ_g2l
     z[not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
   end  
