@@ -1056,8 +1056,10 @@ struct DomainDecompositionLowRankPreconditioner
   chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
   A0_Γ::SparseMatrixCSC{Float64,Int}
   ΠA0_Γ
+  α::Float64
   θ::Float64
-  U::Array{Float64,2}
+  #U::Array{Float64,2}
+  U::Array{Array{Float64,1},1}
   Λ::Array{Float64,1}
   ind_Id_g2l::Array{Dict{Int,Int},1}
   ind_Γ_g2l::Dict{Int,Int}
@@ -1075,7 +1077,7 @@ function apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
   for idom in 1:ndom
     x_Id[idom] .= chol_A0_Id[idom] \ x_Id[idom]
   end  
-  x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ, tol=1e-10)
+  x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ, tol=1e-12)
 end
 
 
@@ -1129,7 +1131,7 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
                                                        ind_Id_g2l::Array{Dict{Int,Int},1},
                                                        ind_Γ_g2l::Dict{Int,Int},
                                                        not_dirichlet_inds_g2l::Dict{Int,Int};
-                                                       nvec=5,
+                                                       nvec=25,
                                                        α=1.)
   
   ndom, = size(A_IId)
@@ -1147,19 +1149,14 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
   #                   nev=nvec+1, which=:LM, issymmetric=true)
 
   Λ, U, info = KrylovKit.eigsolve(x_Γ -> apply_hmat(A_IΓd, chol_A0_Id, A0_Γ, ΠA0_Γ, α, x_Γ),
-                               A_ΓΓ.n, nvec+1, :LM, issymmetric=true)
-
-  println(Λ)
-  println(U)
-  print(info)
-
-
+                               A_ΓΓ.n, nvec+1, :LM, issymmetric=true, krylovdim=2*nvec)
   θ = Λ[nvec + 1]
   
   return DomainDecompositionLowRankPreconditioner(A_IΓd,
                                                   chol_A0_Id,
                                                   A0_Γ,
                                                   ΠA0_Γ,
+                                                  α,
                                                   θ,
                                                   U[1:nvec],
                                                   Λ[1:nvec],
@@ -1173,10 +1170,12 @@ function apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankP
                                              x::Array{Float64,1})
 
   n, = size(x)
-  n_Γ, nvec = size(Πddlr.U)
+  ndom, = size(Πddlr.ind_Id_g2l)
+  n_Γ = Πddlr.ind_Γ_g2l.count
+  nvec, = size(Πddlr.Λ)
 
   x_Id = [Array{Float64,1}(undef, Πddlr.ind_Id_g2l[idom].count) for idom in 1:ndom]
-  x_Γ = Array{Float64, n_Γ}(undef, n_Γ)
+  x_Γ = Array{Float64, 1}(undef, n_Γ)
   y_Γ = zeros(Float64, n_Γ)
   w_Γ = Array{Float64,1}(undef, n_Γ)
   u = Array{Float64,1}(undef, n)
@@ -1200,26 +1199,30 @@ function apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankP
 
   # y_Γ = E' * z
   for idom in 1:ndom
-    y_Γ .+= α^-1 * (A_IΓd[idom]' * z_Id[idom])
+    y_Γ .+= Πddlr.α^-1 * (Πddlr.A_IΓd[idom]' * z_Id[idom])
   end
-  y_Γ .+= -α * z_Γ
+  y_Γ .+= -Πddlr.α * z_Γ
 
   # w_Γ = Ginv_approx * y_Γ
   w_Γ .= y_Γ ./ (1 - Πddlr.θ)
   for k in 1:nvec
-    val = Πnn.U[:, k]' * y_Γ
+    val = Πddlr.U[k]'y_Γ
     val *= (1 - Πddlr.Λ[k])^-1 - (1 - Πddlr.θ)^-1
-    w_Γ .+= val * Πddlr.U[:, k]
+    w_Γ .+= val * Πddlr.U[k]
   end
 
   # x = x + v with v = E * w_Γ
   for idom in 1:ndom
-    x_Id[idom] .+= α^-1 * (A_IΓd[idom] * w_Γ)
+    x_Id[idom] .+= Πddlr.α^-1 * (Πddlr.A_IΓd[idom] * w_Γ)
   end
-  x_Γ .-= α * w_Γ
+  x_Γ .-= Πddlr.α * w_Γ
 
   # Solve A0 u = x
-  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, x_Id, x_Γ)
+  apply_inv_a0!(Πddlr.chol_A0_Id,
+                Πddlr.A0_Γ, 
+                Πddlr.ΠA0_Γ,
+                x_Id,
+                x_Γ)
 
   for idom in 1:ndom
     for (node, node_in_I) in Πddlr.ind_Id_g2l[idom]
