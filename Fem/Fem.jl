@@ -38,6 +38,8 @@ export prepare_neumann_neumann_induced_precond
 export apply_domain_decomposition_low_rank
 export DomainDecompositionLowRankPreconditioner
 export prepare_domain_decomposition_low_rank_precond
+export apply_inv_a0, apply_inv_a0!, apply_hmat
+
 export get_schur_rhs
 export get_subdomain_solutions
 export merge_subdomain_solutions

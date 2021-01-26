@@ -1065,56 +1065,17 @@ struct DomainDecompositionLowRankPreconditioner
 end
 
 
-function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
-                      A0_Γ::SparseMatrixCSC{Float64,Int},
-                      ΠA0_Γ,
-                      ind_Id_g2l::Array{Dict{Int,Int},1},
-                      ind_Γ_g2l::Dict{Int,Int},
-                      not_dirichlet_inds_g2l::Dict{Int,Int},
-                      x::Array{Float64,1})
-
-  n, = size(x)
-  n_Γ = ind_Γ_g2l.count
-  z = Array{Float64,1}(undef, n)
-  x_Γ = Array{Float64,1}(undef, n_Γ)
-
-  for idom in 1:ndom
-    x_I = Array{Float64,1}(undef, ind_Id_g2l[idom].count)
-    for (node, node_in_I) in ind_Id_g2l[idom]
-      x_I[node_in_I] = x[not_dirichlet_inds_g2l[node]]
-    end
-
-    x_I .= chol_A0_Id[idom] \ x_I
-
-    for (node, node_in_I) in ind_Id_g2l[idom]
-      z[not_dirichlet_inds_g2l[node]] = x_I[node_in_I]
-    end
-  end  
-
-  for (node, node_in_Γ) in ind_Γ_g2l
-    x_Γ[node_in_Γ] = x[not_dirichlet_inds_g2l[node]]
-  end
-
-  x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ)
-
-  for (node, node_in_Γ) in ind_Γ_g2l
-    z[not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
-  end  
-
-  return z
-end
-
-
 function apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
                        A0_Γ::SparseMatrixCSC{Float64,Int},
                        ΠA0_Γ,
                        x_Id::Array{Array{Float64,1},1},
                        x_Γ::Array{Float64,1})
 
+  ndom, = size(chol_A0_Id)
   for idom in 1:ndom
     x_Id[idom] .= chol_A0_Id[idom] \ x_Id[idom]
   end  
-  x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ)
+  x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ, tol=1e-10)
 end
 
 
@@ -1123,39 +1084,40 @@ function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
                       ΠA0_Γ,
                       x_Id::Array{Array{Float64,1},1},
                       x_Γ::Array{Float64,1})
-
-  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, x_Id, x_Γ)
-  return x_Id, x_Γ
+  y_Id = copy(x_Id)
+  y_Γ = copy(x_Γ)
+  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, y_Id, y_Γ)
+  return y_Id, y_Γ
 end
 
 
-function apply_hmat(A_IΓd::Array{SparseMatrixCSC,1},
+function apply_hmat(A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
                     chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
                     A0_Γ::SparseMatrixCSC{Float64,Int},
                     ΠA0_Γ,
                     α::Float64,
                     x_Γ::Array{Float64,1})
 
-  ndom, = size(ind_Id_g2l)
+  ndom, = size(A_IΓd)
 
-  x_Id = [Array{Float64,1}(undef, ind_Id_g2l.count) for idom in 1:ndom]
-  x_Γ = Array{Float64,1}(undef, ind_Γ_g2l.count)
-  y_Γ = zeros(Float64, ind_Γ_g2l.count)
+  z_Id = [Array{Float64,1}(undef, A_IΓd[idom].m) for idom in 1:ndom]
+  z_Γ = copy(x_Γ)
+  y_Γ = zeros(Float64, A0_Γ.n)
 
   # x = E * x_Γ
   for idom in 1:ndom
-    x_Id .= α^-1 * (A_IΓd[idom] * x_Γ)
+    z_Id[idom] .= α^-1 * (A_IΓd[idom] * x_Γ)
   end
-  x_Γ .*= -α 
+  z_Γ .*= -α 
 
   # Solve A0 * y = x
-  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, x_Id, x_Γ)
+  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, z_Id, z_Γ)
 
   # y_Γ = E' * y
   for idom in 1:ndom
-    y_Γ .+= α^-1 * (A_IΓd[idom]' * x_Id[idom])
+    y_Γ .+= α^-1 * (A_IΓd[idom]' * z_Id[idom])
   end
-  y_Γ .-= α * x_Γ
+  y_Γ .-= α * z_Γ
 
   return y_Γ
 end
@@ -1181,8 +1143,17 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
     push!(chol_A0_Id, LinearAlgebra.cholesky(A0_I))
   end
 
-  Λ, U = KrylovKit.eigsolve(x -> apply_hmat(A_IΓd, chol_A0_Id, A0_Γ, ΠA0_Γ, α, x_Γ),
-                            A_ΓΓ.n, nvec+1, :LR, issymmetric=true)
+  #Λ, U = Arpack.eigs(LinearMap(x_Γ -> apply_hmat(A_IΓd, chol_A0_Id, A0_Γ, ΠA0_Γ, α, x_Γ), A_ΓΓ.n), 
+  #                   nev=nvec+1, which=:LM, issymmetric=true)
+
+  Λ, U, info = KrylovKit.eigsolve(x_Γ -> apply_hmat(A_IΓd, chol_A0_Id, A0_Γ, ΠA0_Γ, α, x_Γ),
+                               A_ΓΓ.n, nvec+1, :LM, issymmetric=true)
+
+  println(Λ)
+  println(U)
+  print(info)
+
+
   θ = Λ[nvec + 1]
   
   return DomainDecompositionLowRankPreconditioner(A_IΓd,
@@ -1190,7 +1161,7 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
                                                   A0_Γ,
                                                   ΠA0_Γ,
                                                   θ,
-                                                  U[:, 1:nvec],
+                                                  U[1:nvec],
                                                   Λ[1:nvec],
                                                   ind_Id_g2l,
                                                   ind_Γ_g2l,
