@@ -1118,6 +1118,17 @@ function apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
 end
 
 
+function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
+                      A0_Γ::SparseMatrixCSC{Float64,Int},
+                      ΠA0_Γ,
+                      x_Id::Array{Array{Float64,1},1},
+                      x_Γ::Array{Float64,1})
+
+  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, x_Id, x_Γ)
+  return x_Id, x_Γ
+end
+
+
 function apply_hmat(A_IΓd::Array{SparseMatrixCSC,1},
                     chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
                     A0_Γ::SparseMatrixCSC{Float64,Int},
@@ -1137,7 +1148,7 @@ function apply_hmat(A_IΓd::Array{SparseMatrixCSC,1},
   end
   x_Γ .*= -α 
 
-  # A0 * y = x
+  # Solve A0 * y = x
   apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, x_Id, x_Γ)
 
   # y_Γ = E' * y
@@ -1152,7 +1163,7 @@ end
 
 function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                                                        A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                                                       A_ΓΓ::SparseMatrixCSC{Float64,Int}
+                                                       A_ΓΓ::SparseMatrixCSC{Float64,Int},
                                                        ind_Id_g2l::Array{Dict{Int,Int},1},
                                                        ind_Γ_g2l::Dict{Int,Int},
                                                        not_dirichlet_inds_g2l::Dict{Int,Int};
@@ -1187,100 +1198,67 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
 end
 
 
-function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
-  A0_Γ::SparseMatrixCSC{Float64,Int},
-  ΠA0_Γ,
-  ind_Id_g2l::Array{Dict{Int,Int},1},
-  ind_Γ_g2l::Dict{Int,Int},
-  not_dirichlet_inds_g2l::Dict{Int,Int},
-  x::Array{Float64,1})
-
-n, = size(x)
-n_Γ = ind_Γ_g2l.count
-z = Array{Float64,1}(undef, n)
-x_Γ = Array{Float64,1}(undef, n_Γ)
-
-for idom in 1:ndom
-x_I = Array{Float64,1}(undef, ind_Id_g2l[idom].count)
-for (node, node_in_I) in ind_Id_g2l[idom]
-x_I[node_in_I] = x[not_dirichlet_inds_g2l[node]]
-end
-
-x_I .= chol_A0_Id[idom] \ x_I
-
-for (node, node_in_I) in ind_Id_g2l[idom]
-z[not_dirichlet_inds_g2l[node]] = x_I[node_in_I]
-end
-end  
-
-for (node, node_in_Γ) in ind_Γ_g2l
-x_Γ[node_in_Γ] = x[not_dirichlet_inds_g2l[node]]
-end
-
-x_Γ .= IterativeSolvers.cg(A0_Γ, x_Γ, Pl=ΠA0_Γ)
-
-for (node, node_in_Γ) in ind_Γ_g2l
-z[not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
-end  
-
-return z
-end
-
-
-
-
-
-
 function apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankPreconditioner,
                                              x::Array{Float64,1})
 
   n, = size(x)
   n_Γ, nvec = size(Πddlr.U)
 
-  z = Array{Float64,1}(undef, n)
-  y = Array{Float64,1}(undef, n_Γ)
-  w = Array{Float64,1}(undef, n_Γ)
-  v = Array{Float64,1}(undef, n)
+  x_Id = [Array{Float64,1}(undef, Πddlr.ind_Id_g2l[idom].count) for idom in 1:ndom]
+  x_Γ = Array{Float64, n_Γ}(undef, n_Γ)
+  y_Γ = zeros(Float64, n_Γ)
+  w_Γ = Array{Float64,1}(undef, n_Γ)
   u = Array{Float64,1}(undef, n)
 
-  # Solve A_0 * z = x
-  z .= apply_inv_a0(Πddlr
-
-
-  chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
-  A0_Γ::SparseMatrixCSC{Float64,Int},
-  ΠA0_Γ,
-  ind_Id_g2l::Array{Dict{Int,Int},1},
-  ind_Γ_g2l::Dict{Int,Int},
-  not_dirichlet_inds_g2l::Dict{Int,Int},
-  x::Array{Float64,1})
-
-
-
-
-
-
-
-
-
-  # y = E' * z
-  y = 1
-
-  # w = Ginv_approx * y
-  for node in 1:n_Γ
-    w[node] = y[node] / (1 - Πddlr.θ)
+  for idom in 1:ndom
+    for (node, node_in_I) in Πddlr.ind_Id_g2l[idom]
+      x_Id[idom][node_in_I] = x[Πddlr.not_dirichlet_inds_g2l[node]]
+    end
   end
+
+  for (node, node_in_Γ) in Πddlr.ind_Γ_g2l
+    x_Γ[node_in_Γ] = x[Πddlr.not_dirichlet_inds_g2l[node]]
+  end
+    
+  # Solve A0 * z = x
+  z_Id, z_Γ = apply_inv_a0(Πddlr.chol_A0_Id, 
+                           Πddlr.A0_Γ,
+                           Πddlr.ΠA0_Γ,
+                           x_Id,
+                           x_Γ)
+
+  # y_Γ = E' * z
+  for idom in 1:ndom
+    y_Γ .+= α^-1 * (A_IΓd[idom]' * z_Id[idom])
+  end
+  y_Γ .+= -α * z_Γ
+
+  # w_Γ = Ginv_approx * y_Γ
+  w_Γ .= y_Γ ./ (1 - Πddlr.θ)
   for k in 1:nvec
-    val = Πnn.U[:, k]' * y
+    val = Πnn.U[:, k]' * y_Γ
     val *= (1 - Πddlr.Λ[k])^-1 - (1 - Πddlr.θ)^-1
-    w .+= val * Πddlr.U[:, k]
+    w_Γ .+= val * Πddlr.U[:, k]
   end
 
-  # v = E * w
-  v = 1
+  # x = x + v with v = E * w_Γ
+  for idom in 1:ndom
+    x_Id[idom] .+= α^-1 * (A_IΓd[idom] * w_Γ)
+  end
+  x_Γ .-= α * w_Γ
 
-  # Solve A_0 u = x + v
-  u .= apply_inv_a0(Πddlr, x + v)
+  # Solve A0 u = x
+  apply_inv_a0!(chol_A0_Id, A0_Γ, ΠA0_Γ, x_Id, x_Γ)
+
+  for idom in 1:ndom
+    for (node, node_in_I) in Πddlr.ind_Id_g2l[idom]
+      u[Πddlr.not_dirichlet_inds_g2l[node]] = x_Id[idom][node_in_I]
+    end
+  end
+
+  for (node, node_in_Γ) in Πddlr.ind_Γ_g2l
+    u[Πddlr.not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
+  end
 
   return u
 end
