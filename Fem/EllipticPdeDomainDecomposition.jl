@@ -734,146 +734,6 @@ function apply_local_schurs(Sd::Union{Array{SparseMatrixCSC{Float64,Int},1},
 end
 
 
-struct NeumannNeumannSchurPreconditioner
-  ΠSd::Array{Array{Float64,2},1}
-  ind_Γd_Γ2l::Array{Dict{Int,Int},1}
-  node_Γ_cnt::Array{Int,1}
-end
-
-
-"""
-prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                      A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                      A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                      node_Γ_cnt::Array{Int,1};
-                                      preconds=nothing)
-  
-Prepares and returns a NeumannNeumannSchurPreconditioner. 
-  
-"""
-function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                               A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                               A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                               node_Γ_cnt::Array{Int,1};
-                                               preconds=nothing)
-
-  ndom = length(A_IIdd)
-  ΠSd = Array{Float64,2}[]
-
-  for idom in 1:ndom
-    if isnothing(preconds)
-      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
-                                             A_IΓdd[idom],
-                                             A_ΓΓdd[idom],
-                                             xd,
-                                             reltol=1e-15),
-                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
-    else
-      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
-                                             A_IΓdd[idom],
-                                             A_ΓΓdd[idom],
-                                             xd,
-                                             precond=preconds[idom],
-                                             reltol=1e-15),
-                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
-    end
-
-    Sd_mat = Array(Sd)
-    pinv_Sd = LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
-
-    push!(ΠSd, pinv_Sd)
-  end
-
-  return NeumannNeumannSchurPreconditioner(ΠSd,
-                                           ind_Γd_Γ2l,
-                                           node_Γ_cnt)
-end
-
-
-"""
-prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
-                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                      node_Γ_cnt::Array{Int,1})
-  
-Prepares and returns a NeumannNeumannSchurPreconditioner. 
-  
-"""
-function prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
-                                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                               node_Γ_cnt::Array{Int,1})
-
-  ndom = length(Sd_local_mat)
-  ΠSd = Array{Float64,2}[]
-
-  for idom in 1:ndom
-    rtol = sqrt(eps(real(float(one(eltype(Sd_local_mat[idom]))))))
-    if isa(Sd_local_mat[idom], SparseMatrixCSC)
-      push!(ΠSd, LinearAlgebra.pinv(Array(Sd_local_mat[idom]), rtol=rtol))
-    else
-      push!(ΠSd, LinearAlgebra.pinv(Sd_local_mat[idom], rtol=rtol))
-    end
-  end
-
-  return NeumannNeumannSchurPreconditioner(ΠSd,
-                                           ind_Γd_Γ2l,
-                                           node_Γ_cnt)
-end
-
-
-"""
-apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
-                            r::Array{Float64,1})
-  
-Applies the NeumannNeumannSchurPreconditioner.
-  
-"""
-function apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
-                                     r::Array{Float64,1})
-
-  ndom = length(Πnn.ΠSd)
-  z = zeros(Float64, length(Πnn.node_Γ_cnt))
-
-  for idom in 1:ndom
-
-    n_Γd = Πnn.ind_Γd_Γ2l[idom].count
-    rd = Array{Float64,1}(undef, n_Γd)
-    ΠSdrd = Array{Float64,1}(undef, n_Γd)
-
-    for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      rd[lnode_in_Γd] = r[lnode_in_Γ] / Πnn.node_Γ_cnt[lnode_in_Γ]
-    end
-
-    ΠSdrd .= Πnn.ΠSd[idom] * rd
-
-    for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      z[lnode_in_Γ] += ΠSdrd[lnode_in_Γd] / Πnn.node_Γ_cnt[lnode_in_Γ]
-    end
-
-   end # for idom
-
-   return z
-end
-
-
-import Base: \
-function (\)(Πnn::NeumannNeumannSchurPreconditioner, x::Array{Float64,1})
-  apply_neumann_neumann_schur(Πnn, x)
-end
-
-function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
-                             Πnn::NeumannNeumannSchurPreconditioner,
-                             r::Array{Float64,1})
-  z .= apply_neumann_neumann_schur(Πnn, r)
-end
-
-function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
-                             r::Array{Float64,1})
-  r .= apply_neumann_neumann_schur(Πnn, copy(r))
-end
-
-
 """
 get_schur_rhs(b_Id::Array{Array{Float64,1},1},
               A_IId::Array{SparseMatrixCSC{Float64,Int},1},
@@ -1059,6 +919,148 @@ function assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float
 end
 
 
+struct NeumannNeumannSchurPreconditioner
+  ΠSd::Array{Array{Float64,2},1}
+  ind_Γd_Γ2l::Array{Dict{Int,Int},1}
+  node_Γ_cnt::Array{Int,1}
+end
+
+
+"""
+prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                      A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                      A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                      node_Γ_cnt::Array{Int,1};
+                                      preconds=nothing)
+  
+Prepares and returns a NeumannNeumannSchurPreconditioner.
+Computes pseudo-inverses of (singular) local Schur complements.
+  
+"""
+function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                               A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                               A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                               node_Γ_cnt::Array{Int,1};
+                                               preconds=nothing)
+
+  ndom = length(A_IIdd)
+  ΠSd = Array{Float64,2}[]
+
+  for idom in 1:ndom
+    if isnothing(preconds)
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             reltol=1e-15),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
+    else
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             precond=preconds[idom],
+                                             reltol=1e-15),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
+    end
+
+    Sd_mat = Array(Sd)
+    pinv_Sd = LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
+
+    push!(ΠSd, pinv_Sd)
+  end
+
+  return NeumannNeumannSchurPreconditioner(ΠSd,
+                                           ind_Γd_Γ2l,
+                                           node_Γ_cnt)
+end
+
+
+"""
+prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
+                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                      node_Γ_cnt::Array{Int,1})
+  
+Prepares and returns a NeumannNeumannSchurPreconditioner.
+Computes pseudo-inverses of (singular) local Schur complements.
+  
+"""
+function prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
+                                               ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                               node_Γ_cnt::Array{Int,1})
+
+  ndom = length(Sd_local_mat)
+  ΠSd = Array{Float64,2}[]
+
+  for idom in 1:ndom
+    rtol = sqrt(eps(real(float(one(eltype(Sd_local_mat[idom]))))))
+    if isa(Sd_local_mat[idom], SparseMatrixCSC)
+      push!(ΠSd, LinearAlgebra.pinv(Array(Sd_local_mat[idom]), rtol=rtol))
+    else
+      push!(ΠSd, LinearAlgebra.pinv(Sd_local_mat[idom], rtol=rtol))
+    end
+  end
+
+  return NeumannNeumannSchurPreconditioner(ΠSd,
+                                           ind_Γd_Γ2l,
+                                           node_Γ_cnt)
+end
+
+
+"""
+apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
+                            r::Array{Float64,1})
+  
+Applies the NeumannNeumannSchurPreconditioner.
+  
+"""
+function apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
+                                     r::Array{Float64,1})
+
+  ndom = length(Πnn.ΠSd)
+  z = zeros(Float64, length(Πnn.node_Γ_cnt))
+
+  for idom in 1:ndom
+
+    n_Γd = Πnn.ind_Γd_Γ2l[idom].count
+    rd = Array{Float64,1}(undef, n_Γd)
+    ΠSdrd = Array{Float64,1}(undef, n_Γd)
+
+    for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      rd[lnode_in_Γd] = r[lnode_in_Γ] / Πnn.node_Γ_cnt[lnode_in_Γ]
+    end
+
+    ΠSdrd .= Πnn.ΠSd[idom] * rd
+
+    for (lnode_in_Γ, lnode_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      z[lnode_in_Γ] += ΠSdrd[lnode_in_Γd] / Πnn.node_Γ_cnt[lnode_in_Γ]
+    end
+
+   end # for idom
+
+   return z
+end
+
+
+import Base: \
+function (\)(Πnn::NeumannNeumannSchurPreconditioner, x::Array{Float64,1})
+  apply_neumann_neumann_schur(Πnn, x)
+end
+
+function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
+                             Πnn::NeumannNeumannSchurPreconditioner,
+                             r::Array{Float64,1})
+  z .= apply_neumann_neumann_schur(Πnn, r)
+end
+
+function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
+                             r::Array{Float64,1})
+  r .= apply_neumann_neumann_schur(Πnn, copy(r))
+end
+
+
 struct NeumannNeumannInducedPreconditioner
   ΠSd::Array{Array{Float64,2},1}
   A_IIdd::Array{SparseMatrixCSC{Float64,Int},1}
@@ -1084,8 +1086,10 @@ prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,In
                                         node_Γ::Array{Int,1},
                                         not_dirichlet_inds_g2l::Dict{Int,Int};
                                         preconds=nothing)
-  
+
 Prepares and returns a NeumannNeumannInducedPreconditioner.
+
+Notice: This preconditioner only seems to work with deflation.
   
 """
 function prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -1248,8 +1252,12 @@ apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
               x_Id::Array{Array{Float64,1},1},
               x_Γ::Array{Float64,1})
 
-Applies A0 for the ddlr preconditioner.
-  
+Applies A0 for the ddlr preconditioner. See Li & Saad (2017).
+
+Li R & Saad Y. 
+Low-rank correction methods for algebraic domain decomposition preconditioners. 
+SIAM Journal on Matrix Analysis and Applications. 2017;38(3):807-28.
+
 """
 function apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
                        A0_Γ::SparseMatrixCSC{Float64,Int},
@@ -1272,7 +1280,11 @@ apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
              x_Id::Array{Array{Float64,1},1},
              x_Γ::Array{Float64,1})
 
-Applies A0 for the ddlr preconditioner.
+Applies A0 for the ddlr preconditioner. See Li & Saad (2017).
+
+Li R & Saad Y. 
+Low-rank correction methods for algebraic domain decomposition preconditioners. 
+SIAM Journal on Matrix Analysis and Applications. 2017;38(3):807-28.
   
 """
 function apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
@@ -1295,7 +1307,11 @@ apply_hmat(A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
            α::Float64,
            x_Γ::Array{Float64,1})
 
-Applies H for the ddlr preconditioner.
+Applies H for the ddlr preconditioner. See Li & Saad (2017).
+
+Li R & Saad Y. 
+Low-rank correction methods for algebraic domain decomposition preconditioners. 
+SIAM Journal on Matrix Analysis and Applications. 2017;38(3):807-28.
   
 """
 function apply_hmat(A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -1341,6 +1357,16 @@ prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrixCSC{Float
                                               α=1.)
 
 Prepares and returns a DomainDecompositionLowRankPreconditioner.
+See Li & Saad (2017) for a reference on the domain decomposition
+low rank (ddlr) preconditioner. 
+
+Notice: This preconditioner is meant for a partition with vertex separators.
+        Work to be resumed if an edge-based partitioning domain decomposition
+        is implemented.
+
+Li R & Saad Y. 
+Low-rank correction methods for algebraic domain decomposition preconditioners. 
+SIAM Journal on Matrix Analysis and Applications. 2017;38(3):807-28.
   
 """
 function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
@@ -1502,8 +1528,13 @@ prepare_lorasc_precond(S::FunctionMap{Float64},
                        nvec=25, 
                        ε=.01)
 
-Prepares and retur a LorascPreconditioner.
-  
+Prepares and returns a LorascPreconditioner.
+See Grigori et al. (2014) for a reference on the LORASC preconditioner.
+
+Grigori L, Frédéric N, Soleiman Y.
+Robust algebraic Schur complement preconditioners based on low rank corrections.
+Inria research report. 2014;RR-8557:pp.18.
+
 """
 function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 A_IId::Array{SparseMatrixCSC{Float64,Int},1},
