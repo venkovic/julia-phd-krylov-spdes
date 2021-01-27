@@ -1,6 +1,6 @@
 using DelimitedFiles: readdlm
 using SparseArrays: sparse
-using LinearMaps: LinearMap
+using LinearMaps: LinearMap, FunctionMap
 import SuiteSparse
 import LinearAlgebra
 import IterativeSolvers
@@ -645,6 +645,27 @@ function apply_local_schurs(Sd::Union{Array{SparseMatrixCSC{Float64,Int},1},
 end
 
 
+
+"""
+set_subdomains(cells::Array{Int,2}, 
+               cell_neighbors::Array{Int,2}, 
+               epart::Array{Int64,2}, 
+               npart::Array{Int64,2})
+  
+Returns helper data structures for non-overlaping domain decomposition using the mesh 
+partition defined by epart and npart. 
+  
+Input:
+  
+mesh: Instance of TriangleMesh.TriMesh.
+
+nel = mesh.n_cell
+epart[iel, 1]: subdomain idom ∈ [1, ndom] to which element iel ∈ [1, nel] belongs.
+
+nnode = mesh.n_point
+npart[inode, 1]: subdomain idom ∈ [1, ndom] to which node inode ∈ [1, nnode] belongs.
+
+"""
 struct NeumannNeumannSchurPreconditioner
   ΠSd::Array{Array{Float64,2},1}
   ind_Γd_Γ2l::Array{Dict{Int,Int},1}
@@ -679,16 +700,6 @@ function prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Flo
                                              reltol=1e-15),
                                              ind_Γd_Γ2l[idom].count, issymmetric=true)
     end
-
-    #pseudoinv_Sd = zeros(Float64, Sd.N, Sd.N)  
-    #λ, ϕ = Arpack.eigs(Symmetric(Array(Sd) + 1e-8 * I), nev=Sd.N-1)
-    #for (k, λk) in enumerate(λ)
-    #  λk >  ? pseudoinv_Sd .+= λk ^ -1 * ϕ[:, k] * ϕ[:, k]' : break
-    #end
-    #λ, ϕ = LinearAlgebra.eigen(Symmetric(Array(Sd) + 1e-8 * I))    
-    #for k in Sd.N:-1:1
-    #  λ[k] > 1e-6 ? pseudoinv_Sd .+= λ[k] ^ -1 * ϕ[:, k] * ϕ[:, k]' : break
-    #end
 
     Sd_mat = Array(Sd)
     pinv_Sd = LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat)))))))
@@ -1058,7 +1069,6 @@ struct DomainDecompositionLowRankPreconditioner
   ΠA0_Γ
   α::Float64
   θ::Float64
-  #U::Array{Float64,2}
   U::Array{Array{Float64,1},1}
   Λ::Array{Float64,1}
   ind_Id_g2l::Array{Dict{Int,Int},1}
@@ -1253,4 +1263,147 @@ end
 function LinearAlgebra.ldiv!(Πddlr::DomainDecompositionLowRankPreconditioner,
                              r::Array{Float64,1})
   r .= apply_domain_decomposition_low_rank(Πddlr, copy(r))
+end
+
+
+
+struct LorascPreconditioner
+  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
+  chol_A_IId::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
+  A_ΓΓ::SparseMatrixCSC{Float64,Int}
+  ΠA_ΓΓ
+  ε::Float64
+  E::Array{Array{Float64,1},1}
+  Σ::Array{Float64,1}
+  ind_Id_g2l::Array{Dict{Int,Int},1}
+  ind_Γ_g2l::Dict{Int,Int}
+  not_dirichlet_inds_g2l::Dict{Int,Int}
+end
+
+
+function prepare_lorasc_precond(S::FunctionMap{Float64},
+                                A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                                A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                                A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                                ind_Id_g2l::Array{Dict{Int,Int},1},
+                                ind_Γ_g2l::Dict{Int,Int}, 
+                                not_dirichlet_inds_g2l::Dict{Int,Int};
+                                nvec=25, 
+                                ε=.01)
+
+  ndom, = size(A_IId)
+  chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
+
+  ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
+
+  for idom in 1:ndom
+    push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
+  end
+
+  Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
+                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
+                                     isposdef=true, ishermitian=true,
+                                     issymmetric=true)
+  
+  nev = 0
+  for (k, σ) in enumerate(Σ)
+    if σ < ε
+      Σ[k] = (ε - σ) / σ
+      nev += 1
+    else
+      break
+    end
+  end 
+
+  if nev == nvec
+    println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
+  elseif nev == 0 
+    println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
+    nev = nvec
+  end
+
+  return LorascPreconditioner(A_IΓd,
+                              chol_A_IId,
+                              A_ΓΓ,
+                              ΠA_ΓΓ,
+                              ε,
+                              E[1:nev],
+                              Σ[1:nev],
+                              ind_Id_g2l,
+                              ind_Γ_g2l,
+                              not_dirichlet_inds_g2l)
+end
+
+
+function apply_lorasc(Πlorasc::LorascPreconditioner,
+                      x::Array{Float64,1})
+
+  n, = size(x)
+  ndom, = size(Πlorasc.ind_Id_g2l)
+  n_Γ = Πlorasc.ind_Γ_g2l.count
+  nvec, = size(Πlorasc.Σ)
+
+  x_Id = [Array{Float64,1}(undef, Πlorasc.ind_Id_g2l[idom].count) for idom in 1:ndom]
+  x_Γ = Array{Float64, 1}(undef, n_Γ)
+  z_Γ = Array{Float64, 1}(undef, n_Γ)
+  u = Array{Float64,1}(undef, n)
+
+  for idom in 1:ndom
+    for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
+      x_Id[idom][node_in_I] = x[Πlorasc.not_dirichlet_inds_g2l[node]]
+    end
+  end
+
+  for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
+    val = x[Πlorasc.not_dirichlet_inds_g2l[node]]
+    x_Γ[node_in_Γ] = val
+    z_Γ[node_in_Γ] = val
+  end
+
+  for idom in 1:ndom
+    x_Id[idom] .= Πlorasc.chol_A_IId[idom] \ x_Id[idom]
+    z_Γ .-= Πlorasc.A_IΓd[idom]' * x_Id[idom]
+  end
+
+  x_Γ .= IterativeSolvers.cg(Πlorasc.A_ΓΓ, z_Γ, Pl=Πlorasc.ΠA_ΓΓ, tol=1e-12)
+
+  for (k, σ) in enumerate(Πlorasc.Σ)
+    val = Πlorasc.E[k]'z_Γ
+    x_Γ .+= val * Πlorasc.E[k]
+  end
+
+  for idom in 1:ndom
+    x_Id[idom] .-= Πlorasc.chol_A_IId[idom] \ (Πlorasc.A_IΓd[idom] * x_Γ)
+  end
+
+  for idom in 1:ndom
+    for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
+      u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Id[idom][node_in_I]
+    end
+  end
+
+  for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
+    u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
+  end
+
+  return u
+end
+
+
+import Base: \
+function (\)(Πlorasc::LorascPreconditioner, x::Array{Float64,1})
+  apply_lorasc(Πlorasc, x)
+end
+
+
+function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
+                             Πlorasc::LorascPreconditioner,
+                             r::Array{Float64,1})
+  z .= apply_lorasc(Πlorasc, r)
+end
+
+
+function LinearAlgebra.ldiv!(Πlorasc::LorascPreconditioner,
+                             r::Array{Float64,1})
+  r .= apply_lorasc(Πlorasc, copy(r))
 end

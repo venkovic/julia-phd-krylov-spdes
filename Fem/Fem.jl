@@ -39,7 +39,9 @@ export apply_domain_decomposition_low_rank
 export DomainDecompositionLowRankPreconditioner
 export prepare_domain_decomposition_low_rank_precond
 export apply_inv_a0, apply_inv_a0!, apply_hmat
-
+export apply_lorasc
+export LorascPreconditioner
+export prepare_lorasc_precond
 export get_schur_rhs
 export get_subdomain_solutions
 export merge_subdomain_solutions
