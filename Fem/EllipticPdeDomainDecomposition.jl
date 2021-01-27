@@ -1150,7 +1150,7 @@ function prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrix
 
   Λ, U, info = KrylovKit.eigsolve(x_Γ -> apply_hmat(A_IΓd, chol_A0_Id, A0_Γ, ΠA0_Γ, α, x_Γ),
                                A_ΓΓ.n, nvec+1, :LM, issymmetric=true, krylovdim=2*nvec)
-  θ = Λ[nvec + 1]
+  θ = 0 #Λ[nvec + 1]
   
   return DomainDecompositionLowRankPreconditioner(A_IΓd,
                                                   chol_A0_Id,
@@ -1201,7 +1201,7 @@ function apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankP
   for idom in 1:ndom
     y_Γ .+= Πddlr.α^-1 * (Πddlr.A_IΓd[idom]' * z_Id[idom])
   end
-  y_Γ .+= -Πddlr.α * z_Γ
+  y_Γ .-= Πddlr.α * z_Γ
 
   # w_Γ = Ginv_approx * y_Γ
   w_Γ .= y_Γ ./ (1 - Πddlr.θ)
