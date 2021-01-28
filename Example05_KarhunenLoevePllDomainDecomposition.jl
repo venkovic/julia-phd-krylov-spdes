@@ -2,7 +2,9 @@ using Distributed
 
 addprocs(([("marcel", 4)]), tunnel=true)
 addprocs(([("andrew", 3)]), tunnel=true)
-addprocs(([("moorcock", 6)]), tunnel=true)
+addprocs(([("venkovic@moorcock", 6)]), tunnel=true,
+             dir="/home/venkovic/Dropbox/Git/julia-fem/",
+             exename="/home/venkovic/julia-1.5.3/bin/julia")
 addprocs(2) # Add procs after remote hosts due to issue with ClusterManagers
 
 @everywhere begin
