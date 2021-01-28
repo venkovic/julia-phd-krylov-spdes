@@ -10,61 +10,89 @@ import KrylovKit
 
 
 """
-set_subdomains(cells::Array{Int,2}, 
-               cell_neighbors::Array{Int,2}, 
-               epart::Array{Int64,2}, 
-               npart::Array{Int64,2})
+set_subdomains(cells::Array{Int,2},
+               cell_neighbors::Array{Int,2},
+               epart::Array{Int64,1},
+               npart::Array{Int64,1},
+               dirichlet_inds_g2l::Dict{Int,Int})
   
-Returns helper data structures for non-overlaping domain decomposition using the mesh 
-partition defined by epart and npart. 
+Returns helper data structures for non-overlaping domain decomposition, i.e., 
+vertex partition with edge separators, using the partition defined by (epart, npart)
+for the mesh (cells, cell_neighbors) with non-Dirichlet nodes in dirichlet_inds_g2l.
   
 Input:
-  
-mesh: Instance of TriangleMesh.TriMesh.
 
-nel = mesh.n_cell
-epart[iel, 1]: subdomain idom ∈ [1, ndom] to which element iel ∈ [1, nel] belongs.
+  cells::Array{Int,2}, size(cells) = (3, n_el)
+  Nodes of each element.
 
-nnode = mesh.n_point
-npart[inode, 1]: subdomain idom ∈ [1, ndom] to which node inode ∈ [1, nnode] belongs.
+  cell_neighbors::Array{Int,2}, size(cell_neighbors) = (3, n_el)
+  Neighboring elements of each element, or -1 if edge is at mesh boundary. 
+
+  epart::Array{Int64,1}, size(epart) = (nel,)
+  Host subdomain of each element.
+
+  npart::Array{Int,1}, size(npart) = (nnode,) 
+  A host subdomain of each node.
+
+  dirichlet_inds_g2l::Dict{Int,Int}, dirichlet_inds_g2l.count = # non-Dirichlet nodes
+  Conversion table from global mesh node indices to non-dirichlet indices.
 
 Output:
 
-elemd[idom][:]: 1D array of all the elements contained in subdomain idom ∈ [1, ndom].
+  ind_Id_g2l::Array{Dict{Int,Int}}
+  Conversion tables from global to local indices of nodes strictly inside each subdomain.
 
-node_Γ[:]: 1D array of global indices of the nodes at the interface of the mesh
-           partition.
+  ind_Γd_g2l::Array{Dict{Int,Int}}
+  Conversion table from global to local indices of nodes on the interface of each subdomain.
 
+  ind_Γ_g2l::Dict{Int,Int}
+  Conversion table from global to local indices of nodes on the interface of the mesh partition.
 
-           
-           ? IS node_Id necessary ?
+  ind_Γd_Γ2l::Array{Dict{Int,Int}}
+  Conversion table from indices of nodes in Γ to local indices of nodes in Γ_d for each subdomain.
 
+  node_owner::Array{Int,1}
+  Indicates each node's owner:  -1 if node inode ∈ [1, nnode] in Γ is not Dirchlet.
+                                 0 if node inode is Dirichlet.
+                  idom ∈ [1, ndom] if node inode in (Ω_idom ∖ Γ) is not Dirichlet.
 
-node_Id[idom]: 1D array of global indices of the nodes strictly inside subdomain 
-               idom ∈ [1, ndom].
+  elemd::Array{Array{Int,1},1}
+  Elements contained inside each subdomain, i.e., elemd[idom][:] is an array of all the elements 
+  contained in subdomain idom ∈ [1, ndom].
 
-ind_Id[idom]: Conversion table (i.e. dictionary) from global to local indices of 
-              nodes strictly inside subdomain idom ∈ [1, ndom].
+  node_Γ::Array{Int,1}
+  Nodes at the interface of the mesh partition which are not Dirichlet
 
-nnode_Id[idom]: Number of nodes strictly inside subdomain idom ∈ [1, ndom].
+  node_Γ_cnt::Array{Int,1}
+  Number of subdomains owning each local node ∈ Γ
 
-node_owner[inode]:    -1 if node inode ∈ [1, nnode] in Γ is not Dirchlet.
-                       0 if node inode is Dirichlet.
-                    idom ∈ [1, ndom] if node inode in (Ω_idom ∖ Γ) is not Dirichlet.
+  node_Id::Array{Array{Int,1},1}
+  Non-Dirichlet nodes strictly inside each subdomain
+
+  nnode_Id::Array{Int,1}
+  Number of non-Dirchlet nodes strictly inside each subdomain
+
   
 # Examples
 ```jldoctest
 julia>
 using TriangleMesh
-using NPZ
 using Fem
 
-poly = polygon_unitSquare()
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true)
-
 ndom = 400
-epart, npart = mesh_partition(mesh, ndom)
-elemd, node_Γ, node_Id, ind_Id, nnode_Id, node_owner = set_subdomains(mesh, epart, npart)
+tentative_nnode = 400_000
+mesh = get_mesh(tentative_nnode)
+
+dirichlet_inds_g2l, not_dirichlet_inds_g2l,
+dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
+get_dirichlet_inds(mesh.point, mesh.point_marker)
+
+ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
+elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
+                                                              cell_neighbors,
+                                                              epart, 
+                                                              npart,
+                                                              dirichlet_inds_g2l)
 
 ```
 """
@@ -920,6 +948,19 @@ end
 
 
 struct NeumannNeumannSchurPreconditioner
+
+  # Le Tallec P, De Roeck YH, Vidrascu M.
+  # Domain decomposition methods for large linearly elliptic three-dimensional problems. 
+  # Journal of Computational and Applied Mathematics. 1991 Feb 10;34(1):93-117.
+
+  # Bourgat JF, Glowinski R, Le Tallec P, Vidrascu M. 
+  # Variational formulation and algorithm for trace operator in domain decomposition calculations. 
+  # Inria research report. 1988;RR-804:pp.18.
+
+  # Giraud L, Tuminaro RS. 
+  # Algebraic domain decomposition preconditioners. 
+  # Mesh partitioning techniques and domain decomposition methods. 2006 Oct:187-216.
+
   ΠSd::Array{Array{Float64,2},1}
   ind_Γd_Γ2l::Array{Dict{Int,Int},1}
   node_Γ_cnt::Array{Int,1}
@@ -1061,176 +1102,183 @@ function LinearAlgebra.ldiv!(Πnn::NeumannNeumannSchurPreconditioner,
 end
 
 
-struct NeumannNeumannInducedPreconditioner
-  ΠSd::Array{Array{Float64,2},1}
-  A_IIdd::Array{SparseMatrixCSC{Float64,Int},1}
+struct LorascPreconditioner
+
+  # Grigori L, Frédéric N, Soleiman Y.
+  # Robust algebraic Schur complement preconditioners based on low rank corrections.
+  # Inria research report. 2014;RR-8557:pp.18.
+
+  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
   chol_A_IId::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
-  A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1}
+  A_ΓΓ::SparseMatrixCSC{Float64,Int}
+  ΠA_ΓΓ
+  ε::Float64
+  E::Array{Array{Float64,1},1}
+  Σ::Array{Float64,1}
   ind_Id_g2l::Array{Dict{Int,Int},1}
   ind_Γ_g2l::Dict{Int,Int}
-  ind_Γd_Γ2l::Array{Dict{Int,Int},1}
-  node_Γ_cnt::Array{Int,1}
-  node_Γ::Array{Int,1}
   not_dirichlet_inds_g2l::Dict{Int,Int}
 end
 
 
 """
-prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                        A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                        A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                        ind_Id_g2l::Array{Dict{Int,Int},1},
-                                        ind_Γ_g2l::Dict{Int,Int},
-                                        ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                        node_Γ_cnt::Array{Int,1},
-                                        node_Γ::Array{Int,1},
-                                        not_dirichlet_inds_g2l::Dict{Int,Int};
-                                        preconds=nothing)
+prepare_lorasc_precond(S::FunctionMap{Float64},
+                       A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                       A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                       A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                       ind_Id_g2l::Array{Dict{Int,Int},1},
+                       ind_Γ_g2l::Dict{Int,Int}, 
+                       not_dirichlet_inds_g2l::Dict{Int,Int};
+                       nvec=25, 
+                       ε=.01)
 
-Prepares and returns a NeumannNeumannInducedPreconditioner.
+Prepares and returns a LorascPreconditioner.
+See Grigori et al. (2014) for a reference on the LORASC preconditioner.
 
-Notice: This preconditioner only seems to work with deflation.
-  
+Grigori L, Frédéric N, Soleiman Y.
+Robust algebraic Schur complement preconditioners based on low rank corrections.
+Inria research report. 2014;RR-8557:pp.18.
+
 """
-function prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                                 A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                                 A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                                 ind_Id_g2l::Array{Dict{Int,Int},1},
-                                                 ind_Γ_g2l::Dict{Int,Int},
-                                                 ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                                 node_Γ_cnt::Array{Int,1},
-                                                 node_Γ::Array{Int,1},
-                                                 not_dirichlet_inds_g2l::Dict{Int,Int};
-                                                 preconds=nothing)
+function prepare_lorasc_precond(S::FunctionMap{Float64},
+                                A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                                A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                                A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                                ind_Id_g2l::Array{Dict{Int,Int},1},
+                                ind_Γ_g2l::Dict{Int,Int}, 
+                                not_dirichlet_inds_g2l::Dict{Int,Int};
+                                nvec=25, 
+                                ε=.01)
 
-  ndom, = size(A_IIdd)
-  ΠSd = Array{Float64,2}[]
-  chol_A_IId = SuiteSparse.CHOLMOD.Factor{}[]
+  ndom, = size(A_IId)
+  chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
+
+  ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
 
   for idom in 1:ndom
-    if isnothing(preconds)
-      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
-                                             A_IΓdd[idom],
-                                             A_ΓΓdd[idom],
-                                             xd,
-                                             reltol=1e-12),
-                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
-    else
-      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
-                                             A_IΓdd[idom],
-                                             A_ΓΓdd[idom],
-                                             xd,
-                                             precond=preconds[idom],
-                                             reltol=1e-12),
-                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
-    end
-
-    Sd_mat = Array(Sd)
-    push!(ΠSd, LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat))))))))
-    push!(chol_A_IId, LinearAlgebra.cholesky(A_IIdd[idom]))
+    push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
   end
 
-  return NeumannNeumannInducedPreconditioner(ΠSd,
-                                             A_IIdd,
-                                             chol_A_IId,
-                                             A_IΓdd,
-                                             ind_Id_g2l,
-                                             ind_Γ_g2l,
-                                             ind_Γd_Γ2l,
-                                             node_Γ_cnt,
-                                             node_Γ,
-                                             not_dirichlet_inds_g2l)
+  Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
+                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
+                                     isposdef=true, ishermitian=true,
+                                     issymmetric=true)
+  
+  nev = 0
+  for (k, σ) in enumerate(Σ)
+    if σ < ε
+      Σ[k] = (ε - σ) / σ
+      nev += 1
+    else
+      break
+    end
+  end 
+
+  if nev == nvec
+    println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
+  elseif nev == 0 
+    println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
+    nev = nvec
+  end
+
+  return LorascPreconditioner(A_IΓd,
+                              chol_A_IId,
+                              A_ΓΓ,
+                              ΠA_ΓΓ,
+                              ε,
+                              E[1:nev],
+                              Σ[1:nev],
+                              ind_Id_g2l,
+                              ind_Γ_g2l,
+                              not_dirichlet_inds_g2l)
 end
 
 
 """
-apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
-                              r::Array{Float64,1})
-  
-Applies the NeumannNeumannInducedPreconditioner.
+apply_lorasc(Πlorasc::LorascPreconditioner,
+             x::Array{Float64,1})
+
+Applies the LorascPreconditioner.
   
 """
-function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
-                                       r::Array{Float64,1})
-  
-  n, = size(r)  
-  ndom, = size(Πnn.ΠSd)
-  n_Γ, = size(Πnn.node_Γ_cnt)
+function apply_lorasc(Πlorasc::LorascPreconditioner,
+                      x::Array{Float64,1})
 
-  n_Id = [Πnn.A_IIdd[idom].n for idom in 1:ndom]
-  r_Id = [Array{Float64,1}(undef, n_Id[idom]) for idom in 1:ndom]
-  z_Id = [Array{Float64,1}(undef, n_Id[idom]) for idom in 1:ndom]
+  n, = size(x)
+  ndom, = size(Πlorasc.ind_Id_g2l)
+  n_Γ = Πlorasc.ind_Γ_g2l.count
+  nvec, = size(Πlorasc.Σ)
 
-  n_Γd = [Πnn.ind_Γd_Γ2l[idom].count for idom in 1:ndom]
-  r_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
-  z_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
-
-  r_schur = Array{Float64,1}(undef, n_Γ)
-  r_Γ = Array{Float64,1}(undef, n_Γ)
-  z_Γ = zeros(Float64, n_Γ)
-  z = Array{Float64,1}(undef, n)
+  x_Id = [Array{Float64,1}(undef, Πlorasc.ind_Id_g2l[idom].count) for idom in 1:ndom]
+  x_Γ = Array{Float64, 1}(undef, n_Γ)
+  z_Γ = Array{Float64, 1}(undef, n_Γ)
+  u = Array{Float64,1}(undef, n)
 
   for idom in 1:ndom
-    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
-      r_Id[idom][node_in_Id] = r[Πnn.not_dirichlet_inds_g2l[node]]
+    for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
+      x_Id[idom][node_in_I] = x[Πlorasc.not_dirichlet_inds_g2l[node]]
     end
   end
 
-  for (node, node_in_Γ) in Πnn.ind_Γ_g2l
-    r_Γ[node_in_Γ] = r[Πnn.not_dirichlet_inds_g2l[node]]
-  end
-
-  r_schur .= r_Γ
-  for idom in 1:ndom
-    z_Id[idom] .= Πnn.chol_A_IId[idom] \ r_Id[idom]
-    r_Γd[idom] .= Πnn.A_IΓdd[idom]' * z_Id[idom]
-    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      r_schur[node_in_Γ] -= r_Γd[idom][node_in_Γd]
-    end
+  for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
+    val = x[Πlorasc.not_dirichlet_inds_g2l[node]]
+    x_Γ[node_in_Γ] = val
+    z_Γ[node_in_Γ] = val
   end
 
   for idom in 1:ndom
-    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      r_Γd[idom][node_in_Γd] = r_schur[node_in_Γ] / Πnn.node_Γ_cnt[node_in_Γ]
-    end
-    z_Γd[idom] .= Πnn.ΠSd[idom] * r_Γd[idom]
-
-    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
-      z_Γ[node_in_Γ] += z_Γd[idom][node_in_Γd] / Πnn.node_Γ_cnt[node_in_Γ]
-    end
-    z_Id[idom] .= r_Id[idom] .- Πnn.A_IΓdd[idom] * z_Γd[idom]
-    z_Id[idom] .= Πnn.chol_A_IId[idom] \ z_Id[idom]
-    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
-      z[Πnn.not_dirichlet_inds_g2l[node]] = z_Id[idom][node_in_Id]
-    end
-  end # for idom
-
-  for (node, node_in_Γ) in Πnn.ind_Γ_g2l
-    z[Πnn.not_dirichlet_inds_g2l[node]] = z_Γ[node_in_Γ] 
+    x_Id[idom] .= Πlorasc.chol_A_IId[idom] \ x_Id[idom]
+    z_Γ .-= Πlorasc.A_IΓd[idom]' * x_Id[idom]
   end
 
-  return z
+  x_Γ .= IterativeSolvers.cg(Πlorasc.A_ΓΓ, z_Γ, Pl=Πlorasc.ΠA_ΓΓ, tol=1e-12)
+
+  for (k, σ) in enumerate(Πlorasc.Σ)
+    val = Πlorasc.E[k]'z_Γ
+    x_Γ .+= val * Πlorasc.E[k]
+  end
+
+  for idom in 1:ndom
+    x_Id[idom] .-= Πlorasc.chol_A_IId[idom] \ (Πlorasc.A_IΓd[idom] * x_Γ)
+  end
+
+  for idom in 1:ndom
+    for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
+      u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Id[idom][node_in_I]
+    end
+  end
+
+  for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
+    u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
+  end
+
+  return u
 end
 
 
 import Base: \
-function (\)(Πnn::NeumannNeumannInducedPreconditioner, x::Array{Float64,1})
-  apply_neumann_neumann_induced(Πnn, x)
+function (\)(Πlorasc::LorascPreconditioner, x::Array{Float64,1})
+  apply_lorasc(Πlorasc, x)
 end
 
 function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
-                             Πnn::NeumannNeumannInducedPreconditioner,
+                             Πlorasc::LorascPreconditioner,
                              r::Array{Float64,1})
-  z .= apply_neumann_neumann_induced(Πnn, r)
+  z .= apply_lorasc(Πlorasc, r)
 end
 
-function LinearAlgebra.ldiv!(Πnn::NeumannNeumannInducedPreconditioner,
+function LinearAlgebra.ldiv!(Πlorasc::LorascPreconditioner,
                              r::Array{Float64,1})
-  r .= apply_neumann_neumann_induced(Πnn, copy(r))
+  r .= apply_lorasc(Πlorasc, copy(r))
 end
 
 
 struct DomainDecompositionLowRankPreconditioner
+
+  # Li R & Saad Y. 
+  # Low-rank correction methods for algebraic domain decomposition preconditioners. 
+  # SIAM Journal on Matrix Analysis and Applications. 2017;38(3):807-28.
+
   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
   chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
   A0_Γ::SparseMatrixCSC{Float64,Int}
@@ -1503,167 +1551,170 @@ function LinearAlgebra.ldiv!(Πddlr::DomainDecompositionLowRankPreconditioner,
 end
 
 
-struct LorascPreconditioner
-  A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
+struct NeumannNeumannInducedPreconditioner
+  ΠSd::Array{Array{Float64,2},1}
+  A_IIdd::Array{SparseMatrixCSC{Float64,Int},1}
   chol_A_IId::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
-  A_ΓΓ::SparseMatrixCSC{Float64,Int}
-  ΠA_ΓΓ
-  ε::Float64
-  E::Array{Array{Float64,1},1}
-  Σ::Array{Float64,1}
+  A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1}
   ind_Id_g2l::Array{Dict{Int,Int},1}
   ind_Γ_g2l::Dict{Int,Int}
+  ind_Γd_Γ2l::Array{Dict{Int,Int},1}
+  node_Γ_cnt::Array{Int,1}
+  node_Γ::Array{Int,1}
   not_dirichlet_inds_g2l::Dict{Int,Int}
 end
 
 
 """
-prepare_lorasc_precond(S::FunctionMap{Float64},
-                       A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                       A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                       A_ΓΓ::SparseMatrixCSC{Float64,Int},
-                       ind_Id_g2l::Array{Dict{Int,Int},1},
-                       ind_Γ_g2l::Dict{Int,Int}, 
-                       not_dirichlet_inds_g2l::Dict{Int,Int};
-                       nvec=25, 
-                       ε=.01)
+prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                        A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                        A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                        ind_Id_g2l::Array{Dict{Int,Int},1},
+                                        ind_Γ_g2l::Dict{Int,Int},
+                                        ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                        node_Γ_cnt::Array{Int,1},
+                                        node_Γ::Array{Int,1},
+                                        not_dirichlet_inds_g2l::Dict{Int,Int};
+                                        preconds=nothing)
 
-Prepares and returns a LorascPreconditioner.
-See Grigori et al. (2014) for a reference on the LORASC preconditioner.
+Prepares and returns a NeumannNeumannInducedPreconditioner.
 
-Grigori L, Frédéric N, Soleiman Y.
-Robust algebraic Schur complement preconditioners based on low rank corrections.
-Inria research report. 2014;RR-8557:pp.18.
-
+Notice: This preconditioner only seems to work with deflation.
+  
 """
-function prepare_lorasc_precond(S::FunctionMap{Float64},
-                                A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                                A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                                A_ΓΓ::SparseMatrixCSC{Float64,Int},
-                                ind_Id_g2l::Array{Dict{Int,Int},1},
-                                ind_Γ_g2l::Dict{Int,Int}, 
-                                not_dirichlet_inds_g2l::Dict{Int,Int};
-                                nvec=25, 
-                                ε=.01)
+function prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                 A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                 A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                 ind_Id_g2l::Array{Dict{Int,Int},1},
+                                                 ind_Γ_g2l::Dict{Int,Int},
+                                                 ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                                 node_Γ_cnt::Array{Int,1},
+                                                 node_Γ::Array{Int,1},
+                                                 not_dirichlet_inds_g2l::Dict{Int,Int};
+                                                 preconds=nothing)
 
-  ndom, = size(A_IId)
-  chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
-
-  ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
+  ndom, = size(A_IIdd)
+  ΠSd = Array{Float64,2}[]
+  chol_A_IId = SuiteSparse.CHOLMOD.Factor{}[]
 
   for idom in 1:ndom
-    push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
-  end
-
-  Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
-                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
-                                     isposdef=true, ishermitian=true,
-                                     issymmetric=true)
-  
-  nev = 0
-  for (k, σ) in enumerate(Σ)
-    if σ < ε
-      Σ[k] = (ε - σ) / σ
-      nev += 1
+    if isnothing(preconds)
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             reltol=1e-12),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
     else
-      break
+      Sd = LinearMap(xd -> apply_local_schur(A_IIdd[idom],
+                                             A_IΓdd[idom],
+                                             A_ΓΓdd[idom],
+                                             xd,
+                                             precond=preconds[idom],
+                                             reltol=1e-12),
+                                             ind_Γd_Γ2l[idom].count, issymmetric=true)
     end
-  end 
 
-  if nev == nvec
-    println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
-  elseif nev == 0 
-    println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
-    nev = nvec
+    Sd_mat = Array(Sd)
+    push!(ΠSd, LinearAlgebra.pinv(Sd_mat, rtol=sqrt(eps(real(float(one(eltype(Sd_mat))))))))
+    push!(chol_A_IId, LinearAlgebra.cholesky(A_IIdd[idom]))
   end
 
-  return LorascPreconditioner(A_IΓd,
-                              chol_A_IId,
-                              A_ΓΓ,
-                              ΠA_ΓΓ,
-                              ε,
-                              E[1:nev],
-                              Σ[1:nev],
-                              ind_Id_g2l,
-                              ind_Γ_g2l,
-                              not_dirichlet_inds_g2l)
+  return NeumannNeumannInducedPreconditioner(ΠSd,
+                                             A_IIdd,
+                                             chol_A_IId,
+                                             A_IΓdd,
+                                             ind_Id_g2l,
+                                             ind_Γ_g2l,
+                                             ind_Γd_Γ2l,
+                                             node_Γ_cnt,
+                                             node_Γ,
+                                             not_dirichlet_inds_g2l)
 end
 
 
 """
-apply_lorasc(Πlorasc::LorascPreconditioner,
-             x::Array{Float64,1})
-
-Applies the LorascPreconditioner.
+apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
+                              r::Array{Float64,1})
+  
+Applies the NeumannNeumannInducedPreconditioner.
   
 """
-function apply_lorasc(Πlorasc::LorascPreconditioner,
-                      x::Array{Float64,1})
+function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
+                                       r::Array{Float64,1})
+  
+  n, = size(r)  
+  ndom, = size(Πnn.ΠSd)
+  n_Γ, = size(Πnn.node_Γ_cnt)
 
-  n, = size(x)
-  ndom, = size(Πlorasc.ind_Id_g2l)
-  n_Γ = Πlorasc.ind_Γ_g2l.count
-  nvec, = size(Πlorasc.Σ)
+  n_Id = [Πnn.A_IIdd[idom].n for idom in 1:ndom]
+  r_Id = [Array{Float64,1}(undef, n_Id[idom]) for idom in 1:ndom]
+  z_Id = [Array{Float64,1}(undef, n_Id[idom]) for idom in 1:ndom]
 
-  x_Id = [Array{Float64,1}(undef, Πlorasc.ind_Id_g2l[idom].count) for idom in 1:ndom]
-  x_Γ = Array{Float64, 1}(undef, n_Γ)
-  z_Γ = Array{Float64, 1}(undef, n_Γ)
-  u = Array{Float64,1}(undef, n)
+  n_Γd = [Πnn.ind_Γd_Γ2l[idom].count for idom in 1:ndom]
+  r_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
+  z_Γd = [Array{Float64,1}(undef, n_Γd[idom]) for idom in 1:ndom]
+
+  r_schur = Array{Float64,1}(undef, n_Γ)
+  r_Γ = Array{Float64,1}(undef, n_Γ)
+  z_Γ = zeros(Float64, n_Γ)
+  z = Array{Float64,1}(undef, n)
 
   for idom in 1:ndom
-    for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
-      x_Id[idom][node_in_I] = x[Πlorasc.not_dirichlet_inds_g2l[node]]
+    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
+      r_Id[idom][node_in_Id] = r[Πnn.not_dirichlet_inds_g2l[node]]
     end
   end
 
-  for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
-    val = x[Πlorasc.not_dirichlet_inds_g2l[node]]
-    x_Γ[node_in_Γ] = val
-    z_Γ[node_in_Γ] = val
+  for (node, node_in_Γ) in Πnn.ind_Γ_g2l
+    r_Γ[node_in_Γ] = r[Πnn.not_dirichlet_inds_g2l[node]]
   end
 
+  r_schur .= r_Γ
   for idom in 1:ndom
-    x_Id[idom] .= Πlorasc.chol_A_IId[idom] \ x_Id[idom]
-    z_Γ .-= Πlorasc.A_IΓd[idom]' * x_Id[idom]
-  end
-
-  x_Γ .= IterativeSolvers.cg(Πlorasc.A_ΓΓ, z_Γ, Pl=Πlorasc.ΠA_ΓΓ, tol=1e-12)
-
-  for (k, σ) in enumerate(Πlorasc.Σ)
-    val = Πlorasc.E[k]'z_Γ
-    x_Γ .+= val * Πlorasc.E[k]
-  end
-
-  for idom in 1:ndom
-    x_Id[idom] .-= Πlorasc.chol_A_IId[idom] \ (Πlorasc.A_IΓd[idom] * x_Γ)
-  end
-
-  for idom in 1:ndom
-    for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
-      u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Id[idom][node_in_I]
+    z_Id[idom] .= Πnn.chol_A_IId[idom] \ r_Id[idom]
+    r_Γd[idom] .= Πnn.A_IΓdd[idom]' * z_Id[idom]
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      r_schur[node_in_Γ] -= r_Γd[idom][node_in_Γd]
     end
   end
 
-  for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
-    u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
+  for idom in 1:ndom
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      r_Γd[idom][node_in_Γd] = r_schur[node_in_Γ] / Πnn.node_Γ_cnt[node_in_Γ]
+    end
+    z_Γd[idom] .= Πnn.ΠSd[idom] * r_Γd[idom]
+
+    for (node_in_Γ, node_in_Γd) in Πnn.ind_Γd_Γ2l[idom]
+      z_Γ[node_in_Γ] += z_Γd[idom][node_in_Γd] / Πnn.node_Γ_cnt[node_in_Γ]
+    end
+    z_Id[idom] .= r_Id[idom] .- Πnn.A_IΓdd[idom] * z_Γd[idom]
+    z_Id[idom] .= Πnn.chol_A_IId[idom] \ z_Id[idom]
+    for (node, node_in_Id) in Πnn.ind_Id_g2l[idom]
+      z[Πnn.not_dirichlet_inds_g2l[node]] = z_Id[idom][node_in_Id]
+    end
+  end # for idom
+
+  for (node, node_in_Γ) in Πnn.ind_Γ_g2l
+    z[Πnn.not_dirichlet_inds_g2l[node]] = z_Γ[node_in_Γ] 
   end
 
-  return u
+  return z
 end
 
 
 import Base: \
-function (\)(Πlorasc::LorascPreconditioner, x::Array{Float64,1})
-  apply_lorasc(Πlorasc, x)
+function (\)(Πnn::NeumannNeumannInducedPreconditioner, x::Array{Float64,1})
+  apply_neumann_neumann_induced(Πnn, x)
 end
 
 function LinearAlgebra.ldiv!(z::Array{Float64,1}, 
-                             Πlorasc::LorascPreconditioner,
+                             Πnn::NeumannNeumannInducedPreconditioner,
                              r::Array{Float64,1})
-  z .= apply_lorasc(Πlorasc, r)
+  z .= apply_neumann_neumann_induced(Πnn, r)
 end
 
-function LinearAlgebra.ldiv!(Πlorasc::LorascPreconditioner,
+function LinearAlgebra.ldiv!(Πnn::NeumannNeumannInducedPreconditioner,
                              r::Array{Float64,1})
-  r .= apply_lorasc(Πlorasc, copy(r))
+  r .= apply_neumann_neumann_induced(Πnn, copy(r))
 end
