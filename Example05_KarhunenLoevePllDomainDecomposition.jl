@@ -2,7 +2,7 @@ using Distributed
 
 addprocs(([("marcel", 4)]), tunnel=true)
 addprocs(([("andrew", 3)]), tunnel=true)
-#addprocs(([("moorcock", 4)]), tunnel=true)
+addprocs(([("moorcock", 6)]), tunnel=true)
 addprocs(2) # Add procs after remote hosts due to issue with ClusterManagers
 
 @everywhere begin
@@ -21,9 +21,9 @@ end
 using NPZ
 
 @everywhere begin
-  ndom = 400
+  ndom = 600
   nev = 35
-  tentative_nnode = 800_000
+  tentative_nnode = 2_000_000
   forget = 1e-6
 end
 
