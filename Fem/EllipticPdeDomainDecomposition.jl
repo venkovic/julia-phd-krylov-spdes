@@ -17,8 +17,8 @@ set_subdomains(cells::Array{Int,2},
                dirichlet_inds_g2l::Dict{Int,Int})
   
 Returns helper data structures for non-overlaping domain decomposition, i.e., 
-vertex partition with edge separators, using the partition defined by (epart, npart)
-for the mesh (cells, cell_neighbors) with non-Dirichlet nodes in dirichlet_inds_g2l.
+edge-based partitioning, using the partition defined by (epart, npart) for the 
+mesh (cells, cell_neighbors) with non-Dirichlet nodes in dirichlet_inds_g2l.
   
 Input:
 
