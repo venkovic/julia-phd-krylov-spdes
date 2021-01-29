@@ -61,9 +61,11 @@ function uexact(xx::Float64, yy::Float64)
   return .734
 end
 
+
 println()
 space_println("nnode = $(size(points)[2])")
 space_println("nel = $(size(cells)[2])")
+
 
 M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
@@ -175,10 +177,16 @@ printlnln("prepare_lorasc_precond ...")
 # Preconditioner applications
 #
 println()
+
+Π_amg_0 \ rand(A.n);
 print("apply amg_0 ...")
 @time Π_amg_0 \ rand(A.n);
+
+Π_amg_t \ rand(A.n);
 print("apply amg_t ...")
 @time Π_amg_t \ rand(A.n);
+
+Π_lorasc_0 \ rand(A.n)
 print("apply lorasc_0 ...")
 @time Π_lorasc_0 \ rand(A.n)
 
