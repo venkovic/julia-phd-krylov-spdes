@@ -50,6 +50,8 @@ elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
                                                               epart, 
                                                               npart,
                                                               dirichlet_inds_g2l)
+n_Γ = ind_Γ_g2l.count
+
 
 function f(x::Float64, y::Float64)
   return -1.
@@ -122,7 +124,7 @@ S_local_mat_0 = LinearMap(x -> apply_local_schurs(Sd_local_mat_0,
                                                   ind_Γd_Γ2l,
                                                   node_Γ_cnt,
                                                   x), nothing,
-                                                  node_Γ_cnt.count, issymmetric=true)
+                                                  n_Γ, issymmetric=true)
 
 
 #
