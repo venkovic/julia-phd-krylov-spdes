@@ -1,8 +1,12 @@
 push!(LOAD_PATH, "./Fem/")
+push!(LOAD_PATH, "./Utils/")
 import Pkg
 Pkg.activate(".")
+
 using Fem
-using NPZ
+using Utils: space_println, printlnln
+
+using NPZ: npzwrite
 
 tentative_nnode = 20_000
 load_existing_mesh = false
@@ -57,10 +61,10 @@ elemsd = Array{Int,1}[]
 centerd = Array{Float64,1}[]
 energy_expected = 0.
 
-println("nnode = $(size(points)[2])")
-println("nel = $(size(cells)[2])")
+space_println("nnode = $(size(points)[2])")
+space_println("nel = $(size(cells)[2])")
 
-println("solve_local_kl ...")
+printlnln("solve_local_kl ...")
 @time for idom in 1:ndom
   subdom = solve_local_kl(cells, points, epart, cov, nev, idom, relative=relative_local)
   inds_g2ld[idom] = subdom.inds_g2l
@@ -72,22 +76,22 @@ println("solve_local_kl ...")
 end
 println("... done with solve_local_kl.")
 
-println("do_global_mass_covariance_reduced_assembly ...")
+printlnln("do_global_mass_covariance_reduced_assembly ...")
 K = @time do_global_mass_covariance_reduced_assembly(cells, points, elemsd,
                                                      inds_g2ld, inds_l2gd, ϕd,
                                                      centerd, cov, forget=forget)
 println("... done with do_global_mass_covariance_reduced_assembly.")
 
-println("solve_global_reduced_kl ...")
+printlnln("solve_global_reduced_kl ...")
 Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected,
                                      elemsd, inds_l2gd, ϕd,
                                      relative=relative_global)
 npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
 npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
 
-print("sample ...")
+printlnln("sample ...")
 ξ, g = @time draw(Λ, Ψ)
 
-print("sample in place ...")
+printlnln("sample in place ...")
 @time draw!(Λ, Ψ, ξ, g)
 npzwrite("data/$root_fname.greal.npz", g)

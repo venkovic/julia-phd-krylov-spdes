@@ -2,7 +2,7 @@ import numpy as np
 import pylab as pl
 from postproc_utils import to_axis, get_root_filename
 
-tentative_nnode = 800_000
+tentative_nnode = 1_000_000
 model = 'SExp'
 L = .1
 sig2 = 1.
