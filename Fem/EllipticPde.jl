@@ -177,7 +177,7 @@ function do_isotropic_elliptic_assembly(cells::Array{Int,2},
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3)
 
-  b_vec = zeros(Foat64, length(not_dirichlet_inds_g2l)) # Right hand side
+  b_vec = zeros(Float64, length(not_dirichlet_inds_g2l)) # Right hand side
 
   # Loop over elements
   for iel in 1:nel
