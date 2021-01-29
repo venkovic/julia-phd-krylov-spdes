@@ -7,7 +7,6 @@ using Fem
 using Utils: space_println, printlnln
 
 using NPZ: npzwrite
-#using Distributions
 
 tentative_nnode = 10_000
 load_existing_mesh = false
