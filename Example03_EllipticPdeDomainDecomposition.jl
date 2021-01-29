@@ -107,7 +107,7 @@ printlnln("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
 printlnln("amg-pcg solve of A * u_no_dd_no_dirichlet = b ...")
-u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=Π)
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b, M=Π)
 space_println("n = $(A.n), iter = $it")
 
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
@@ -252,20 +252,20 @@ printlnln("prepare_lorasc_precond ...")
                                          not_dirichlet_inds_g2l)
 
 printlnln("lorasc-pcg solve of A * u = b ...")
-u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=ΠA_lorasc)
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b, M=ΠA_lorasc)
 space_println("n = $(A.n), ndom = $ndom, iter = $it")
 
 nev = ndom + 10
 printlnln("solve for least dominant eigvecs of A ...")
 λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:SM)
 printlnln("ld-def-lorasc-pcg solve of A * u = b ...")
-u_no_ddno_dirichlet, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠA_lorasc);
+u_no_ddno_dirichlet, it, _ = @time defpcg(A, b, ϕ, M=ΠA_lorasc);
 space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
 
 printlnln("solve for most dominant eigvecs of A ...")
 λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:LM)
 printlnln("ld-def-lorasc-pcg solve of A * u = b ...")
-u_no_ddno_dirichlet, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠA_lorasc);
+u_no_ddno_dirichlet, it, _ = @time defpcg(A, b, ϕ, M=ΠA_lorasc);
 space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
 
 
@@ -284,13 +284,13 @@ printlnln("prepare_domain_decomposition_low_rank_precond...")
                   A.n, issymmetric=true)
 
 printlnln("ddlr-pcg solve of A * u = b ...")
-u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=ΠA_ddlr)
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b, M=ΠA_ddlr)
 space_println("n = $(A.n), ndom = $ndom, iter = $it")
 
 nev = ndom + 10
 λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:SM)
 printlnln("ld-def-ddlr-pcg solve of A * u = b ...")
-u_no_ddno_dirichlet, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠA_ddlr);
+u_no_ddno_dirichlet, it, _ = @time defpcg(A, b, ϕ, M=ΠA_ddlr);
 space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
 """
 
@@ -312,9 +312,9 @@ printlnln("prepare_neumann_neumann_induced_precond using S_local_mat ...")
 printlnln("solve for least dominant eigvecs of A ...")
 λ, ϕ = @time Arpack.eigs(A, nev=nev, which=:SM)
 printlnln("ld-def-neumann-neumann-induced-pcg solve of A * u = b ...")
-u_no_ddno_dirichlet, it, _ = @time defpcg(A, b[:, 1], ϕ, M=ΠA_induced_nn_local_mat);
+u_no_ddno_dirichlet, it, _ = @time defpcg(A, b, ϕ, M=ΠA_induced_nn_local_mat);
 space_println("n = $(A.n), ndom = $ndom, nev = $nev (md), iter = $it")
 
 printlnln("neumann-neumann-induced-pcg solve of A * u = b ...")
-u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=ΠA_induced_nn_local_mat)
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b, M=ΠA_induced_nn_local_mat)
 space_println("n = $(A.n), ndom = $ndom, iter = $it")"""
