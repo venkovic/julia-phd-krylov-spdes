@@ -1,17 +1,20 @@
 using Distributed
 
-addprocs(([("marcel", 4)]), tunnel=true)
-addprocs(([("andrew", 3)]), tunnel=true)
-addprocs(([("venkovic@moorcock", 6)]), tunnel=true,
-             dir="/home/venkovic/Dropbox/Git/julia-fem/",
-             exename="/home/venkovic/julia-1.5.3/bin/julia")
+#addprocs(([("marcel", 4)]), tunnel=true)
+#addprocs(([("andrew", 3)]), tunnel=true)
+#addprocs(([("venkovic@moorcock", 6)]), tunnel=true,
+#             dir="/home/venkovic/Dropbox/Git/julia-fem/",
+#             exename="/home/venkovic/julia-1.5.3/bin/julia")
 addprocs(2) # Add procs after remote hosts due to issue with ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
+  push!(LOAD_PATH, "./Utils/")
   import Pkg
   Pkg.activate(".")
 end
+
+using Utils: space_println, printlnln
 
 @everywhere begin 
   using Fem
@@ -20,12 +23,12 @@ end
   using DistributedOperations
 end
 
-using NPZ
+using NPZ: npzwrite
 
 @everywhere begin
-  ndom = 600
-  nev = 35
-  tentative_nnode = 2_000_000
+  ndom = 400
+  nev = 25
+  tentative_nnode = 200_000
   forget = 1e-6
 end
 
@@ -72,10 +75,10 @@ sig2 = 1.
 L = .1
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
-println("nnode = $(size(points)[2])")
-println("nel = $(size(cells)[2])")
+space_println("nnode = $(size(points)[2])")
+space_println("nel = $(size(cells)[2])")
 
-println("pll_solve_local_kl ...")
+printlnln("pll_solve_local_kl ...")
 @time domain = @sync @distributed merge! for idom in 1:ndom
   relative_local, _ = suggest_parameters(nnode)
   pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
@@ -95,7 +98,7 @@ for idom in 1:ndom
 end
 bcast(md, procs())
 
-println("pll_do_global_mass_covariance_reduced_assembly ...")
+printlnln("pll_do_global_mass_covariance_reduced_assembly ...")
 @time begin
   K = @sync @distributed (+) for idom in 1:ndom
   pll_do_global_mass_covariance_reduced_assembly(cells, points, 
@@ -105,7 +108,7 @@ println("pll_do_global_mass_covariance_reduced_assembly ...")
 end
 println("... done with pll_do_global_mass_covariance_reduced_assembly.")
 
-println("solve_global_reduced_kl ...")
+printlnln("solve_global_reduced_kl ...")
 _, relative_global = suggest_parameters(nnode)
 Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected, domain, 
                                      relative=relative_global)
@@ -113,9 +116,9 @@ println("... done with do_global_mass_covariance_reduced_assembly.")
 npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
 npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
 
-print("sample ...")
+printlnln("sample ...")
 ξ, g = @time draw(Λ, Ψ)
 
-print("sample in place ...")
+printlnln("sample in place ...")
 @time draw!(Λ, Ψ, ξ, g)
 npzwrite("data/$root_fname.greal.npz", g)
