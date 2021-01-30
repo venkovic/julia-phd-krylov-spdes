@@ -71,12 +71,10 @@ Output:
 
  `nnode_Id::Array{Int,1}`
   Number of non-Dirchlet nodes strictly inside each subdomain
-
   
 # Examples
 ```jldoctest
 julia>
-using TriangleMesh
 using Fem
 
 ndom = 400

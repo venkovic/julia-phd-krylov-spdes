@@ -31,12 +31,12 @@ Output:
 
  `A_mat::SparseMatrixCSC{Float64,Int}`, `size(A_mat) = (n, n)`, 
   sparse array of Galerkin formulation (`n`-by-`n`) with components 
- `A_mat[i, j]` = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j dΩ where a: Ω → R is interpolated 
-  at the nodes in Span {ϕ_k}_{k=1}^nnode.
+ `A_mat[i, j] = ∫_Ω a ∇ϕ_i ⋅ ∇ϕ_j` dΩ where `a: Ω → R` is interpolated 
+  at the nodes in `Span {ϕ_k}_{k=1}^n`.
 
  `b_vec::Array{Float64,1}`, `size(b_vec) = (n,)`,
   right hand side vector of Galerkin formulation with with components 
- `b_vec[i] = ∫_Ω f ϕ_i dΩ` where f: Ω → R is interpolated at the nodes 
+ `b_vec[i] = ∫_Ω f ϕ_i dΩ` where `f: Ω → R` is interpolated at the nodes 
   in `Span {ϕ_k}_{k=1}^n`.
 
 # Examples
@@ -397,7 +397,7 @@ Output:
 
  `M::SparseMatrixCSC{Float64,Int}`, `size(M) = (n, n)`, 
   masss matrix formulation (`n`-by-`n`) with components 
- `M[i, j]` = ∫_Ω ϕ_i(P) ϕ_j(P) dΩ.
+ `M[i, j] = ∫_Ω ϕ_i(P) ϕ_j(P) dΩ`.
 
 # Examples
 ```jldoctest
