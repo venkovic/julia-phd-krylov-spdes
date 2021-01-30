@@ -10,9 +10,11 @@ using Utils: space_println, printlnln
 
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
 using NPZ: npzread
+using Random: seed!; seed!(123_456);
+using LinearMaps: LinearMap
 import Arpack
 
-tentative_nnode = 200_000
+tentative_nnode = 100_000
 load_existing_mesh = false
 
 ndom = 40
@@ -118,16 +120,31 @@ A_IIdd_0, A_IΓdd_0, A_ΓΓdd_0, _, _ = @time prepare_local_schurs(cells,
                                                                 f,
                                                                 uexact)
 
+# 
+# (Slow-ish) assembly of local Schur complements
+#
+
 printlnln("assemble_local_schurs ...")
 Sd_local_mat_0 = @time assemble_local_schurs(A_IIdd_0, A_IΓdd_0, A_ΓΓdd_0, preconds=Π_IId_0)
-                                                                                                                         
-using LinearMaps
-S_local_mat_0 = LinearMap(x -> apply_local_schurs(Sd_local_mat_0,
-                                                  ind_Γd_Γ2l,
-                                                  node_Γ_cnt,
-                                                  x), nothing,
-                                                  n_Γ, issymmetric=true)
+                                            
+printlnln("build LinearMap using assembled local schurs ...")
+S_0 = LinearMap(x -> apply_local_schurs(Sd_local_mat_0,
+                                        ind_Γd_Γ2l,
+                                        node_Γ_cnt,
+                                        x), nothing,
+                                        n_Γ, issymmetric=true)
 
+"""
+printlnln("build LinearMap using (p)cg solves ...")
+S_0 = LinearMap(x -> apply_local_schurs(A_IIdd_0,
+                                        A_IΓdd_0,
+                                        A_ΓΓdd_0,
+                                        ind_Γd_Γ2l,
+                                        node_Γ_cnt,
+                                        x,
+                                        preconds=Π_IId_0), 
+                                        nothing, n_Γ, issymmetric=true)
+"""
 
 #
 # Operator assemblies for a random ξ_t
@@ -164,7 +181,7 @@ printlnln("assemble amg_t preconditioner for A ...")
 Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(A);
 
 printlnln("prepare_lorasc_precond ...")
-Π_lorasc_0 = @time prepare_lorasc_precond(S_local_mat_0,
+Π_lorasc_0 = @time prepare_lorasc_precond(S_0,
                                           A_IId_0,
                                           A_IΓd_0,
                                           A_ΓΓ_0,
