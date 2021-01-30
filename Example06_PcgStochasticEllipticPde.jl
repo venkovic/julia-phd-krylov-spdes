@@ -36,7 +36,7 @@ else
 end
 
 dirichlet_inds_g2l, not_dirichlet_inds_g2l,
-dirichlet_inds_l2g, not_dirichlet_inds_l2g = 
+dirichlet_inds_l2g, not_dirichlet_inds_l2g =
 get_dirichlet_inds(points, point_markers)
 
 if load_existing_partition
@@ -189,6 +189,17 @@ printlnln("prepare_lorasc_precond ...")
                                           ind_Γ_g2l,
                                           not_dirichlet_inds_g2l)
 
+printlnln("prepare_lorasc_precond ...")
+Π_lorasc_1 = @time prepare_lorasc_precond(tentative_nnode,
+                                          ndom,
+                                          cells,
+                                          points,
+                                          cell_neighbors,
+                                          exp.(g),
+                                          dirichlet_inds_g2l,
+                                          not_dirichlet_inds_g2l,
+                                          f,
+                                          uexact)
 
 #
 # Preconditioner applications

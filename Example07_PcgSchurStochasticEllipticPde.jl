@@ -85,19 +85,19 @@ A, b = @time do_isotropic_elliptic_assembly(cells, points,
 printlnln("assemble amg preconditioner of A ...")
 Π = @time AMGPreconditioner{SmoothedAggregation}(A)
 
-printlnln("prepare_global_schur ...")
-A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
-                                                           points,
-                                                           epart,
-                                                           ind_Id_g2l,
-                                                           ind_Γ_g2l,
-                                                           node_owner,
-                                                           exp.(g),
-                                                           f,
-                                                           uexact)
+#printlnln("prepare_global_schur ...")
+#A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
+#                                                           points,
+#                                                           epart,
+#                                                           ind_Id_g2l,
+#                                                           ind_Γ_g2l,
+#                                                           node_owner,
+#                                                           exp.(g),
+#                                                           f,
+#                                                           uexact)
 
 printlnln("prepare_local_schurs ...")
-A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
+A_IIdd, A_IΓdd, A_ΓΓdd, b_Idd, b_Γ = @time prepare_local_schurs(cells,
                                                           points,
                                                           epart,
                                                           ind_Id_g2l,
@@ -108,12 +108,12 @@ A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
                                                           f,
                                                           uexact)
 
-printlnln("get_schur_rhs ...")
-b_schur = @time get_schur_rhs(b_Id, A_IId, A_IΓd, b_Γ)
-
 printlnln("assemble amg preconditioners of A_IId ...")
 Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IIdd[idom])
                for idom in 1:ndom];
+
+printlnln("get_schur_rhs ...")
+b_schur = @time get_schur_rhs(b_Idd, A_IIdd, A_IΓdd, b_Γ, ind_Γd_Γ2l, preconds=Π_IId)
 
 printlnln("assemble_local_schurs ...")
 Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
@@ -140,7 +140,7 @@ u_Γ, it, _ = @time pcg(S_local_mat, b_schur, M=ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), iter = $it")
 
 printlnln("get_subdomain_solutions ...")
-u_Id = @time get_subdomain_solutions(u_Γ, A_IId, A_IΓd, b_Id);
+u_Id = @time get_subdomain_solutions(u_Γ, A_IIdd, A_IΓdd, b_Idd);
                                                 
 printlnln("merge_subdomain_solutions ...")
 u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,

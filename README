@@ -62,7 +62,6 @@ Example09_DefPcgMcmcStochasticEllipticPde:
 
 
 To do:
-1. fast operator (re-)assembly
-2. fast preconditioner update
-3. light pll for Lorasc? for NeumannNeumannPreconditioner?
-4. Example09.
+1. light pll for Lorasc? for NeumannNeumannPreconditioner?
+2. Example09.
+3. Example07, Example08
