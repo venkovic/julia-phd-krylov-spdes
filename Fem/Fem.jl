@@ -3,6 +3,7 @@ module Fem
 export SubDomain
 
 export do_isotropic_elliptic_assembly
+export update_isotropic_elliptic_assembly!
 export get_mass_matrix
 
 export get_dirichlet_inds
