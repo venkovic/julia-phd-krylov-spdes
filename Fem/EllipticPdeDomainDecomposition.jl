@@ -16,60 +16,60 @@ import KrylovKit
                     npart::Array{Int64,1},
                     dirichlet_inds_g2l::Dict{Int,Int})
   
-Returns helper data structures for non-overlaping domain decomposition, i.e., 
-edge-based partitioning, using the partition defined by (epart, npart) for the 
-mesh (cells, cell_neighbors) with non-Dirichlet nodes in dirichlet_inds_g2l.
+Returns helper data structures for non-overlaping domain decomposition (edge-based
+partitioning) using the partition defined by (`epart`, `npart`), for the mesh with
+(`cells`, `cell_neighbors`) and non-Dirichlet nodes in `dirichlet_inds_g2l`.
   
 Input:
 
-  cells::Array{Int,2}, size(cells) = (3, n_el)
-  Nodes of each element.
+ `cells::Array{Int,2}`, `size(cells) = (3, n_el)`,
+  nodes of each element.
 
-  cell_neighbors::Array{Int,2}, size(cell_neighbors) = (3, n_el)
-  Neighboring elements of each element, or -1 if edge is at mesh boundary. 
+ `cell_neighbors::Array{Int,2}`, `size(cell_neighbors) = (3, n_el)`,
+  neighboring elements of each element, or `-1` if edge is at mesh boundary. 
 
-  epart::Array{Int64,1}, size(epart) = (nel,)
-  Host subdomain of each element.
+ `epart::Array{Int64,1}`, `size(epart) = (n_el,)`,
+  host subdomain of each element.
 
-  npart::Array{Int,1}, size(npart) = (nnode,) 
-  A host subdomain of each node.
+ `npart::Array{Int,1}`, `size(npart) = (nnode,)`,
+  a host subdomain of each node.
 
-  dirichlet_inds_g2l::Dict{Int,Int}, dirichlet_inds_g2l.count = # non-Dirichlet nodes
+ `dirichlet_inds_g2l::Dict{Int,Int}`, `dirichlet_inds_g2l.count` = # non-Dirichlet nodes
   Conversion table from global mesh node indices to non-dirichlet indices.
 
 Output:
 
-  ind_Id_g2l::Array{Dict{Int,Int}}
-  Conversion tables from global to local indices of nodes strictly inside each subdomain.
+ `ind_Id_g2l::Array{Dict{Int,Int}}`, 
+  conversion tables from global to local indices of nodes strictly inside each subdomain.
 
-  ind_Γd_g2l::Array{Dict{Int,Int}}
-  Conversion table from global to local indices of nodes on the interface of each subdomain.
+ `ind_Γd_g2l::Array{Dict{Int,Int}}`,
+  conversion table from global to local indices of nodes on the interface of each subdomain.
 
-  ind_Γ_g2l::Dict{Int,Int}
-  Conversion table from global to local indices of nodes on the interface of the mesh partition.
+ `ind_Γ_g2l::Dict{Int,Int}`,
+  conversion table from global to local indices of nodes on the interface of the mesh partition.
 
-  ind_Γd_Γ2l::Array{Dict{Int,Int}}
-  Conversion table from indices of nodes in Γ to local indices of nodes in Γ_d for each subdomain.
+ `ind_Γd_Γ2l::Array{Dict{Int,Int}}`,
+  conversion table from indices of nodes in Γ to local indices of nodes in Γ_d for each subdomain.
 
-  node_owner::Array{Int,1}
-  Indicates each node's owner:  -1 if node inode ∈ [1, nnode] in Γ is not Dirchlet.
-                                 0 if node inode is Dirichlet.
-                  idom ∈ [1, ndom] if node inode in (Ω_idom ∖ Γ) is not Dirichlet.
+ `node_owner::Array{Int,1}`,
+  indicates each node's owner: `-1` if node `inode` ∈ [`1`, `nnode`] in Γ is not Dirchlet,
+                                `0` if node `inode` is Dirichlet,
+             `idom` ∈ [`1`, `ndom`] if node `inode` in (Ω_idom ∖ Γ) is not Dirichlet.
 
-  elemd::Array{Array{Int,1},1}
-  Elements contained inside each subdomain, i.e., elemd[idom][:] is an array of all the elements 
-  contained in subdomain idom ∈ [1, ndom].
+ `elemd::Array{Array{Int,1},1}`
+  Elements contained inside each subdomain, i.e., `elemd[idom][:]` is an array of all the elements 
+  contained in subdomain `idom` ∈ [`1`, `ndom`].
 
-  node_Γ::Array{Int,1}
+ `node_Γ::Array{Int,1}`
   Nodes at the interface of the mesh partition which are not Dirichlet
 
-  node_Γ_cnt::Array{Int,1}
+ `node_Γ_cnt::Array{Int,1}`
   Number of subdomains owning each local node ∈ Γ
 
-  node_Id::Array{Array{Int,1},1}
+ `node_Id::Array{Array{Int,1},1}`
   Non-Dirichlet nodes strictly inside each subdomain
 
-  nnode_Id::Array{Int,1}
+ `nnode_Id::Array{Int,1}`
   Number of non-Dirchlet nodes strictly inside each subdomain
 
   
@@ -847,7 +847,7 @@ end
                              A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
                              b_Id::Array{Array{Float64,1},1})
   
-Computes u_I.
+Computes `u_I`.
   
 """
 function get_subdomain_solutions(u_Γ::Array{Float64,1},
@@ -913,7 +913,7 @@ end
      assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1})
   
-Assembles A_ΓΓ from A_ΓΓd's.
+Assembles `A_ΓΓ` from `A_ΓΓd`'s.
   
 """
 function assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -975,7 +975,7 @@ end
                                            node_Γ_cnt::Array{Int,1};
                                            preconds=nothing)
   
-Prepares and returns a NeumannNeumannSchurPreconditioner.
+Prepares and returns a `NeumannNeumannSchurPreconditioner`.
 Computes pseudo-inverses of (singular) local Schur complements.
   
 """
@@ -1024,7 +1024,7 @@ end
                                            ind_Γd_Γ2l::Array{Dict{Int,Int},1},
                                            node_Γ_cnt::Array{Int,1})
   
-Prepares and returns a NeumannNeumannSchurPreconditioner.
+Prepares and returns a `NeumannNeumannSchurPreconditioner`.
 Computes pseudo-inverses of (singular) local Schur complements.
   
 """
@@ -1054,7 +1054,7 @@ end
      apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
                                 r::Array{Float64,1})
   
-Applies the NeumannNeumannSchurPreconditioner.
+Applies the `NeumannNeumannSchurPreconditioner`.
   
 """
 function apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
@@ -1138,7 +1138,7 @@ end
                             nvec=25, 
                             ε=.01)
 
-Prepares and returns a LorascPreconditioner.
+Prepares and returns a `LorascPreconditioner`.
 See Grigori et al. (2014) for a reference on the LORASC preconditioner.
 
 Grigori L, Frédéric N, Soleiman Y.
@@ -1223,7 +1223,7 @@ end
      apply_lorasc(Πlorasc::LorascPreconditioner,
                   x::Array{Float64,1})
 
-Applies the LorascPreconditioner.
+Applies the `LorascPreconditioner`.
   
 """
 function apply_lorasc(Πlorasc::LorascPreconditioner,
@@ -1331,7 +1331,7 @@ end
                    x_Id::Array{Array{Float64,1},1},
                    x_Γ::Array{Float64,1})
 
-Applies A0 for the ddlr preconditioner. See Li & Saad (2017).
+Applies `A0` for the ddlr preconditioner. See Li & Saad (2017).
 
 Li R & Saad Y. 
 Low-rank correction methods for algebraic domain decomposition preconditioners. 
@@ -1359,7 +1359,7 @@ end
                   x_Id::Array{Array{Float64,1},1},
                   x_Γ::Array{Float64,1})
 
-Applies A0 for the ddlr preconditioner. See Li & Saad (2017).
+Applies `A0` for the ddlr preconditioner. See Li & Saad (2017).
 
 Li R & Saad Y. 
 Low-rank correction methods for algebraic domain decomposition preconditioners. 
@@ -1386,7 +1386,7 @@ end
                 α::Float64,
                 x_Γ::Array{Float64,1})
 
-Applies H for the ddlr preconditioner. See Li & Saad (2017).
+Applies `H` for the ddlr preconditioner. See Li & Saad (2017).
 
 Li R & Saad Y. 
 Low-rank correction methods for algebraic domain decomposition preconditioners. 
@@ -1490,7 +1490,7 @@ end
      apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankPreconditioner,
                                          x::Array{Float64,1})
 
-Applies the DomainDecompositionLowRankPreconditioner.
+Applies the `DomainDecompositionLowRankPreconditioner`.
   
 """
 function apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankPreconditioner,
@@ -1608,7 +1608,7 @@ end
                                              not_dirichlet_inds_g2l::Dict{Int,Int};
                                              preconds=nothing)
 
-Prepares and returns a NeumannNeumannInducedPreconditioner.
+Prepares and returns a `NeumannNeumannInducedPreconditioner`.
 
 Notice: This preconditioner only seems to work with deflation.
   
@@ -1668,7 +1668,7 @@ end
      apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
                                    r::Array{Float64,1})
   
-Applies the NeumannNeumannInducedPreconditioner.
+Applies the `NeumannNeumannInducedPreconditioner`.
   
 """
 function apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
