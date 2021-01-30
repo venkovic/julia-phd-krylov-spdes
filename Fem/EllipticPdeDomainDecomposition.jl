@@ -10,11 +10,11 @@ import KrylovKit
 
 
 """
-set_subdomains(cells::Array{Int,2},
-               cell_neighbors::Array{Int,2},
-               epart::Array{Int64,1},
-               npart::Array{Int64,1},
-               dirichlet_inds_g2l::Dict{Int,Int})
+     set_subdomains(cells::Array{Int,2},
+                    cell_neighbors::Array{Int,2},
+                    epart::Array{Int64,1},
+                    npart::Array{Int64,1},
+                    dirichlet_inds_g2l::Dict{Int,Int})
   
 Returns helper data structures for non-overlaping domain decomposition, i.e., 
 edge-based partitioning, using the partition defined by (epart, npart) for the 
@@ -207,16 +207,16 @@ end
 
 
 """
-prepare_global_schur(cells::Array{Int,2},
-                     points::Array{Float64,2},
-                     epart::Array{Int,1},
-                     ind_Id_g2l::Array{Dict{Int,Int},1},
-                     ind_Γ_g2l::Dict{Int,Int},
-                     node_owner::Array{Int,1},
-                     coeff::Union{Array{Float64,1},
-                                  Function},
-                     f::Function,
-                     uexact::Function)
+     prepare_global_schur(cells::Array{Int,2},
+                          points::Array{Float64,2},
+                          epart::Array{Int,1},
+                          ind_Id_g2l::Array{Dict{Int,Int},1},
+                          ind_Γ_g2l::Dict{Int,Int},
+                          node_owner::Array{Int,1},
+                          coeff::Union{Array{Float64,1},
+                                       Function},
+                          f::Function,
+                          uexact::Function)
   
 Prepares and returns matrices necessary for the application 
 and/or assembly of the global Schur complement. 
@@ -383,17 +383,17 @@ end
 
 
 """
-prepare_local_schurs(cells::Array{Int,2},
-                     points::Array{Float64,2},
-                     epart::Array{Int,1},
-                     ind_Id_g2l::Array{Dict{Int,Int},1},
-                     ind_Γd_g2l::Array{Dict{Int,Int},1},
-                     ind_Γ_g2l::Dict{Int,Int},
-                     node_owner::Array{Int,1},
-                     coeff::Union{Array{Float64,1},
-                                  Function},
-                     f::Function,
-                     uexact::Function)
+     prepare_local_schurs(cells::Array{Int,2},
+                          points::Array{Float64,2},
+                          epart::Array{Int,1},
+                          ind_Id_g2l::Array{Dict{Int,Int},1},
+                          ind_Γd_g2l::Array{Dict{Int,Int},1},
+                          ind_Γ_g2l::Dict{Int,Int},
+                          node_owner::Array{Int,1},
+                          coeff::Union{Array{Float64,1},
+                                       Function},
+                          f::Function,
+                          uexact::Function)
   
 Prepares and returns all matrices necessary for the application 
 and/or assembly of local Schur complements. 
@@ -560,12 +560,12 @@ end
 
 
 """
-apply_global_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                   A_ΓΓ::SparseMatrixCSC{Float64,Int},
-                   x::Array{Float64,1};
-                   preconds=nothing,
-                   verbose=false)
+     apply_global_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                        A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                        A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                        x::Array{Float64,1};
+                        preconds=nothing,
+                        verbose=false)
   
 Applies global Schur complement with local (p)cg solves. 
   
@@ -603,12 +603,12 @@ end
 
 
 """
-apply_local_schur(A_IIdd::SparseMatrixCSC{Float64,Int},
-                  A_IΓdd::SparseMatrixCSC{Float64,Int},
-                  A_ΓΓdd::SparseMatrixCSC{Float64,Int},
-                  xd::Array{Float64,1};
-                  precond=nothing,
-                  reltol=1e-9)
+     apply_local_schur(A_IIdd::SparseMatrixCSC{Float64,Int},
+                       A_IΓdd::SparseMatrixCSC{Float64,Int},
+                       A_ΓΓdd::SparseMatrixCSC{Float64,Int},
+                       xd::Array{Float64,1};
+                       precond=nothing,
+                       reltol=1e-9)
   
 Applies a single local Schur complement with (p)cg solve. 
   
@@ -632,11 +632,11 @@ end
 
 
 """
-assemble_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                      A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                      A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1};
-                      preconds=nothing,
-                      reltol=1e-9)
+     assemble_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                           A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                           A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1};
+                           preconds=nothing,
+                           reltol=1e-9)
   
 Assembles local Schur complements. 
   
@@ -673,16 +673,16 @@ end
 
 
 """
-apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                   A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                   A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                   ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                   node_Γ_cnt::Array{Int,1},
-                   x::Array{Float64,1};
-                   preconds=nothing,
-                   reltol=1e-9)
+     apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                        A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                        A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                        ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                        node_Γ_cnt::Array{Int,1},
+                        x::Array{Float64,1};
+                        preconds=nothing,
+                        reltol=1e-9)
   
-Applies local Schur complements (with local (p)cg solves), and gather. 
+Applies local Schur complements with (p)cg solves, and gather. 
   
 """
 function apply_local_schurs(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -725,12 +725,12 @@ end
 
 
 """
-apply_local_schurs(Sd::Union{Array{SparseMatrixCSC{Float64,Int},1},
-                             Array{SparseMatrixCSC{Float64,Int},1}},
-                   ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                   node_Γ_cnt::Array{Int,1},
-                   x::Array{Float64,1};
-                   reltol=1e-9)
+     apply_local_schurs(Sd::Union{Array{SparseMatrixCSC{Float64,Int},1},
+                                  Array{SparseMatrixCSC{Float64,Int},1}},
+                        ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                        node_Γ_cnt::Array{Int,1},
+                        x::Array{Float64,1};
+                        reltol=1e-9)
   
 Applies (previously assembled) local Schur complements, and gather. 
   
@@ -763,11 +763,11 @@ end
 
 
 """
-get_schur_rhs(b_Id::Array{Array{Float64,1},1},
-              A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-              A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-              b_Γ::Array{Float64,1};
-              preconds=nothing)
+     get_schur_rhs(b_Id::Array{Array{Float64,1},1},
+                   A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                   b_Γ::Array{Float64,1};
+                   preconds=nothing)
   
 Assembles the Schur right hand side.
   
@@ -799,12 +799,12 @@ end
 
 
 """
-get_schur_rhs(b_Id::Array{Array{Float64,1},1},
-              A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-              A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-              b_Γ::Array{Float64,1},
-              ind_Γd_Γ2l::Array{Dict{Int,Int}};
-              preconds=nothing)
+     get_schur_rhs(b_Id::Array{Array{Float64,1},1},
+                   A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                   b_Γ::Array{Float64,1},
+                   ind_Γd_Γ2l::Array{Dict{Int,Int}};
+                   preconds=nothing)
   
 Assembles the Schur right hand side.
   
@@ -842,10 +842,10 @@ end
 
 
 """
-get_subdomain_solutions(u_Γ::Array{Float64,1},
-                        A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                        A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                        b_Id::Array{Array{Float64,1},1})
+     get_subdomain_solutions(u_Γ::Array{Float64,1},
+                             A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                             A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                             b_Id::Array{Array{Float64,1},1})
   
 Computes u_I.
   
@@ -865,13 +865,13 @@ end
 
 
 """
-merge_subdomain_solutions(u_Γ::Array{Float64,1},
-                          u_Id::Array{Array{Float64,1},1},
-                          node_Γ::Array{Int,1},
-                          node_Id::Array{Array{Int,1},1},
-                          dirichlet_inds_l2g::Array{Int,1},
-                          uexact::Function,
-                          points::Array{Float64,2})
+     merge_subdomain_solutions(u_Γ::Array{Float64,1},
+                               u_Id::Array{Array{Float64,1},1},
+                               node_Γ::Array{Int,1},
+                               node_Id::Array{Array{Int,1},1},
+                               dirichlet_inds_l2g::Array{Int,1},
+                               uexact::Function,
+                               points::Array{Float64,2})
   
 Assembles solution with dirichlet bcs.
   
@@ -910,8 +910,8 @@ end
 
 
 """
-assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                ind_Γd_Γ2l::Array{Dict{Int,Int},1})
+     assemble_A_ΓΓ_from_local_blocks(A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                     ind_Γd_Γ2l::Array{Dict{Int,Int},1})
   
 Assembles A_ΓΓ from A_ΓΓd's.
   
@@ -968,12 +968,12 @@ end
 
 
 """
-prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                      A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                      A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                      node_Γ_cnt::Array{Int,1};
-                                      preconds=nothing)
+     prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                           A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                           A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                           ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                           node_Γ_cnt::Array{Int,1};
+                                           preconds=nothing)
   
 Prepares and returns a NeumannNeumannSchurPreconditioner.
 Computes pseudo-inverses of (singular) local Schur complements.
@@ -1020,9 +1020,9 @@ end
 
 
 """
-prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
-                                      ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                      node_Γ_cnt::Array{Int,1})
+     prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
+                                           ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                           node_Γ_cnt::Array{Int,1})
   
 Prepares and returns a NeumannNeumannSchurPreconditioner.
 Computes pseudo-inverses of (singular) local Schur complements.
@@ -1051,8 +1051,8 @@ end
 
 
 """
-apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
-                            r::Array{Float64,1})
+     apply_neumann_neumann_schur(Πnn::NeumannNeumannSchurPreconditioner,
+                                r::Array{Float64,1})
   
 Applies the NeumannNeumannSchurPreconditioner.
   
@@ -1111,26 +1111,32 @@ struct LorascPreconditioner
   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1}
   chol_A_IId::Array{SuiteSparse.CHOLMOD.Factor{Float64},1}
   A_ΓΓ::SparseMatrixCSC{Float64,Int}
-  ΠA_ΓΓ
+  ΠA_ΓΓ # preconditioner for A_ΓΓ
+  chol_A_ΓΓ::Union{SuiteSparse.CHOLMOD.Factor{Float64},Nothing}
   ε::Float64
   E::Array{Array{Float64,1},1}
   Σ::Array{Float64,1}
   ind_Id_g2l::Array{Dict{Int,Int},1}
   ind_Γ_g2l::Dict{Int,Int}
   not_dirichlet_inds_g2l::Dict{Int,Int}
+
+  x_Id::Array{Array{Float64,1},1}
+  x_Γ::Array{Float64, 1}
+  z_Γ::Array{Float64, 1}
+  u::Array{Float64,1}
 end
 
 
 """
-prepare_lorasc_precond(S::FunctionMap{Float64},
-                       A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                       A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                       A_ΓΓ::SparseMatrixCSC{Float64,Int},
-                       ind_Id_g2l::Array{Dict{Int,Int},1},
-                       ind_Γ_g2l::Dict{Int,Int}, 
-                       not_dirichlet_inds_g2l::Dict{Int,Int};
-                       nvec=25, 
-                       ε=.01)
+     prepare_lorasc_precond(S::FunctionMap{Float64},
+                            A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                            A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                            A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                            ind_Id_g2l::Array{Dict{Int,Int},1},
+                            ind_Γ_g2l::Dict{Int,Int}, 
+                            not_dirichlet_inds_g2l::Dict{Int,Int};
+                            nvec=25, 
+                            ε=.01)
 
 Prepares and returns a LorascPreconditioner.
 See Grigori et al. (2014) for a reference on the LORASC preconditioner.
@@ -1147,13 +1153,20 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 ind_Id_g2l::Array{Dict{Int,Int},1},
                                 ind_Γ_g2l::Dict{Int,Int}, 
                                 not_dirichlet_inds_g2l::Dict{Int,Int};
+                                compute_A_ΓΓ_chol=true,
                                 nvec=25, 
                                 ε=.01)
 
   ndom, = size(A_IId)
   chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
 
-  ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
+  if compute_A_ΓΓ_chol
+    ΠA_ΓΓ = nothing
+    chol_A_ΓΓ = LinearAlgebra.cholesky(A_ΓΓ)
+  else
+    ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
+    chol_A_ΓΓ = nothing
+  end
 
   for idom in 1:ndom
     push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
@@ -1181,22 +1194,34 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
     nev = nvec
   end
 
+  n_Γ = ind_Γ_g2l.count
+  n = not_dirichlet_inds_g2l.count
+  x_Id = [Array{Float64,1}(undef, ind_Id_g2l[idom].count) for idom in 1:ndom]
+  x_Γ = Array{Float64, 1}(undef, n_Γ)
+  z_Γ = Array{Float64, 1}(undef, n_Γ)
+  u = Array{Float64,1}(undef, n)
+
   return LorascPreconditioner(A_IΓd,
                               chol_A_IId,
                               A_ΓΓ,
                               ΠA_ΓΓ,
+                              chol_A_ΓΓ,
                               ε,
                               E[1:nev],
                               Σ[1:nev],
                               ind_Id_g2l,
                               ind_Γ_g2l,
-                              not_dirichlet_inds_g2l)
+                              not_dirichlet_inds_g2l,
+                              x_Id,
+                              x_Γ,
+                              z_Γ,
+                              u)
 end
 
 
 """
-apply_lorasc(Πlorasc::LorascPreconditioner,
-             x::Array{Float64,1})
+     apply_lorasc(Πlorasc::LorascPreconditioner,
+                  x::Array{Float64,1})
 
 Applies the LorascPreconditioner.
   
@@ -1209,50 +1234,56 @@ function apply_lorasc(Πlorasc::LorascPreconditioner,
   n_Γ = Πlorasc.ind_Γ_g2l.count
   nvec, = size(Πlorasc.Σ)
 
-  x_Id = [Array{Float64,1}(undef, Πlorasc.ind_Id_g2l[idom].count) for idom in 1:ndom]
-  x_Γ = Array{Float64, 1}(undef, n_Γ)
-  z_Γ = Array{Float64, 1}(undef, n_Γ)
-  u = Array{Float64,1}(undef, n)
+  #x_Id = [Array{Float64,1}(undef, Πlorasc.ind_Id_g2l[idom].count) for idom in 1:ndom]
+  #x_Γ = Array{Float64, 1}(undef, n_Γ)
+  #z_Γ = Array{Float64, 1}(undef, n_Γ)
+  #u = Array{Float64,1}(undef, n)
 
   for idom in 1:ndom
     for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
-      x_Id[idom][node_in_I] = x[Πlorasc.not_dirichlet_inds_g2l[node]]
+      Πlorasc.x_Id[idom][node_in_I] = x[Πlorasc.not_dirichlet_inds_g2l[node]]
     end
   end
 
   for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
     val = x[Πlorasc.not_dirichlet_inds_g2l[node]]
-    x_Γ[node_in_Γ] = val
-    z_Γ[node_in_Γ] = val
+    Πlorasc.x_Γ[node_in_Γ] = val
+    Πlorasc.z_Γ[node_in_Γ] = val
   end
 
   for idom in 1:ndom
-    x_Id[idom] .= Πlorasc.chol_A_IId[idom] \ x_Id[idom]
-    z_Γ .-= Πlorasc.A_IΓd[idom]' * x_Id[idom]
+    Πlorasc.x_Id[idom] .= Πlorasc.chol_A_IId[idom] \ Πlorasc.x_Id[idom]
+    Πlorasc.z_Γ .-= Πlorasc.A_IΓd[idom]' * Πlorasc.x_Id[idom]
   end
 
-  x_Γ .= IterativeSolvers.cg(Πlorasc.A_ΓΓ, z_Γ, Pl=Πlorasc.ΠA_ΓΓ, tol=1e-12)
+  if isnothing(Πlorasc.chol_A_ΓΓ)
+    Πlorasc.x_Γ .= IterativeSolvers.cg(Πlorasc.A_ΓΓ, 
+                                       Πlorasc.z_Γ,
+                                       Pl=Πlorasc.ΠA_ΓΓ, tol=1e-9)
+  else
+    Πlorasc.x_Γ .= Πlorasc.chol_A_ΓΓ \ Πlorasc.z_Γ
+  end
 
   for (k, σ) in enumerate(Πlorasc.Σ)
-    val = Πlorasc.E[k]'z_Γ
-    x_Γ .+= val * Πlorasc.E[k]
+    val = Πlorasc.E[k]'Πlorasc.z_Γ
+    Πlorasc.x_Γ .+= val * Πlorasc.E[k]
   end
 
   for idom in 1:ndom
-    x_Id[idom] .-= Πlorasc.chol_A_IId[idom] \ (Πlorasc.A_IΓd[idom] * x_Γ)
+    Πlorasc.x_Id[idom] .-= Πlorasc.chol_A_IId[idom] \ (Πlorasc.A_IΓd[idom] * Πlorasc.x_Γ)
   end
 
   for idom in 1:ndom
     for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
-      u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Id[idom][node_in_I]
+      Πlorasc.u[Πlorasc.not_dirichlet_inds_g2l[node]] = Πlorasc.x_Id[idom][node_in_I]
     end
   end
 
   for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
-    u[Πlorasc.not_dirichlet_inds_g2l[node]] = x_Γ[node_in_Γ]
+    Πlorasc.u[Πlorasc.not_dirichlet_inds_g2l[node]] = Πlorasc.x_Γ[node_in_Γ]
   end
 
-  return u
+  return Πlorasc.u
 end
 
 
@@ -1294,11 +1325,11 @@ end
 
 
 """
-apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
-              A0_Γ::SparseMatrixCSC{Float64,Int},
-              ΠA0_Γ,
-              x_Id::Array{Array{Float64,1},1},
-              x_Γ::Array{Float64,1})
+     apply_inv_a0!(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
+                   A0_Γ::SparseMatrixCSC{Float64,Int},
+                   ΠA0_Γ,
+                   x_Id::Array{Array{Float64,1},1},
+                   x_Γ::Array{Float64,1})
 
 Applies A0 for the ddlr preconditioner. See Li & Saad (2017).
 
@@ -1322,11 +1353,11 @@ end
 
 
 """
-apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
-             A0_Γ::SparseMatrixCSC{Float64,Int},
-             ΠA0_Γ,
-             x_Id::Array{Array{Float64,1},1},
-             x_Γ::Array{Float64,1})
+     apply_inv_a0(chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
+                  A0_Γ::SparseMatrixCSC{Float64,Int},
+                  ΠA0_Γ,
+                  x_Id::Array{Array{Float64,1},1},
+                  x_Γ::Array{Float64,1})
 
 Applies A0 for the ddlr preconditioner. See Li & Saad (2017).
 
@@ -1348,12 +1379,12 @@ end
 
 
 """
-apply_hmat(A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-           chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
-           A0_Γ::SparseMatrixCSC{Float64,Int},
-           ΠA0_Γ,
-           α::Float64,
-           x_Γ::Array{Float64,1})
+     apply_hmat(A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                chol_A0_Id::Array{SuiteSparse.CHOLMOD.Factor{Float64},1},
+                A0_Γ::SparseMatrixCSC{Float64,Int},
+                ΠA0_Γ,
+                α::Float64,
+                x_Γ::Array{Float64,1})
 
 Applies H for the ddlr preconditioner. See Li & Saad (2017).
 
@@ -1395,14 +1426,14 @@ end
 
 
 """
-prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
-                                              A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
-                                              A_ΓΓ::SparseMatrixCSC{Float64,Int},
-                                              ind_Id_g2l::Array{Dict{Int,Int},1},
-                                              ind_Γ_g2l::Dict{Int,Int},
-                                              not_dirichlet_inds_g2l::Dict{Int,Int};
-                                              nvec=25,
-                                              α=1.)
+     prepare_domain_decomposition_low_rank_precond(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
+                                                   A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                   A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                                                   ind_Id_g2l::Array{Dict{Int,Int},1},
+                                                   ind_Γ_g2l::Dict{Int,Int},
+                                                   not_dirichlet_inds_g2l::Dict{Int,Int};
+                                                   nvec=25,
+                                                   α=1.)
 
 Prepares and returns a DomainDecompositionLowRankPreconditioner.
 See Li & Saad (2017) for a reference on the domain decomposition
@@ -1456,8 +1487,8 @@ end
 
 
 """
-apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankPreconditioner,
-                                    x::Array{Float64,1})
+     apply_domain_decomposition_low_rank(Πddlr::DomainDecompositionLowRankPreconditioner,
+                                         x::Array{Float64,1})
 
 Applies the DomainDecompositionLowRankPreconditioner.
   
@@ -1566,16 +1597,16 @@ end
 
 
 """
-prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                        A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                        A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                        ind_Id_g2l::Array{Dict{Int,Int},1},
-                                        ind_Γ_g2l::Dict{Int,Int},
-                                        ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                        node_Γ_cnt::Array{Int,1},
-                                        node_Γ::Array{Int,1},
-                                        not_dirichlet_inds_g2l::Dict{Int,Int};
-                                        preconds=nothing)
+     prepare_neumann_neumann_induced_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                             A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                             A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                             ind_Id_g2l::Array{Dict{Int,Int},1},
+                                             ind_Γ_g2l::Dict{Int,Int},
+                                             ind_Γd_Γ2l::Array{Dict{Int,Int},1},
+                                             node_Γ_cnt::Array{Int,1},
+                                             node_Γ::Array{Int,1},
+                                             not_dirichlet_inds_g2l::Dict{Int,Int};
+                                             preconds=nothing)
 
 Prepares and returns a NeumannNeumannInducedPreconditioner.
 
@@ -1634,8 +1665,8 @@ end
 
 
 """
-apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
-                              r::Array{Float64,1})
+     apply_neumann_neumann_induced(Πnn::NeumannNeumannInducedPreconditioner,
+                                   r::Array{Float64,1})
   
 Applies the NeumannNeumannInducedPreconditioner.
   
