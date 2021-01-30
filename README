@@ -1,20 +1,68 @@
-Example01_pde:
- Assembly of Galerkin operator and right hand side for discretization
- of an heterogenous isotropic elliptic equation with 2D P1 elements.
+Example00_SetUpEnvironment:
+-activates and instantiates julia environment.
 
-Example02_kl:
- Assembly of Galerkin kernel operator with 2D P1 elements.
 
-Example03_dd:
- Assembly of Schur decomposition of Galerkin operator with 2D 
- P1 elements.
+Example01_EllipticPde:
+-assembles linear system of fem discretization for the heat equation
+with a heterogeneous isotropic coefficient field using 2D P1 elements.
+
+
+Example02_KarhunenLoeve:
+-assembles (and solves) the generalized eigenvalue problem obtained by 
+fem for the Karhunen-Loeve expansion of a Gaussian process.
+
+
+Example03_EllipticPdeDomainDecomposition:
+-prepares and assembles, or not, operators obtained by fem discretization for 
+the heat equation with a heterogeneous isotropic coefficient field using 
+non-overlaping domain decomposition.
+-prepares and asembles, or not, corresponding preconditioners for both,
+the original system A * u = b, as well as for the Schur complement system.
+-shows effect of deflation on NeumannNeumannSchurPreconditioner for the 
+Schur complement system of a toy problem.
+-shows effect of deflation on LorascPreconditioner for A * u = b.
+-shows lack of effect of deflation on AMGPreconditioner for A * u = b. 
+
+
+Example04_KarhunenLoeveDomainDecomposition:
+-uses domain decomposition to assemble (and solve) generalized eigenvalue 
+problems obtained by fem for the "local" and "global" Karhunen-Loeve 
+expansions of a Gaussian process.
+
+
+Example05_KarhunenLoevePllDomainDecomposition:
+-parallel implementation of the use of domain decomposition to assemble 
+(and solve) generalized eigenvalue problems obtained by fem for the "local"
+and "global" Karhunen-Loeve expansions of a Gaussian process.
+
+
+Example06_PcgStochasticEllipticPde:
+-assembles (and quickly re-assembles) linear systems of fem discretization 
+for the heat equation with a heterogeneous isotropic lognormal coefficient field. 
+-shows how to assemble constant preconditionners for given realizations. 
+-shows effect of deflation on "median" LorascPreconditioner for A * u = b.
+-Shows lack of effect of deflation on "median" AMGPreconditioner for A * u = b. 
+
+
+Example07_PcgSchurStochasticEllipticPde:
+-prepares (and quickly updates) Schur complement operators for the heat equation 
+with a heterogeneous isotropic lognormal coefficient field. 
+-shows how to assemble constant NeumannNeumannSchurPreconditioners for given 
+ realizations. 
+-shows effect of deflation on the "median" NeumannNeumannPreconditioner.
+
+
+Example08_EllipticPdePllDomainDecomposition:
+-work in progress.
+
+
+Example09_DefPcgMcmcStochasticEllipticPde:
+-mcmc sampling of lognormal coefficient field.
+-applies deflation with online eigenvector approximation.
+
 
 To do:
-1. Check derivation for do_mass_covariance_assembly()
-2. Check implementation for do_mass_covariance_assembly()
-3. Add get_mass_matrix()
-4. Test kl.
-5. Find a way to identify boundary nodes and create the e array
-6. Check apply_dirichlet()
-7. Domain decomposition for kl
-8. Add update_galerkin() to avoid repeating assembly.
+1. fast operator (re-)assembly
+2. fast preconditioner update
+3. light pll for Lorasc? for NeumannNeumannPreconditioner?
+4. Example09.
