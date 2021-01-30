@@ -1,6 +1,7 @@
 using DelimitedFiles: readdlm
 using SparseArrays: sparse
 using LinearMaps: LinearMap, FunctionMap
+using Preconditioners: AMGPreconditioner, SmoothedAggregation
 import SuiteSparse
 import LinearAlgebra
 import IterativeSolvers
@@ -1214,6 +1215,183 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                               x_Γ,
                               z_Γ,
                               u)
+end
+
+
+"""
+     prepare_lorasc_precond(tentative_nnode::Int,
+                            ndom::Int,
+                            cells::Array{Int,2},
+                            points::Array{Float64,2},
+                            cell_neighbors::Array{Int,2},
+                            a_vec::Array{Float64,1},
+                            dirichlet_inds_g2l::Dict{Int,Int},
+                            not_dirichlet_inds_g2l::Dict{Int,Int},
+                            f::Function,
+                            uexact::Function;
+                            do_local_schur_assembly=true,
+                            load_partition=false,
+                            compute_A_ΓΓ_chol=true,
+                            nvec=25, 
+                            ε=.01)
+
+Prepares and returns a `LorascPreconditioner`.
+See Grigori et al. (2014) for a reference on the LORASC preconditioner.
+
+Grigori L, Frédéric N, Soleiman Y.
+Robust algebraic Schur complement preconditioners based on low rank corrections.
+Inria research report. 2014;RR-8557:pp.18.
+
+"""
+function prepare_lorasc_precond(tentative_nnode::Int,
+                                ndom::Int,
+                                cells::Array{Int,2},
+                                points::Array{Float64,2},
+                                cell_neighbors::Array{Int,2},
+                                a_vec::Array{Float64,1},
+                                dirichlet_inds_g2l::Dict{Int,Int},
+                                not_dirichlet_inds_g2l::Dict{Int,Int},
+                                f::Function,
+                                uexact::Function;
+                                do_local_schur_assembly=true,
+                                load_partition=false,
+                                compute_A_ΓΓ_chol=true,
+                                nvec=25, 
+                                ε=.01)
+
+  if load_partition
+    epart, npart = load_partition(tentative_nnode, ndom)
+  else
+    epart, npart = mesh_partition(cells, ndom)
+    save_partition(epart, npart, tentative_nnode, ndom)
+  end
+
+  ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
+  elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
+                                                                cell_neighbors,
+                                                                epart, 
+                                                                npart,
+                                                                dirichlet_inds_g2l)
+  n_Γ = ind_Γ_g2l.count
+
+  print("prepare_global_schur ...")
+  A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
+                                                             points,
+                                                             epart,
+                                                             ind_Id_g2l,
+                                                             ind_Γ_g2l,
+                                                             node_owner,
+                                                             a_vec,
+                                                             f,
+                                                             uexact)
+
+  print("assemble amg preconditioners of A_IId ...")
+  Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
+                 for idom in 1:ndom];
+
+  print("prepare_local_schurs ...")
+  A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
+                                                            points,
+                                                            epart,
+                                                            ind_Id_g2l,
+                                                            ind_Γd_g2l,
+                                                            ind_Γ_g2l,
+                                                            node_owner,
+                                                            a_vec,
+                                                            f,
+                                                            uexact)
+  
+  if do_local_schur_assembly
+    print("assemble_local_schurs ...")
+    Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
+                                            
+    print("build LinearMap using assembled local schurs ...")
+    S = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x), nothing,
+                                          n_Γ, issymmetric=true)
+
+  else
+    print("build LinearMap using (p)cg solves ...")
+    S = LinearMap(x -> apply_local_schurs(A_IIdd,
+                                          A_IΓdd,
+                                          A_ΓΓdd,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x,
+                                          preconds=Π_IId), 
+                                          nothing, n_Γ, issymmetric=true)
+  end
+
+
+
+  return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
+                                ind_Γ_g2l, not_dirichlet_inds_g2l, 
+                                compute_A_ΓΓ_chol=compute_A_ΓΓ_chol,
+                                nvec=nvec, 
+                                ε=ε)
+
+  """
+  chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
+
+  if compute_A_ΓΓ_chol
+    ΠA_ΓΓ = nothing
+    chol_A_ΓΓ = LinearAlgebra.cholesky(A_ΓΓ)
+  else
+    ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
+    chol_A_ΓΓ = nothing
+  end
+
+  for idom in 1:ndom
+    push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
+  end
+
+  Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
+                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
+                                     isposdef=true, ishermitian=true,
+                                     issymmetric=true)
+  
+  nev = 0
+  for (k, σ) in enumerate(Σ)
+    if σ < ε
+      Σ[k] = (ε - σ) / σ
+      nev += 1
+    else
+      break
+    end
+  end 
+
+  if nev == nvec
+    println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
+  elseif nev == 0 
+    println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
+    nev = nvec
+  end
+
+  n_Γ = ind_Γ_g2l.count
+  n = not_dirichlet_inds_g2l.count
+  x_Id = [Array{Float64,1}(undef, ind_Id_g2l[idom].count) for idom in 1:ndom]
+  x_Γ = Array{Float64, 1}(undef, n_Γ)
+  z_Γ = Array{Float64, 1}(undef, n_Γ)
+  u = Array{Float64,1}(undef, n)
+
+  return LorascPreconditioner(A_IΓd,
+                              chol_A_IId,
+                              A_ΓΓ,
+                              ΠA_ΓΓ,
+                              chol_A_ΓΓ,
+                              ε,
+                              E[1:nev],
+                              Σ[1:nev],
+                              ind_Id_g2l,
+                              ind_Γ_g2l,
+                              not_dirichlet_inds_g2l,
+                              x_Id,
+                              x_Γ,
+                              z_Γ,
+                              u)
+  """
 end
 
 
