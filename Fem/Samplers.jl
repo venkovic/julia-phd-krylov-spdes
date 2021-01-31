@@ -83,7 +83,7 @@ function prepare_mcmc_sampler(Λ::Array{Float64,1},
   Ξ = MvNormal(m, σ2)
   ξ = rand(Ξ)
 
-  ϑ2 = 2.38 * σ2  
+  ϑ2 = 2.38^2 * σ2 / m
   ΔΧ = MvNormal(m, ϑ2)
   χ = ξ .+ rand(ΔΧ)
   
@@ -129,6 +129,7 @@ function draw!(smp::McmcSampler)
     u = rand()
     cnt += 1
   end
+  smp.ξ .= smp.χ
   
   smp.g .= smp.Λ[1] * smp.χ[1] * smp.Ψ[:, 1]
   for k in 2:smp.m

@@ -1168,11 +1168,11 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
     ΠA_ΓΓ = nothing
     verbose ? print("compute cholesky factorization of A_ΓΓ ... ") : nothing
     time = @elapsed chol_A_ΓΓ = LinearAlgebra.cholesky(A_ΓΓ)
-    verbose ? print("$time seconds") : nothing
+    verbose ? println("$time seconds") : nothing
   else
     verbose ? print("prepare amg for A_ΓΓ ... ") : nothing
     ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
-    verbose ? print("$time seconds") : nothing
+    verbose ? println("$time seconds") : nothing
     chol_A_ΓΓ = nothing
   end
 
