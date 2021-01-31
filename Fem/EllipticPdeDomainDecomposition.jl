@@ -1146,6 +1146,8 @@ Grigori L, Frédéric N, Soleiman Y.
 Robust algebraic Schur complement preconditioners based on low rank corrections.
 Inria research report. 2014;RR-8557:pp.18.
 
+Remark: Consider having an implementation of the randomized set-up of Lorasc.
+
 """
 function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 A_IId::Array{SparseMatrixCSC{Float64,Int},1},
@@ -1164,9 +1166,13 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
 
   if compute_A_ΓΓ_chol
     ΠA_ΓΓ = nothing
-    chol_A_ΓΓ = LinearAlgebra.cholesky(A_ΓΓ)
+    verbose ? print("compute cholesky factorization of A_ΓΓ ... ") : nothing
+    time = @elapsed chol_A_ΓΓ = LinearAlgebra.cholesky(A_ΓΓ)
+    verbose ? print("$time seconds") : nothing
   else
+    verbose ? print("prepare amg for A_ΓΓ ... ") : nothing
     ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
+    verbose ? print("$time seconds") : nothing
     chol_A_ΓΓ = nothing
   end
 
@@ -1250,6 +1256,8 @@ See Grigori et al. (2014) for a reference on the LORASC preconditioner.
 Grigori L, Frédéric N, Soleiman Y.
 Robust algebraic Schur complement preconditioners based on low rank corrections.
 Inria research report. 2014;RR-8557:pp.18.
+
+Remark: There is no need to call both prepare_global_schur() and prepare_local_schurs().
 
 """
 function prepare_lorasc_precond(tentative_nnode::Int,
