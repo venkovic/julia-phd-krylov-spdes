@@ -44,9 +44,9 @@ end
 """
 function draw!(smp::McSampler)
   smp.ξ .= rand(smp.Ξ)
-  smp.g .= smp.Λ[1] * smp.ξ[1] * smp.Ψ[:, 1]
+  smp.g .= sqrt(smp.Λ[1]) * smp.ξ[1] * smp.Ψ[:, 1]
   for k in 2:smp.m
-    smp.g .+= smp.Λ[k] * smp.ξ[k] * smp.Ψ[:, k]
+    smp.g .+= sqrt(smp.Λ[k]) * smp.ξ[k] * smp.Ψ[:, k]
   end
 end
 
@@ -131,9 +131,9 @@ function draw!(smp::McmcSampler)
   end
   smp.ξ .= smp.χ
   
-  smp.g .= smp.Λ[1] * smp.χ[1] * smp.Ψ[:, 1]
+  smp.g .= sqrt(smp.Λ[1]) * smp.χ[1] * smp.Ψ[:, 1]
   for k in 2:smp.m
-    smp.g .+= smp.Λ[k] * smp.χ[k] * smp.Ψ[:, k]
+    smp.g .+= sqrt(smp.Λ[k]) * smp.χ[k] * smp.Ψ[:, k]
   end
 
   return cnt
