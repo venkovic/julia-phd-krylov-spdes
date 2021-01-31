@@ -54,7 +54,6 @@ elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
                                                               dirichlet_inds_g2l)
 n_Γ = ind_Γ_g2l.count
 
-
 function f(x::Float64, y::Float64)
   return -1.
 end
@@ -62,7 +61,6 @@ end
 function uexact(xx::Float64, yy::Float64)
   return .734
 end
-
 
 println()
 space_println("nnode = $(size(points)[2])")
@@ -195,7 +193,7 @@ printlnln("prepare_lorasc_precond ...")
                                           cells,
                                           points,
                                           cell_neighbors,
-                                          exp.(g),
+                                          exp.(g_0),
                                           dirichlet_inds_g2l,
                                           not_dirichlet_inds_g2l,
                                           f,
