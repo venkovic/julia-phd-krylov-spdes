@@ -67,6 +67,9 @@ export pll_draw
 export suggest_parameters
 export get_root_filename
 
+export prepare_mc_sampler
+export prepare_mcmc_sampler
+
 include("Mesh.jl")
 include("EllipticPde.jl")
 include("BoundaryConditions.jl")
@@ -75,4 +78,5 @@ include("KarhunenLoeve.jl")
 include("KarhunenLoeveDomainDecomposition.jl")
 include("KarhunenLoevePllDomainDecomposition.jl")
 include("KarhunenLoeveDomainDecompositionHelper.jl")
+include("Samplers.jl")
 end
