@@ -1134,6 +1134,8 @@ end
                             ind_Id_g2l::Array{Dict{Int,Int},1},
                             ind_Γ_g2l::Dict{Int,Int}, 
                             not_dirichlet_inds_g2l::Dict{Int,Int};
+                            verbose=true,
+                            compute_A_ΓΓ_chol=true,
                             nvec=25, 
                             ε=.01)
 
@@ -1152,9 +1154,10 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 ind_Id_g2l::Array{Dict{Int,Int},1},
                                 ind_Γ_g2l::Dict{Int,Int}, 
                                 not_dirichlet_inds_g2l::Dict{Int,Int};
+                                verbose=true,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25, 
-                                ε=.01)
+                                ε=.01) 
 
   ndom, = size(A_IId)
   chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
@@ -1167,14 +1170,19 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
     chol_A_ΓΓ = nothing
   end
 
-  for idom in 1:ndom
+  verbose ? print("compute cholesky of A_IId's ... ") : nothing
+  time = @elapsed for idom in 1:ndom
     push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
   end
+  verbose ? println("$time seconds") : nothing
 
-  Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
-                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
-                                     isposdef=true, ishermitian=true,
-                                     issymmetric=true)
+
+  verbose ? print("solve for general ld eigenpairs of (S, A_ΓΓ) ... ") : nothing
+  time = @elapsed Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
+                                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
+                                                     isposdef=true, ishermitian=true,
+                                                     issymmetric=true)
+  verbose ? println("$time seconds") : nothing
   
   nev = 0
   for (k, σ) in enumerate(Σ)
@@ -1229,6 +1237,7 @@ end
                             not_dirichlet_inds_g2l::Dict{Int,Int},
                             f::Function,
                             uexact::Function;
+                            verbose=true,
                             do_local_schur_assembly=true,
                             load_partition=false,
                             compute_A_ΓΓ_chol=true,
@@ -1253,6 +1262,7 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                 not_dirichlet_inds_g2l::Dict{Int,Int},
                                 f::Function,
                                 uexact::Function;
+                                verbose=true,
                                 do_local_schur_assembly=true,
                                 load_partition=false,
                                 compute_A_ΓΓ_chol=true,
@@ -1274,38 +1284,47 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                                                 dirichlet_inds_g2l)
   n_Γ = ind_Γ_g2l.count
 
-  print("prepare_global_schur ...")
-  A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
-                                                             points,
-                                                             epart,
-                                                             ind_Id_g2l,
-                                                             ind_Γ_g2l,
-                                                             node_owner,
-                                                             a_vec,
-                                                             f,
-                                                             uexact)
+  verbose ? print("prepare_global_schur ... ") : nothing
+  time = @elapsed A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = prepare_global_schur(cells,
+                                                                       points,
+                                                                       epart,
+                                                                       ind_Id_g2l,
+                                                                       ind_Γ_g2l,
+                                                                       node_owner,
+                                                                       a_vec,
+                                                                       f,
+                                                                       uexact)
+  verbose ? println("$time seconds") : nothing
 
-  print("assemble amg preconditioners of A_IId ...")
-  Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
-                 for idom in 1:ndom];
 
-  print("prepare_local_schurs ...")
-  A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
-                                                            points,
-                                                            epart,
-                                                            ind_Id_g2l,
-                                                            ind_Γd_g2l,
-                                                            ind_Γ_g2l,
-                                                            node_owner,
-                                                            a_vec,
-                                                            f,
-                                                            uexact)
-  
+  verbose ? print("assemble amg preconditioners of A_IId ... ") : nothing
+  time = @elapsed Π_IId = [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
+                           for idom in 1:ndom];
+  verbose ? println("$time seconds") : nothing
+
+  verbose ? print("prepare_local_schurs ... ") : nothing
+  time = @elapsed A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = prepare_local_schurs(cells,
+                                                                      points,
+                                                                      epart,
+                                                                      ind_Id_g2l,
+                                                                      ind_Γd_g2l,
+                                                                      ind_Γ_g2l,
+                                                                      node_owner,
+                                                                      a_vec,
+                                                                      f,
+                                                                      uexact)
+  verbose ? println("$time seconds") : nothing
+
+
   if do_local_schur_assembly
-    print("assemble_local_schurs ...")
-    Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
-                                            
-    print("build LinearMap using assembled local schurs ...")
+    verbose ? print("assemble_local_schurs ... ") : nothing
+    time = @elapsed Sd_local_mat = assemble_local_schurs(A_IIdd,
+                                                         A_IΓdd,
+                                                         A_ΓΓdd,
+                                                         preconds=Π_IId)
+    verbose ? println("$time seconds") : nothing
+
+
     S = LinearMap(x -> apply_local_schurs(Sd_local_mat,
                                           ind_Γd_Γ2l,
                                           node_Γ_cnt,
@@ -1313,7 +1332,6 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                           n_Γ, issymmetric=true)
 
   else
-    print("build LinearMap using (p)cg solves ...")
     S = LinearMap(x -> apply_local_schurs(A_IIdd,
                                           A_IΓdd,
                                           A_ΓΓdd,
@@ -1324,74 +1342,11 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                           nothing, n_Γ, issymmetric=true)
   end
 
-
-
   return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
                                 ind_Γ_g2l, not_dirichlet_inds_g2l, 
                                 compute_A_ΓΓ_chol=compute_A_ΓΓ_chol,
-                                nvec=nvec, 
-                                ε=ε)
+                                nvec=nvec, ε=ε, verbose=verbose)
 
-  """
-  chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
-
-  if compute_A_ΓΓ_chol
-    ΠA_ΓΓ = nothing
-    chol_A_ΓΓ = LinearAlgebra.cholesky(A_ΓΓ)
-  else
-    ΠA_ΓΓ = Preconditioners.AMGPreconditioner(A_ΓΓ)
-    chol_A_ΓΓ = nothing
-  end
-
-  for idom in 1:ndom
-    push!(chol_A_IId, LinearAlgebra.cholesky(A_IId[idom]))
-  end
-
-  Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
-                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
-                                     isposdef=true, ishermitian=true,
-                                     issymmetric=true)
-  
-  nev = 0
-  for (k, σ) in enumerate(Σ)
-    if σ < ε
-      Σ[k] = (ε - σ) / σ
-      nev += 1
-    else
-      break
-    end
-  end 
-
-  if nev == nvec
-    println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
-  elseif nev == 0 
-    println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
-    nev = nvec
-  end
-
-  n_Γ = ind_Γ_g2l.count
-  n = not_dirichlet_inds_g2l.count
-  x_Id = [Array{Float64,1}(undef, ind_Id_g2l[idom].count) for idom in 1:ndom]
-  x_Γ = Array{Float64, 1}(undef, n_Γ)
-  z_Γ = Array{Float64, 1}(undef, n_Γ)
-  u = Array{Float64,1}(undef, n)
-
-  return LorascPreconditioner(A_IΓd,
-                              chol_A_IId,
-                              A_ΓΓ,
-                              ΠA_ΓΓ,
-                              chol_A_ΓΓ,
-                              ε,
-                              E[1:nev],
-                              Σ[1:nev],
-                              ind_Id_g2l,
-                              ind_Γ_g2l,
-                              not_dirichlet_inds_g2l,
-                              x_Id,
-                              x_Γ,
-                              z_Γ,
-                              u)
-  """
 end
 
 
