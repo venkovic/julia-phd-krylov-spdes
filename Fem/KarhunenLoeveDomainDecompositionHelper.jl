@@ -16,6 +16,12 @@ in these cases:
   
   ndom = 500, dev = 35, tentative_nnode = 1_000_000, forget=1e-6
 
+(relative_local, relative_global) = (.9986, .995), for a SExp 
+covariance model with sig2=1 and L=0.1, leads to satisfactory results 
+in these cases:
+
+  ndom = 300, dev = 25, tentative_nnode =    50_000, forget=1e-6
+
 """
 function suggest_parameters(nnode::Int)
   if nnode <= 100_000
