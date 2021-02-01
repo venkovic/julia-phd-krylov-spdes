@@ -19,9 +19,14 @@ load_existing_mesh = false
 ndom = 40
 load_existing_partition = false
 
+verbose = true
+
 model = "SExp"
 sig2 = 1.
 L = .1
+
+nsmp = 30
+
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 if load_existing_mesh
@@ -66,7 +71,7 @@ A_0, _ = @time do_isotropic_elliptic_assembly(cells, points,
                                               point_markers,
                                               exp.(g_0), f, uexact)
 
-printlnln("assemble amg_0 preconditioner for A_0 ...")
+printlnln("prepare amg_0 preconditioner for A_0 ...")
 Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
 
 printlnln("prepare_lorasc_precond for A_0 ...")
@@ -89,49 +94,49 @@ M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
                                               
-mcmc_sampler = prepare_mcmc_sampler(Λ, Ψ)
-#mc_sampler = prepare_mc_sampler(Λ, Ψ)
+sampler = prepare_mcmc_sampler(Λ, Ψ)
+verbose ? println("\n1 / $nsmp") : nothing
 
+verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
+time = @elapsed A, b = do_isotropic_elliptic_assembly(cells, points,
+                                                      dirichlet_inds_g2l,
+                                                      not_dirichlet_inds_g2l,
+                                                      point_markers,
+                                                      exp.(g_0), f, uexact)
+verbose ? println("$time seconds") : nothing
 
-println("do_isotropic_elliptic_assembly for ξ_1 ...")
-A, b = @time do_isotropic_elliptic_assembly(cells, points,
-                                              dirichlet_inds_g2l,
-                                              not_dirichlet_inds_g2l,
-                                              point_markers,
-                                              exp.(g_0), f, uexact)
-
+verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
+time = @elapsed _, it, _  = pcg(A, b, M=Π_amg_0)
+verbose ? println("$time seconds, iter = $it") : nothing
 
 #
-# Sample ξ by mcmc and solve linear systems by deflated pcg with 
-# online eigenvector approximations
+# Sample ξ by mcmc and solve linear systems by def-pcg with 
+# online eigenvectors approximation
 #
-nsmp = 20
-cnt_reals = ones(Int, nsmp)
-
+cnt_reals = 1
 for s in 2:nsmp
 
-  println("\n$s / $nsmp")
-  cnt_reals[s] = cnt_reals[s-1] + draw!(mcmc_sampler)
-  #draw!(mc_sampler)
-  println(s / cnt_reals[s])
+  verbose ? print("\n$s / $nsmp") : nothing
+  global cnt_reals += draw!(sampler)
+  verbose ? println(" (acceptance frequency: $(s / cnt_reals))") : nothing
 
+  verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
+  local time = @elapsed update_isotropic_elliptic_assembly!(A, b,
+                                                            cells, points,
+                                                            dirichlet_inds_g2l,
+                                                            not_dirichlet_inds_g2l,
+                                                            point_markers,
+                                                            exp.(sampler.g),
+                                                            f, uexact)
+  verbose ? println("$time seconds") : nothing
 
-  print("do_isotropic_elliptic_assembly ... ")  
-  @time update_isotropic_elliptic_assembly!(A, b,
-                                            cells, points,
-                                            dirichlet_inds_g2l,
-                                            not_dirichlet_inds_g2l,
-                                            point_markers,
-                                            exp.(mcmc_sampler.g),
-                                            f, uexact)
-
-  #print("amg_0-pcg of A * u = b ... ")
-  #u, it, _ = @time pcg(A, b, M=Π_amg_0)
-  #space_println("iter = $it")
+  verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
+  local time = @elapsed _, it, _ = pcg(A, b, M=Π_amg_0)
+  verbose ? println("$time seconds, iter = $it") : nothing
                                          
-  #print("lorasc_0-pcg solve of A * u = b ...")
-  #u, it, _ = @time pcg(A, b, M=Π_lorasc_0)
-  #space_println("iter = $it")
+  print("lorasc_0-pcg solve of A * u = b ...")
+  local time = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
+  verbose ? println("$time seconds, iter = $it") : nothing
 
 end                                          
 
