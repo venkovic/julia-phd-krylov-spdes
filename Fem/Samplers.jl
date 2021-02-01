@@ -24,7 +24,7 @@ function prepare_mc_sampler(Λ::Array{Float64,1},
 
   n, m = size(Ψ)
 
-  Ξ = MvNormal(m, 1)
+  Ξ = MvNormal(m, 1.)
   ξ = rand(Ξ)
   
   g = sqrt(Λ[1]) * ξ[1] * Ψ[:, 1]
@@ -80,11 +80,11 @@ function prepare_mcmc_sampler(Λ::Array{Float64,1},
   n, m = size(Ψ)
 
   σ2 = 1.
-  Ξ = MvNormal(m, σ2)
+  Ξ = MvNormal(m, sqrt(σ2))
   ξ = rand(Ξ)
 
   ϑ2 = 2.38^2 * σ2 / m
-  ΔΧ = MvNormal(m, ϑ2)
+  ΔΧ = MvNormal(m, sqrt(ϑ2))
   χ = ξ .+ rand(ΔΧ)
   
   g = sqrt(Λ[1]) * ξ[1] * Ψ[:, 1]
