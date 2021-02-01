@@ -10,10 +10,10 @@ using Utils: space_println, printlnln
 
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
 using NPZ: npzread
-using Random: seed!; seed!(123_456);
+using Random: seed!; seed!(481_456);
 using LinearMaps: LinearMap
 
-tentative_nnode = 100_000
+tentative_nnode = 50_000
 load_existing_mesh = false
 
 ndom = 40
@@ -89,8 +89,8 @@ M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
                                               
-#mcmc_sampler = prepare_mcmc_sampler(Λ, Ψ)
-mc_sampler = prepare_mc_sampler(Λ, Ψ)
+mcmc_sampler = prepare_mcmc_sampler(Λ, Ψ)
+#mc_sampler = prepare_mc_sampler(Λ, Ψ)
 
 
 println("do_isotropic_elliptic_assembly for ξ_1 ...")
@@ -105,15 +105,16 @@ A, b = @time do_isotropic_elliptic_assembly(cells, points,
 # Sample ξ by mcmc and solve linear systems by deflated pcg with 
 # online eigenvector approximations
 #
-nsmp = 1_000
+nsmp = 20
 cnt_reals = ones(Int, nsmp)
-using Statistics: var
 
 for s in 2:nsmp
 
   println("\n$s / $nsmp")
-  #cnt_reals[s] = cnt_reals[s-1] + draw!(mcmc_sampler)
-  draw!(mc_sampler)
+  cnt_reals[s] = cnt_reals[s-1] + draw!(mcmc_sampler)
+  #draw!(mc_sampler)
+  println(s / cnt_reals[s])
+
 
   print("do_isotropic_elliptic_assembly ... ")  
   @time update_isotropic_elliptic_assembly!(A, b,
@@ -121,20 +122,20 @@ for s in 2:nsmp
                                             dirichlet_inds_g2l,
                                             not_dirichlet_inds_g2l,
                                             point_markers,
-                                            exp.(mc_sampler.g),
+                                            exp.(mcmc_sampler.g),
                                             f, uexact)
 
-  print("amg_0-pcg of A * u = b ... ")
-  u, it, _ = @time pcg(A, b, M=Π_amg_0)
-  space_println("iter = $it")
+  #print("amg_0-pcg of A * u = b ... ")
+  #u, it, _ = @time pcg(A, b, M=Π_amg_0)
+  #space_println("iter = $it")
                                          
-  print("lorasc_0-pcg solve of A * u = b ...")
-  u, it, _ = @time pcg(A, b, M=Π_lorasc_0)
-  space_println("iter = $it")
+  #print("lorasc_0-pcg solve of A * u = b ...")
+  #u, it, _ = @time pcg(A, b, M=Π_lorasc_0)
+  #space_println("iter = $it")
 
 end                                          
 
-
+"""
 printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
 u, it, _ = @time defpcg(A, b, ϕ_ld, M=Π_amg_0);
 space_println("n = $(A.n), nev = $nev (ld), iter = $it")
@@ -142,3 +143,4 @@ space_println("n = $(A.n), nev = $nev (ld), iter = $it")
 printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
 u, it, _ = @time defpcg(A, b, ϕ_ld, M=Π_lorasc_0);
 space_println("n = $(A.n), nev = $nev (ld), iter = $it")
+"""
