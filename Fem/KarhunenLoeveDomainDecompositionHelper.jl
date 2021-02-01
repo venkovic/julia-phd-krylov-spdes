@@ -8,6 +8,8 @@ to be used for the truncation of local and global Karhunen expansions.
 covariance model with sig2=1 and L=0.1, leads to satisfactory results 
 in these cases:
 
+  ndom = 400, dev = 25, tentative_nnode =   100_000, forget=1e-6
+
   ndom = 400, dev = 25, tentative_nnode =   200_000, forget=1e-6
 
   ndom = 400, dev = 25, tentative_nnode =   400_000, forget=1e-6
@@ -16,7 +18,11 @@ in these cases:
 
 """
 function suggest_parameters(nnode::Int)
-  return .9993, .995 
+  if nnode <= 100_000
+    return .9986, .995 
+  else
+    return .9993, .995 
+  end
 end
 
 

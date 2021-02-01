@@ -27,9 +27,9 @@ function prepare_mc_sampler(Λ::Array{Float64,1},
   Ξ = MvNormal(m, 1)
   ξ = rand(Ξ)
   
-  g = Λ[1] * ξ[1] * Ψ[:, 1]
+  g = sqrt(Λ[1]) * ξ[1] * Ψ[:, 1]
   for k in 2:m
-    g .+= Λ[k] * ξ[k] * Ψ[:, k]
+    g .+= sqrt(Λ[k]) * ξ[k] * Ψ[:, k]
   end
 
   return McSampler(n, m,
@@ -87,9 +87,9 @@ function prepare_mcmc_sampler(Λ::Array{Float64,1},
   ΔΧ = MvNormal(m, ϑ2)
   χ = ξ .+ rand(ΔΧ)
   
-  g = Λ[1] * ξ[1] * Ψ[:, 1]
+  g = sqrt(Λ[1]) * ξ[1] * Ψ[:, 1]
   for k in 2:m
-    g .+= Λ[k] * ξ[k] * Ψ[:, k]
+    g .+= sqrt(Λ[k]) * ξ[k] * Ψ[:, k]
   end
 
   return McmcSampler(n, m,
@@ -131,9 +131,9 @@ function draw!(smp::McmcSampler)
   end
   smp.ξ .= smp.χ
   
-  smp.g .= sqrt(smp.Λ[1]) * smp.χ[1] * smp.Ψ[:, 1]
+  smp.g .= sqrt(smp.Λ[1]) * smp.ξ[1] * smp.Ψ[:, 1]
   for k in 2:smp.m
-    smp.g .+= sqrt(smp.Λ[k]) * smp.χ[k] * smp.Ψ[:, k]
+    smp.g .+= sqrt(smp.Λ[k]) * smp.ξ[k] * smp.Ψ[:, k]
   end
 
   return cnt
