@@ -525,17 +525,38 @@ eigDef-PCG: 96, Def-PCG: 107, PCG: 145
 eigDef-PCG: 95, Def-PCG: 95, PCG: 141
 ```
 """
-function eigdefpcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, M, W::Array{T,2}, spdim::Int)
-  r, Ap, res_norm, p, z = similar(x), similar(x), similar(x), similar(x), similar(x)
+function eigdefpcg(A::SparseMatrixCSC{T},
+                   b::Array{T,1},
+                   x::Array{T,1},
+                   M,
+                   W::Array{T,2},
+                   spdim::Int)
+  
+  #r, Ap, res_norm, p, z = similar(x), similar(x), similar(x), similar(x), similar(x)
+
+  n, = size(x)
+
+  r = Array{T,1}(undef, n)
+  Ap = Array{T,1}(undef, n)
+  res_norm = Array{T,1}(undef, n)
+  p = Array{T,1}(undef, n)
+  z = Array{T,1}(undef, n)
+
+  m, = size(W)
+  WtA = Array{T,2}(undef, size(W)[2], n)
+  WtA = Array{T,2}(undef, size(W)[2], n)
+
+
+
   #
-  WtA = W' * A
+  WtA .= W'A
   WtAW = WtA * W
   WtW = W'W
   #
   if iszero(x)
     r .= b
   else
-    r = b - A * x
+    r .= b .- A * x
   end
   mu = W' * r
   mu = WtAW \ mu

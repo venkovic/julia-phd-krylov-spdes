@@ -308,7 +308,13 @@ Init-PCG: 92, PCG: 259
 Init-PCG: 100, PCG: 257
 ```
 """
-function eigpcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, M, nvec::Int, spdim::Int)
+function eigpcg(A::SparseMatrixCSC{T}, 
+                b::Vector{T},
+                x::Vector{T},
+                M,
+                nvec::Int,
+                spdim::Int)
+                
   r, Ap, p, res_norm, z = similar(x), similar(x), similar(x), similar(x), similar(x)
   #
   n = size(x)[1]

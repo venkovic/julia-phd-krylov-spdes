@@ -9,7 +9,7 @@ export cg, pcg
 export eigcg, eigpcg
 export defcg, eigdefcg, defpcg, eigdefpcg
 export initcg, initpcg
-export Recycler
+export Recycler, prepare_recycler
 
 const T = Float64
 const eps = 1e-7
