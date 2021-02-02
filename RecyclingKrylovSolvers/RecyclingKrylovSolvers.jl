@@ -9,6 +9,7 @@ export cg, pcg
 export eigcg, eigpcg
 export defcg, eigdefcg, defpcg, eigdefpcg
 export initcg, initpcg
+export Recycler
 
 const T = Float64
 const eps = 1e-7
@@ -17,5 +18,6 @@ include("cg.jl")
 include("eigcg.jl")
 include("defcg.jl")
 include("initcg.jl")
+include("Recyclers.jl")
 
 end
