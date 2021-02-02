@@ -67,6 +67,7 @@ export pll_draw
 export suggest_parameters
 export get_root_filename
 
+export McmcSampler
 export prepare_mc_sampler
 export prepare_mcmc_sampler
 
