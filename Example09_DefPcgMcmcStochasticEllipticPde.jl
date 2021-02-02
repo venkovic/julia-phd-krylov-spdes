@@ -5,7 +5,7 @@ import Pkg
 Pkg.activate(".")
 
 using Fem
-using RecyclingKrylovSolvers: cg, pcg, defpcg
+using RecyclingKrylovSolvers: cg, pcg, defpcg, eigpcg, eigdefpcg
 using Utils: space_println, printlnln
 
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
@@ -18,6 +18,11 @@ load_existing_mesh = false
 
 ndom = 40
 load_existing_partition = false
+
+nvec = ndom + 5
+spdim = floor(Int, 2.5 * nvec)
+
+do_lorasc_0_pcg = false
 
 verbose = true
 
@@ -95,57 +100,81 @@ M = get_mass_matrix(cells, points)
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
                                               
 sampler = prepare_mcmc_sampler(Λ, Ψ)
-verbose ? println("\n1 / $nsmp") : nothing
 
-verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
-time = @elapsed A, b = do_isotropic_elliptic_assembly(cells, points,
+function test01(Π_amg_0,
+                Π_lorasc_0::LorascPreconditioner,
+                sampler::McmcSampler,
+                verbose::Bool,
+                do_lorasc_0_pcg::Bool,
+                nsmp::Int)
+
+  verbose ? println("\n1 / $nsmp") : nothing
+  verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
+  Δt = @elapsed A, b = do_isotropic_elliptic_assembly(cells, points,
                                                       dirichlet_inds_g2l,
                                                       not_dirichlet_inds_g2l,
                                                       point_markers,
-                                                      exp.(g_0), f, uexact)
-verbose ? println("$time seconds") : nothing
+                                                      exp.(sampler.g),
+                                                      f, uexact)
+  verbose ? println("$Δt seconds") : nothing
 
-verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
-time = @elapsed _, it, _  = pcg(A, b, M=Π_amg_0)
-verbose ? println("$time seconds, iter = $it") : nothing
-
-#
-# Sample ξ by mcmc and solve linear systems by def-pcg with 
-# online eigenvectors approximation
-#
-cnt_reals = 1
-for s in 2:nsmp
-
-  verbose ? print("\n$s / $nsmp") : nothing
-  global cnt_reals += draw!(sampler)
-  verbose ? println(" (acceptance frequency: $(s / cnt_reals))") : nothing
-
-  verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
-  local time = @elapsed update_isotropic_elliptic_assembly!(A, b,
-                                                            cells, points,
-                                                            dirichlet_inds_g2l,
-                                                            not_dirichlet_inds_g2l,
-                                                            point_markers,
-                                                            exp.(sampler.g),
-                                                            f, uexact)
-  verbose ? println("$time seconds") : nothing
+  x = zeros(Float64, A.n)
 
   verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
-  local time = @elapsed _, it, _ = pcg(A, b, M=Π_amg_0)
-  verbose ? println("$time seconds, iter = $it") : nothing
-                                         
-  print("lorasc_0-pcg solve of A * u = b ...")
-  local time = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
-  verbose ? println("$time seconds, iter = $it") : nothing
+  Δt = @elapsed _, it, _  = pcg(A, b, M=Π_amg_0)
+  verbose ? println("$Δt seconds, iter = $it") : nothing
 
-end                                          
+  if do_lorasc_0_pcg
+    print("lorasc_0-pcg solve of A * u = b ...")
+    Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+  end
 
-"""
-printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, ϕ_ld, M=Π_amg_0);
-space_println("n = $(A.n), nev = $nev (ld), iter = $it")
-                                         
-printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, ϕ_ld, M=Π_lorasc_0);
-space_println("n = $(A.n), nev = $nev (ld), iter = $it")
-"""
+  print("lorasc_0-eigpcg solve of A * u = b ...")
+  Δt = @elapsed _, it, _, W = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
+  verbose ? println("$Δt seconds, iter = $it") : nothing
+
+  #
+  # Sample ξ by mcmc and solve linear systems by def-pcg with 
+  # online eigenvectors approximation
+  #
+  cnt_reals = 1
+  for s in 2:nsmp
+
+    verbose ? print("\n$s / $nsmp") : nothing
+    cnt_reals += draw!(sampler)
+    verbose ? println(" (acceptance frequency: $(s / cnt_reals))") : nothing
+
+    verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
+    Δt = @elapsed update_isotropic_elliptic_assembly!(A, b,
+                                                      cells, points,
+                                                      dirichlet_inds_g2l,
+                                                      not_dirichlet_inds_g2l,
+                                                      point_markers,
+                                                      exp.(sampler.g),
+                                                      f, uexact)
+    verbose ? println("$Δt seconds") : nothing
+
+    verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
+    Δt = @elapsed _, it, _ = pcg(A, b, M=Π_amg_0)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+
+    if do_lorasc_0_pcg
+      print("lorasc_0-pcg solve of A * u = b ...")
+      Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
+      verbose ? println("$Δt seconds, iter = $it") : nothing
+    end
+
+    print("lorasc_0-eigdefpcg solve of A * u = b ...")
+    Δt = @elapsed _, it, _, W = eigdefpcg(A, b, x, Π_lorasc_0, W, spdim)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+
+  end
+end
+
+test01(Π_amg_0,
+       Π_lorasc_0,
+       sampler,
+       verbose,
+       do_lorasc_0_pcg,
+       nsmp)
