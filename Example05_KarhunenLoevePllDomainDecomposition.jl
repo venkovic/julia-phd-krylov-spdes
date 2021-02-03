@@ -1,15 +1,20 @@
 using Distributed
 
-#addprocs(([("marcel", 4)]), tunnel=true)
+addprocs(([("marcel", 4)]), tunnel=true)
+addprocs(([("hector", 6)]), tunnel=true)
+#addprocs(([("lucien", 4)]), tunnel=true, max_parallel=30, multiplex=true)
 #addprocs(([("andrew", 3)]), tunnel=true)
 #addprocs(([("venkovic@moorcock", 6)]), tunnel=true,
 #             dir="/home/venkovic/Dropbox/Git/julia-fem/",
 #             exename="/home/venkovic/julia-1.5.3/bin/julia")
-addprocs(2) # Add procs after remote hosts due to issue with ClusterManagers
+addprocs(6) # Add procs after remote hosts due to issue with ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
   push!(LOAD_PATH, "./Utils/")
+end
+
+@everywhere begin
   import Pkg
   Pkg.activate(".")
 end
@@ -23,17 +28,19 @@ using Utils: space_println, printlnln
   using DistributedOperations
 end
 
+@everywhere worker_timeout() = 10_000.
+
 using NPZ: npzwrite
 
 @everywhere begin
-  ndom = 400
-  nev = 25
-  tentative_nnode = 200_000
+  ndom = 500
+  nev = 35
+  tentative_nnode = 2_000_000
   forget = 1e-6
 end
 
-load_existing_mesh = false
-load_existing_partition = false
+load_existing_mesh = true
+load_existing_partition = true
 
 if load_existing_mesh
   cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
