@@ -1,5 +1,6 @@
 push!(LOAD_PATH, "./Fem/")
 push!(LOAD_PATH, "./RecyclingKrylovSolvers/")
+push!(LOAD_PATH, "./MyPreconditioners/")
 push!(LOAD_PATH, "./Utils/")
 import Pkg
 Pkg.activate(".")
@@ -9,8 +10,9 @@ using RecyclingKrylovSolvers: cg, pcg, defpcg, eigpcg, eigdefpcg
 using Utils: space_println, printlnln
 
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
-using NPZ: npzread
-using Random: seed!; seed!(481_456);
+using MyPreconditioners: BJPreconditioner, BJop
+using NPZ: npzread, npzwrite
+using Random: seed!
 using LinearMaps: LinearMap
 
 tentative_nnode = 50_000
@@ -19,18 +21,20 @@ load_existing_mesh = false
 ndom = 40
 load_existing_partition = false
 
+nbj = ndom
+
 nvec = ndom + 5
 spdim = floor(Int, 2.5 * nvec)
 
 do_lorasc_0_pcg = false
-
 verbose = true
+
+nsmp = 30
+seed!(481_456)
 
 model = "SExp"
 sig2 = 1.
 L = .1
-
-nsmp = 30
 
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
@@ -91,6 +95,8 @@ printlnln("prepare_lorasc_precond for A_0 ...")
                                           f,
                                           uexact)
 
+printlnln("prepare bj_0 preconditioner for A_0 ...")
+Π_bj_0 = @time BJPreconditioner(nbj, A_0);
 
 #
 # Load kl representation and prepare mcmc sampler
@@ -103,10 +109,21 @@ sampler = prepare_mcmc_sampler(Λ, Ψ)
 
 function test01(Π_amg_0,
                 Π_lorasc_0::LorascPreconditioner,
+                Π_bj_0::BJop,
                 sampler::McmcSampler,
                 verbose::Bool,
                 do_lorasc_0_pcg::Bool,
                 nsmp::Int)
+  
+  ndom, = size(Π_lorasc_0.x_Id)
+  methods = ["amg_0-pcg",
+             "lorasc$(ndom)_0-eigdefpcg",
+             "bj$(nbj)_0-eigdefpcg"]
+
+  iter = Dict{String,Array{Int,1}}()
+  for method in methods
+    iter[method] = Array{Int,1}(undef, nsmp)
+  end
 
   verbose ? println("\n1 / $nsmp") : nothing
   verbose ? print("do_isotropic_elliptic_assembly ... ") : nothing
@@ -123,16 +140,23 @@ function test01(Π_amg_0,
   verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
   Δt = @elapsed _, it, _  = pcg(A, b, M=Π_amg_0)
   verbose ? println("$Δt seconds, iter = $it") : nothing
+  iter["amg_0-pcg"][1] = it
 
   if do_lorasc_0_pcg
-    print("lorasc_0-pcg solve of A * u = b ...")
+    print("lorasc$(ndom)_0-pcg solve of A * u = b ...")
     Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
     verbose ? println("$Δt seconds, iter = $it") : nothing
   end
 
   print("lorasc_0-eigpcg solve of A * u = b ...")
-  Δt = @elapsed _, it, _, W = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
+  Δt = @elapsed _, it, _, W_lorasc = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
+  iter["lorasc$(ndom)_0-eigdefpcg"][1] = it
+
+  print("bj_0-eigpcg solve of A * u = b ...")
+  Δt = @elapsed _, it, _, W_bj = eigpcg(A, b, x, Π_bj_0, nvec, spdim)
+  verbose ? println("$Δt seconds, iter = $it") : nothing
+  iter["bj$(nbj)_0-eigdefpcg"][1] = it
 
   #
   # Sample ξ by mcmc and solve linear systems by def-pcg with 
@@ -158,23 +182,42 @@ function test01(Π_amg_0,
     verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
     Δt = @elapsed _, it, _ = pcg(A, b, M=Π_amg_0)
     verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["amg_0-pcg"][s] = it
 
     if do_lorasc_0_pcg
-      print("lorasc_0-pcg solve of A * u = b ...")
+      print("lorasc$(ndom)_0-pcg solve of A * u = b ...")
       Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
       verbose ? println("$Δt seconds, iter = $it") : nothing
     end
 
-    print("lorasc_0-eigdefpcg solve of A * u = b ...")
-    Δt = @elapsed _, it, _, W = eigdefpcg(A, b, x, Π_lorasc_0, W, spdim)
+    print("lorasc$(ndom)_0-eigdefpcg solve of A * u = b ...")
+    Δt = @elapsed _, it, _, W_lorasc = eigdefpcg(A, b, x, Π_lorasc_0, W_lorasc, spdim)
     verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["lorasc$(ndom)_0-eigdefpcg"][s] = it
+
+    print("bj$(nbj)_0-eigdefpcg solve of A * u = b ...")
+    Δt = @elapsed _, it, _, W_bj = eigdefpcg(A, b, x, Π_bj_0, W_bj, spdim)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["bj$(nbj)_0-eigdefpcg"][s] = it
 
   end
+
+  npzwrite("data/test01_$(root_fname)_amg_0-pcg.it.npz",
+           iter["amg_0-pcg"])
+  npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+           iter["lorasc$(ndom)_0-eigdefpcg"])
+  npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+           iter["bj$(nbj)_0-eigdefpcg"])
+  
 end
 
 test01(Π_amg_0,
        Π_lorasc_0,
+       Π_bj_0,
        sampler,
        verbose,
        do_lorasc_0_pcg,
        nsmp)
+
+#BjPrecond,
+#Chol32,
