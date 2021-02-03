@@ -70,6 +70,9 @@ export solve_local_kl
 export do_global_mass_reduced_assembly,
        do_global_mass_covariance_reduced_assembly,
        solve_global_reduced_kl
+export project_on_mesh,
+       trim_and_order,
+       get_kl_coordinates
 export draw,
        draw!
 
@@ -79,9 +82,6 @@ export pll_solve_local_kl
 export pll_draw
 
 # from KarhunenLoeveDomainDecompositionHelper.jl
-export project_on_mesh
-export trim_and_order
-export get_kl_coordinates
 export suggest_parameters
 export get_root_filename
 
@@ -91,7 +91,7 @@ export McSampler,
 export McmcSampler,
        prepare_mcmc_sampler
 
-       
+
 include("Mesh.jl")
 include("BoundaryConditions.jl")
 include("EllipticPde.jl")
