@@ -44,11 +44,6 @@ export NeumannNeumannSchurPreconditioner,
        apply_neumann_neumann_schur
 
 # from EllipticPdeDomainDecomposition.jl,
-export NeumannNeumannInducedPreconditioner,
-       prepare_neumann_neumann_induced_precond,
-       apply_neumann_neumann_induced
-
-# from EllipticPdeDomainDecomposition.jl,
 export LorascPreconditioner,
        prepare_lorasc_precond,
        apply_lorasc
@@ -58,6 +53,11 @@ export DomainDecompositionLowRankPreconditioner,
        prepare_domain_decomposition_low_rank_precond,
        apply_inv_a0, apply_inv_a0!, apply_hmat,
        apply_domain_decomposition_low_rank
+
+# from EllipticPdeDomainDecomposition.jl,
+export NeumannNeumannInducedPreconditioner,
+       prepare_neumann_neumann_induced_precond,
+       apply_neumann_neumann_induced
 
 # from KarhunenLoeve.jl
 export do_mass_covariance_assembly
