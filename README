@@ -13,29 +13,29 @@ Dependencies:
  3. metis
     $ sudo apt-get install metis
 
-
-Launch examples as follows:
-$ nohup julia -i <NameOfExample.jl> > sim.out 2>&1 &
-
-
 Change julia worker timeout
 Modify and add following line to ~/.bashrc
 $ export JULIA_WORKER_TIMEOUT=10000.
 
+Launch examples as follows:
+$ nohup julia -i <NameOfExample.jl> 1> sim.out 2> err.out &
+or
+$ nohup julia -i <NameOfExample.jl> 1> sim.out 2>&1 &
+
+
+
+Description of examples:
 
 Example00_SetUpEnvironment:
 -activates and instantiates julia environment.
-
 
 Example01_EllipticPde:
 -assembles linear system of fem discretization for the heat equation
 with a heterogeneous isotropic coefficient field using 2D P1 elements.
 
-
 Example02_KarhunenLoeve:
 -assembles (and solves) the generalized eigenvalue problem obtained by 
 fem for the Karhunen-Loeve expansion of a Gaussian process.
-
 
 Example03_EllipticPdeDomainDecomposition:
 -prepares and assembles, or not, operators obtained by fem discretization for 
@@ -48,18 +48,15 @@ Schur complement system of a toy problem.
 -shows effect of deflation on LorascPreconditioner for A * u = b.
 -shows lack of effect of deflation on AMGPreconditioner for A * u = b. 
 
-
 Example04_KarhunenLoeveDomainDecomposition:
 -uses domain decomposition to assemble (and solve) generalized eigenvalue 
 problems obtained by fem for the "local" and "global" Karhunen-Loeve 
 expansions of a Gaussian process.
 
-
 Example05_KarhunenLoevePllDomainDecomposition:
 -parallel implementation of the use of domain decomposition to assemble 
 (and solve) generalized eigenvalue problems obtained by fem for the "local"
 and "global" Karhunen-Loeve expansions of a Gaussian process.
-
 
 Example06_PcgStochasticEllipticPde:
 -assembles (and quickly re-assembles) linear systems of fem discretization 
@@ -68,7 +65,6 @@ for the heat equation with a heterogeneous isotropic lognormal coefficient field
 -shows effect of deflation on "median" LorascPreconditioner for A * u = b.
 -Shows lack of effect of deflation on "median" AMGPreconditioner for A * u = b. 
 
-
 Example07_PcgSchurStochasticEllipticPde:
 -prepares (and quickly updates) Schur complement operators for the heat equation 
 with a heterogeneous isotropic lognormal coefficient field. 
@@ -76,10 +72,8 @@ with a heterogeneous isotropic lognormal coefficient field.
  realizations. 
 -shows effect of deflation on the "median" NeumannNeumannPreconditioner.
 
-
 Example08_EllipticPdePllDomainDecomposition:
 -work in progress.
-
 
 Example09_DefPcgMcmcStochasticEllipticPde:
 -mcmc sampling of lognormal coefficient field.
