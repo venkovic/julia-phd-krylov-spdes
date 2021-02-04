@@ -4,7 +4,7 @@ Dependencies:
     $ wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
     $ tar zxvf julia-1.5.3-linux-x86_64.tar.gz
     Modify and add following line to ~/.bashrc
-    $ cat export PATH="$PATH:/path/to/<Julia directory>/bin"
+    $ export PATH="$PATH:/path/to/<Julia directory>/bin"
     $ source ~/.bashrc
 
  2. build-tools
@@ -12,6 +12,16 @@ Dependencies:
  
  3. metis
     $ sudo apt-get install metis
+
+
+Launch examples as follows:
+$ nohup julia -i <NameOfExample.jl> > sim.out 2>&1 &
+
+
+Change julia worker timeout
+Modify and add following line to ~/.bashrc
+$ export JULIA_WORKER_TIMEOUT=10000.
+
 
 Example00_SetUpEnvironment:
 -activates and instantiates julia environment.
