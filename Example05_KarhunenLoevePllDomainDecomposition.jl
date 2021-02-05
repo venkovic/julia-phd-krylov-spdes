@@ -13,7 +13,6 @@ addprocs(Sys.CPU_THREADS - 2, topology=:master_worker) # Add local procs after r
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
-  push!(LOAD_PATH, "./Utils/")
 end
 
 @everywhere begin
@@ -21,6 +20,7 @@ end
   Pkg.activate(".")
 end
 
+push!(LOAD_PATH, "./Utils/")
 using Utils: space_println, printlnln
 
 @everywhere begin 
