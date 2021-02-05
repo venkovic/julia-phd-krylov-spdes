@@ -13,6 +13,7 @@ addprocs(Sys.CPU_THREADS - 2, topology=:master_worker) # Add local procs after r
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
+  push!(LOAD_PATH, "./Utils/")
 end
 
 @everywhere begin
@@ -20,7 +21,6 @@ end
   Pkg.activate(".")
 end
 
-push!(LOAD_PATH, "./Utils/")
 using Utils: space_println, printlnln
 
 @everywhere begin 
@@ -28,14 +28,12 @@ using Utils: space_println, printlnln
   using Distributed
 end
 
-@everywhere worker_timeout() = 10_000.
-
 using NPZ: npzwrite
 
 @everywhere begin
   ndom = 40
   nev = 40
-  tentative_nnode = 20_000
+  tentative_nnode = 200_000
   forget = 1e-6
 end
 

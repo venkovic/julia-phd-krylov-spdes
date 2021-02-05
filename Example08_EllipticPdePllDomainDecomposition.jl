@@ -11,22 +11,22 @@ addprocs(([("hector", :auto)]), tunnel=true, topology=:master_worker)
 #             topology=:master_worker)
 addprocs(Sys.CPU_THREADS - 2, topology=:master_worker) # Add local procs after remote procs to avoid issues with ClusterManagers
 
-@everywhere push!(LOAD_PATH, "./Fem/")
+@everywhere begin
+  push!(LOAD_PATH, "./Fem/")
+  push!(LOAD_PATH, "./Utils/")
+end
 
 @everywhere begin
   import Pkg
   Pkg.activate(".")
 end
 
-push!(LOAD_PATH, "./Utils/")
 using Utils: space_println, printlnln
 
 @everywhere begin 
   using Fem
   using Distributed
 end
-
-@everywhere worker_timeout() = 10_000.
 
 using NPZ: npzwrite
 
