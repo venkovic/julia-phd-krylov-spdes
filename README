@@ -3,7 +3,7 @@ Dependencies:
  1. julia
     $ wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
     $ tar zxvf julia-1.5.3-linux-x86_64.tar.gz
-    Modify and add following line to ~/.bashrc
+    modify ~/.bashrc and add to PATH 
     $ export PATH="$PATH:/path/to/<Julia directory>/bin"
     $ source ~/.bashrc
 
@@ -13,15 +13,12 @@ Dependencies:
  3. metis
     $ sudo apt-get install metis
 
-Change julia worker timeout
+Change julia worker timeout (on each machine)
 Modify and add following line to ~/.bashrc
 $ export JULIA_WORKER_TIMEOUT=10000.
 
 Launch examples as follows:
-$ nohup julia -i <NameOfExample.jl> 1> sim.out 2> err.out &
-or
-$ nohup julia -i <NameOfExample.jl> 1> sim.out 2>&1 &
-
+$ nohup time julia <NameOfExample.jl> 1> sim.out 2> err.out &
 
 
 Description of examples:
