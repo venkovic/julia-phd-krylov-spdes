@@ -9,7 +9,7 @@ addprocs(([("hector", :auto)]), tunnel=true, topology=:master_worker)
 #             dir="/home/venkovic/Dropbox/Git/julia-fem/",
 #             exename="/home/venkovic/julia-1.5.3/bin/julia",
 #             topology=:master_worker)
-#addprocs(Sys.CPU_THREADS) # Add local procs after remote hosts' to avoid issues of ClusterManagers
+addprocs(Sys.CPU_THREADS - 2, topology=:master_worker) # Add local procs after remote hosts' to avoid issues of ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
