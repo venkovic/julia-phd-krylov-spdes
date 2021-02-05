@@ -1,13 +1,14 @@
 using Distributed
 
-addprocs(([("marcel", 4)]), tunnel=true)
-addprocs(([("hector", 6)]), tunnel=true)
-#addprocs(([("lucien", 4)]), tunnel=true, max_parallel=30, multiplex=true)
+#addprocs(([("marcel", 4)]), tunnel=true)
+#addprocs(([("hector", 6)]), tunnel=true)
+#addprocs(([("lucien", 8)]), tunnel=true, max_parallel=30)
+addprocs(([("lucien", 3)]), tunnel=true, max_parallel=30)
 #addprocs(([("andrew", 3)]), tunnel=true)
 #addprocs(([("venkovic@moorcock", 6)]), tunnel=true,
 #             dir="/home/venkovic/Dropbox/Git/julia-fem/",
 #             exename="/home/venkovic/julia-1.5.3/bin/julia")
-addprocs(6) # Add procs after remote hosts due to issue with ClusterManagers
+addprocs(3) # Add procs after remote hosts due to issue with ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
@@ -24,8 +25,6 @@ using Utils: space_println, printlnln
 @everywhere begin 
   using Fem
   using Distributed
-  using Distributions
-  using DistributedOperations
 end
 
 @everywhere worker_timeout() = 10_000.
@@ -33,14 +32,14 @@ end
 using NPZ: npzwrite
 
 @everywhere begin
-  ndom = 500
-  nev = 35
-  tentative_nnode = 2_000_000
+  ndom = 20
+  nev = 40
+  tentative_nnode = 20_000
   forget = 1e-6
 end
 
-load_existing_mesh = true
-load_existing_partition = true
+load_existing_mesh = false
+load_existing_partition = false
 
 if load_existing_mesh
   cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
@@ -66,10 +65,13 @@ else
   save_partition(epart, npart, tentative_nnode, ndom)
 end
 
-bcast(nnode, procs())
-bcast(cells, procs())
-bcast(points, procs())
-bcast(epart, procs())
+# Broadcast mesh data
+@everywhere begin
+  nnode = $nnode
+  cells = $cells
+  points = $points
+  epart = $epart
+end
 
 @everywhere function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
   L = .1
@@ -103,7 +105,9 @@ md = zeros(Int, ndom)
 for idom in 1:ndom
   md[idom] = size(domain[idom].ϕ)[2]
 end
-bcast(md, procs())
+
+# Broadcast numbers of local modes retained
+@everywhere md = $md
 
 printlnln("pll_do_global_mass_covariance_reduced_assembly ...")
 @time begin
