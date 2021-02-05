@@ -1,14 +1,15 @@
 using Distributed
 
-#addprocs(([("marcel", 4)]), tunnel=true)
-#addprocs(([("hector", 6)]), tunnel=true)
-#addprocs(([("lucien", 8)]), tunnel=true, max_parallel=30)
-addprocs(([("lucien", 3)]), tunnel=true, max_parallel=30)
-#addprocs(([("andrew", 3)]), tunnel=true)
-#addprocs(([("venkovic@moorcock", 6)]), tunnel=true,
+addprocs(([("lucien", :auto)]), tunnel=true, topology=:master_worker)
+addprocs(([("hector", :auto)]), tunnel=true, topology=:master_worker)
+#addprocs(([("marcel", :auto)]), tunnel=true, topology=:master_worker)
+#addprocs(([("andrew", :auto)]), tunnel=true, topology=:master_worker)
+#addprocs(([("celine", :auto)]), tunnel=true, topology=:master_worker)
+#addprocs(([("venkovic@moorcock", :auto)]), tunnel=true,
 #             dir="/home/venkovic/Dropbox/Git/julia-fem/",
-#             exename="/home/venkovic/julia-1.5.3/bin/julia")
-addprocs(3) # Add procs after remote hosts due to issue with ClusterManagers
+#             exename="/home/venkovic/julia-1.5.3/bin/julia",
+#             topology=:master_worker)
+#addprocs(Sys.CPU_THREADS) # Add local procs after remote hosts' to avoid issues of ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
@@ -32,7 +33,7 @@ end
 using NPZ: npzwrite
 
 @everywhere begin
-  ndom = 20
+  ndom = 40
   nev = 40
   tentative_nnode = 20_000
   forget = 1e-6
@@ -100,7 +101,6 @@ for idom in 1:ndom
   global energy_expected += domain[idom].energy
 end
 
-# Count number of local modes retained in each subdomain
 md = zeros(Int, ndom) 
 for idom in 1:ndom
   md[idom] = size(domain[idom].ϕ)[2]
