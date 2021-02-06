@@ -2,7 +2,7 @@ struct BJop
   n::Int
   nb::Int
   bsize::Int
-  chol::Vector{Factor{T}}
+  chol::Vector{SuiteSparse.CHOLMOD.Factor{T}}
 end
 
 function slice(i::Int, nb::Int, bsize::Int, n::Int)
