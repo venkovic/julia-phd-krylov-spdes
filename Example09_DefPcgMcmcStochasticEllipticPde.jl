@@ -9,8 +9,8 @@ using Fem
 using RecyclingKrylovSolvers: cg, pcg, defpcg, eigpcg, eigdefpcg
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
 using MyPreconditioners: BJPreconditioner, BJop,
-                         Chol32Preconditioner,
-                         Chol16Preconditioner
+                         Cholesky16, get_cholesky16,
+                         Cholesky32, get_cholesky32
 
 using Utils: space_println, printlnln
 
@@ -104,7 +104,7 @@ printlnln("prepare bj_0 preconditioner for A_0 ...")
 Π_bj_0 = @time BJPreconditioner(nbj, A_0);
 
 printlnln("prepare chol16_0 preconditioner for A_0 ...")
-Π_chol16_0 = @time Chol16Preconditioner(A_0);
+Π_chol16_0 = @time get_cholesky16(A_0);
 
 #
 # Load kl representation and prepare mcmc sampler
@@ -118,7 +118,7 @@ sampler = prepare_mcmc_sampler(Λ, Ψ)
 function test01(Π_amg_0,
                 Π_lorasc_0::LorascPreconditioner,
                 Π_bj_0::BJop,
-                Π_chol16_0::SuiteSparse.CHOLMOD.Factor{Float64},
+                Π_chol16_0::Cholesky16,
                 sampler::McmcSampler,
                 verbose::Bool,
                 do_lorasc_0_pcg::Bool,
