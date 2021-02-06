@@ -5,7 +5,8 @@ end
 function get_cholesky16(A::SparseMatrixCSC{T})
   A = SparseMatrixCSC{T16,Int64}(A)
   chol = cholesky(A)
-  #return chol
+  # return chol
+  # see issue in julia-1.5.3/share/julia/stdlib/v1.5/SuiteSparse/src/cholmod.jl
   return Cholesky16(chol)
 end
 
