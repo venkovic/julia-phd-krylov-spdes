@@ -1,3 +1,6 @@
+# Low precision wrappers for sparse Cholesky factorizations.
+# Note that SuiteSparse.CHOLMOD does not support mixed precision.
+
 struct Cholesky16 
   chol::SuiteSparse.CHOLMOD.Factor{T}
 end
@@ -53,4 +56,3 @@ function LinearAlgebra.ldiv!(Πchol32::Cholesky32,
                              r::Array{Float64,1})
   r .= Πchol32.chol \ Array{Float32,1}(r)
 end
-
