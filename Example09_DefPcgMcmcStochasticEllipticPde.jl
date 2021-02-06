@@ -20,7 +20,7 @@ using LinearMaps: LinearMap
 import SuiteSparse
 
 
-tentative_nnode = 50_000
+tentative_nnode = 20_000
 load_existing_mesh = false
 
 ndom = 40
@@ -31,11 +31,13 @@ nbj = ndom
 nvec = ndom + 5
 spdim = floor(Int, 2 * nvec)
 
+do_amg_0_pcg = false
 do_lorasc_0_pcg = false
 verbose = true
 
 nsmp = 30
 seed!(481_456)
+nchains = 10
 
 model = "SExp"
 sig2 = 1.
@@ -113,22 +115,27 @@ M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
                                               
-sampler = prepare_mcmc_sampler(Λ, Ψ)
-
-function test01(Π_amg_0,
-                Π_lorasc_0::LorascPreconditioner,
-                Π_bj_0::BJop,
-                Π_chol16_0::Cholesky16,
-                sampler::McmcSampler,
-                verbose::Bool,
-                do_lorasc_0_pcg::Bool,
-                nsmp::Int)
+function test_one_chain_01(Π_amg_0,
+                           Π_lorasc_0::LorascPreconditioner,
+                           Π_bj_0::BJop,
+                           Π_chol16_0::Cholesky16,
+                           verbose::Bool,
+                           do_amg_0_pcg::Bool,
+                           do_lorasc_0_pcg::Bool,
+                           nsmp::Int,
+                           Λ::Array{Float64,1},
+                           Ψ::Array{Float64,2};
+                           save_pcg_results=false)
   
+  sampler = prepare_mcmc_sampler(Λ, Ψ)
+
   ndom, = size(Π_lorasc_0.x_Id)
-  methods = ["amg_0-pcg",
+  methods = ["amg_0-eigdefpcg",
              "lorasc$(ndom)_0-eigdefpcg",
              "bj$(nbj)_0-eigdefpcg",
              "chol16_0-eigdefpcg"]
+  do_amg_0_pcg ? push!(methods, "amg_0-pcg") : nothing
+  do_lorasc_0_pcg ? push!(methods, "lorasc$(ndom)_0-pcg") : nothing
 
   iter = Dict{String,Array{Int,1}}()
   for method in methods
@@ -147,18 +154,26 @@ function test01(Π_amg_0,
 
   x = zeros(Float64, A.n)
 
-  verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
-  Δt = @elapsed _, it, _  = pcg(A, b, M=Π_amg_0)
-  verbose ? println("$Δt seconds, iter = $it") : nothing
-  iter["amg_0-pcg"][1] = it
-
+  if do_amg_0_pcg
+    verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
+    Δt = @elapsed _, it, _  = pcg(A, b, M=Π_amg_0)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["amg_0-pcg"][1] = it
+  end
+  
   if do_lorasc_0_pcg
-    print("lorasc$(ndom)_0-pcg solve of A * u = b ...")
+    verbose ? print("lorasc$(ndom)_0-pcg solve of A * u = b ...") : nothing
     Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
     verbose ? println("$Δt seconds, iter = $it") : nothing
   end
 
+  print("amg_0-eigpcg solve of A * u = b ...")
+  Δt = @elapsed _, it, _, W_amg = eigpcg(A, b, x, Π_amg_0, nvec, spdim)
+  verbose ? println("$Δt seconds, iter = $it") : nothing
+  iter["amg_0-eigdefpcg"][1] = it
+
   print("lorasc_0-eigpcg solve of A * u = b ...")
+  x .= 0.
   Δt = @elapsed _, it, _, W_lorasc = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
   iter["lorasc$(ndom)_0-eigdefpcg"][1] = it
@@ -196,16 +211,24 @@ function test01(Π_amg_0,
                                                       f, uexact)
     verbose ? println("$Δt seconds") : nothing
 
-    verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
-    Δt = @elapsed _, it, _ = pcg(A, b, M=Π_amg_0)
-    verbose ? println("$Δt seconds, iter = $it") : nothing
-    iter["amg_0-pcg"][s] = it
+    if do_amg_0_pcg
+      verbose ? print("amg_0-pcg of A * u = b ... ") : nothing
+      Δt = @elapsed _, it, _ = pcg(A, b, M=Π_amg_0)
+      verbose ? println("$Δt seconds, iter = $it") : nothing
+      iter["amg_0-pcg"][s] = it
+    end
 
     if do_lorasc_0_pcg
       print("lorasc$(ndom)_0-pcg solve of A * u = b ...")
       Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
       verbose ? println("$Δt seconds, iter = $it") : nothing
     end
+
+    print("amg_0-eigdefpcg solve of A * u = b ...")
+    x .= 0.
+    Δt = @elapsed _, it, _, W_amg = eigdefpcg(A, b, x, Π_amg_0, W_amg, spdim)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["amg_0-eigdefpcg"][s] = it
 
     print("lorasc$(ndom)_0-eigdefpcg solve of A * u = b ...")
     x .= 0.
@@ -226,21 +249,79 @@ function test01(Π_amg_0,
     iter["chol16_0-eigdefpcg"][s] = it
   end
 
-  npzwrite("data/test01_$(root_fname)_amg_0-pcg.it.npz",
-           iter["amg_0-pcg"])
-  npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
-           iter["lorasc$(ndom)_0-eigdefpcg"])
-  npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
-           iter["bj$(nbj)_0-eigdefpcg"])
-  npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
-           iter["chol16_0-eigdefpcg"])
+  if save_pcg_results
+    do_amg_0_pcg ? npzwrite("data/test01_$(root_fname)_amg_0-pcg.it.npz",
+                            iter["amg_0-pcg"]) : nothing
+    do_lorasc_0_pcg ? npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-pcg.it.npz",
+                               iter["lorasc$(ndom)_0-pcg"]) : nothing
+    npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+             iter["amg_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+             iter["lorasc$(ndom)_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+             iter["bj$(nbj)_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+             iter["chol16_0-eigdefpcg"])
+  end
+
+  return iter
 end
 
-test01(Π_amg_0,
-       Π_lorasc_0,
-       Π_bj_0,
-       Π_chol16_0,
-       sampler,
-       verbose,
-       do_lorasc_0_pcg,
-       nsmp)
+
+function test_several_chains_01(nchains::Int,
+                                Π_amg_0,
+                                Π_lorasc_0::LorascPreconditioner,
+                                Π_bj_0::BJop,
+                                Π_chol16_0::Cholesky16,
+                                verbose::Bool,
+                                do_amg_0_pcg::Bool,
+                                do_lorasc_0_pcg::Bool,
+                                nsmp::Int,
+                                Λ::Array{Float64,1},
+                                Ψ::Array{Float64,2})
+
+  iters = Dict{String,Array{Int,2}}()
+
+  for ichain in 1:nchains
+    iter = test_one_chain_01(Π_amg_0,
+                             Π_lorasc_0,
+                             Π_bj_0,
+                             Π_chol16_0,
+                             verbose,
+                             do_amg_0_pcg,
+                             do_lorasc_0_pcg,
+                             nsmp,
+                             Λ,
+                             Ψ)
+   
+    for (method, _iter) in iter
+      if haskey(iters, method) 
+        iters[method] = hcat(iters[method], _iter)
+      else
+        iters[method] = reshape(_iter, length(_iter), 1)
+      end
+    end
+                                
+    npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+             iters["amg_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+             iters["lorasc$(ndom)_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+             iters["bj$(nbj)_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+             iters["chol16_0-eigdefpcg"])
+  end
+end
+
+
+test_several_chains_01(nchains,
+                       Π_amg_0,
+                       Π_lorasc_0,
+                       Π_bj_0,
+                       Π_chol16_0,
+                       verbose,
+                       do_amg_0_pcg,
+                       do_lorasc_0_pcg,
+                       nsmp,
+                       Λ,
+                       Ψ)
