@@ -376,7 +376,8 @@ function eigpcg(A::SparseMatrixCSC{T},
       nev = rank(Y) # nvec <= nev <= 2*nvec
       Q = svd(Y).U[:, 1:nev] # spdim-by-nev
       H = Q' * (Tm * Q) # nev-by-nev
-      vals, Z = eigen(H)::Eigen{T,T,Array{T,2},Array{T,1}}
+      #println("H:", typeof(H), ", ", issymmetric(H))
+      vals, Z = eigen(Symmetric(H))::Eigen{T,T,Array{T,2},Array{T,1}}
       V[:, 1:nev] = V * (Q * Z) # n-by-nev
       #
       ivec = nev + 1
@@ -406,7 +407,7 @@ function eigpcg(A::SparseMatrixCSC{T},
       nev = rank(Y[1:ivec, :]) # nvec <= nev <= 2*nvec
       Q = svd(Y[1:ivec, :]).U[:, 1:nev] # ivec-by-nev
       H = Q' * (Tm * Q) # nev-by-nev
-      vals, Z = eigen(H)::Eigen{T,T,Array{T,2},Array{T,1}}
+      vals, Z = eigen(Symmetric(H))::Eigen{T,T,Array{T,2},Array{T,1}}
       V[:, 1:nev] = V[:, 1:ivec] * (Q * Z) # n-by-nev
     else
       println("Warning: Less CG iterations than the number of ",
