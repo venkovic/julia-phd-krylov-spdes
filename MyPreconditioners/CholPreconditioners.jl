@@ -1,5 +1,6 @@
 # Low precision wrappers for sparse Cholesky factorizations.
 # Note that SuiteSparse.CHOLMOD does not support mixed precision.
+# See issues in julia-1.5.3/share/julia/stdlib/v1.5/SuiteSparse/src/cholmod.jl
 
 struct Cholesky16 
   chol::SuiteSparse.CHOLMOD.Factor{T}
@@ -8,8 +9,6 @@ end
 function get_cholesky16(A::SparseMatrixCSC{T})
   A = SparseMatrixCSC{T16,Int64}(A)
   chol = cholesky(A)
-  # return chol
-  # see issue in julia-1.5.3/share/julia/stdlib/v1.5/SuiteSparse/src/cholmod.jl
   return Cholesky16(chol)
 end
 
@@ -37,7 +36,6 @@ end
 function get_cholesky32(A::SparseMatrixCSC{T})
   A = SparseMatrixCSC{T32,Int64}(A)
   chol = cholesky(A)
-  #return chol
   return Cholesky32(chol)
 end
 
