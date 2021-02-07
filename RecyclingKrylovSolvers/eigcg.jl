@@ -308,7 +308,6 @@ Init-PCG: 92, PCG: 259
 Init-PCG: 100, PCG: 257
 ```
 """
-import JLD
 function eigpcg(A::SparseMatrixCSC{T}, 
                 b::Vector{T},
                 x::Vector{T},
