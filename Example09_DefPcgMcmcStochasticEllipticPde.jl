@@ -12,13 +12,12 @@ using MyPreconditioners: BJPreconditioner, BJop,
                          Cholesky16, get_cholesky16,
                          Cholesky32, get_cholesky32
 
-using Utils: space_println, printlnln
+using Utils: space_println, printlnln, save_deflated_system
 
 using NPZ: npzread, npzwrite
 using Random: seed!
 using LinearMaps: LinearMap
 import SuiteSparse
-
 
 tentative_nnode = 200_000
 load_existing_mesh = false
@@ -227,25 +226,45 @@ function test_one_chain_01(Π_amg_0,
 
     print("amg_0-eigdefpcg solve of A * u = b ...")
     x .= 0.
-    Δt = @elapsed _, it, _, W_amg = eigdefpcg(A, b, x, Π_amg_0, W_amg, spdim)
+    try
+      Δt = @elapsed _, it, _, W_amg = eigdefpcg(A, b, x, Π_amg_0, W_amg, spdim)
+    catch
+      Δt = @elapsed _, it, _, W_amg = eigpcg(A, b, x, Π_amg_0, nvec, spdim)
+      save_deflated_system(A, b, W_amg, s, "amg", print_error=true)
+    end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["amg_0-eigdefpcg"][s] = it
 
     print("lorasc$(ndom)_0-eigdefpcg solve of A * u = b ...")
     x .= 0.
-    Δt = @elapsed _, it, _, W_lorasc = eigdefpcg(A, b, x, Π_lorasc_0, W_lorasc, spdim)
+    try
+      Δt = @elapsed _, it, _, W_lorasc = eigdefpcg(A, b, x, Π_lorasc_0, W_lorasc, spdim)
+    catch 
+      Δt = @elapsed _, it, _, W_lorasc = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
+      save_deflated_system(A, b, W_lorasc, s, "lorasc", print_error=true)
+    end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["lorasc$(ndom)_0-eigdefpcg"][s] = it
 
     print("bj$(nbj)_0-eigdefpcg solve of A * u = b ...")
     x .= 0.
-    Δt = @elapsed _, it, _, W_bj = eigdefpcg(A, b, x, Π_bj_0, W_bj, spdim)
+    try
+      Δt = @elapsed _, it, _, W_bJ = eigdefpcg(A, b, x, Π_bJ_0, W_bJ, spdim)
+    catch 
+      Δt = @elapsed _, it, _, W_bJ = eigpcg(A, b, x, Π_bJ_0, nvec, spdim)
+      save_deflated_system(A, b, W_bJ, s, "bJ", print_error=true)
+    end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["bj$(nbj)_0-eigdefpcg"][s] = it
 
     print("chol16_0-eigdefpcg solve of A * u = b ...")
     x .= 0.
-    Δt = @elapsed _, it, _, W_chol16 = eigdefpcg(A, b, x, Π_chol16_0, W_chol16, spdim)
+    try
+      Δt = @elapsed _, it, _, W_chol16 = eigdefpcg(A, b, x, Π_chol16_0, W_chol16, spdim)
+    catch 
+      Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
+      save_deflated_system(A, b, W_chol16, s, "chol16", print_error=true)
+    end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["chol16_0-eigdefpcg"][s] = it
   end
@@ -322,11 +341,6 @@ function test_several_chains_01(nchains::Int,
 end
 
 
-
-
-
-
-
 iters = test_several_chains_01(nchains,
                                Π_amg_0,
                                Π_lorasc_0,
@@ -337,4 +351,4 @@ iters = test_several_chains_01(nchains,
                                do_lorasc_0_pcg,
                                nsmp,
                                Λ,
-                               Ψ
+                               Ψ)
