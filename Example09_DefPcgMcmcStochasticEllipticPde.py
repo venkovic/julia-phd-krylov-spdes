@@ -1,9 +1,6 @@
 import numpy as np
-#import pylab as pl
-import matplotlib.pyplot as pl
+import pylab as pl
 from postproc_utils import get_root_filename
-
-#pl.style.use('seaborn-whitegrid')
 
 #pl.rc('text', usetex=True)
 #pl.rcParams['text.usetex'] = True
