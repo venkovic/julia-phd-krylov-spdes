@@ -20,10 +20,10 @@ using LinearMaps: LinearMap
 import SuiteSparse
 
 
-tentative_nnode = 20_000
+tentative_nnode = 200_000
 load_existing_mesh = false
 
-ndom = 40
+ndom = 20
 load_existing_partition = false
 
 nbj = ndom
@@ -35,9 +35,9 @@ do_amg_0_pcg = false
 do_lorasc_0_pcg = false
 verbose = true
 
-nsmp = 30
+nchains = 50
+nsmp = 10
 seed!(481_456)
-nchains = 10
 
 model = "SExp"
 sig2 = 1.
@@ -165,6 +165,7 @@ function test_one_chain_01(Π_amg_0,
     verbose ? print("lorasc$(ndom)_0-pcg solve of A * u = b ...") : nothing
     Δt = @elapsed _, it, _ = pcg(A, b, M=Π_lorasc_0)
     verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["lorasc$(ndom)_0-pcg"][1] = it
   end
 
   print("amg_0-eigpcg solve of A * u = b ...")
@@ -188,7 +189,7 @@ function test_one_chain_01(Π_amg_0,
   x .= 0.
   Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
-  iter["bj$(nbj)_0-eigdefpcg"][1] = it
+  iter["chol16_0-eigdefpcg"][1] = it
 
   #
   # Sample ξ by mcmc and solve linear systems by def-pcg with 
@@ -283,6 +284,9 @@ function test_several_chains_01(nchains::Int,
   iters = Dict{String,Array{Int,2}}()
 
   for ichain in 1:nchains
+
+    println("\n\nworking on chain $ichain / $nchains ...")
+
     iter = test_one_chain_01(Π_amg_0,
                              Π_lorasc_0,
                              Π_bj_0,
@@ -304,24 +308,28 @@ function test_several_chains_01(nchains::Int,
                                 
     npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
              iters["amg_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+    npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
              iters["lorasc$(ndom)_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+    npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
              iters["bj$(nbj)_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+    npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
              iters["chol16_0-eigdefpcg"])
+
+    println("\n\n ... done working on chain $ichain / $nchains.")
   end
+
+  return iters
 end
 
 
-test_several_chains_01(nchains,
-                       Π_amg_0,
-                       Π_lorasc_0,
-                       Π_bj_0,
-                       Π_chol16_0,
-                       verbose,
-                       do_amg_0_pcg,
-                       do_lorasc_0_pcg,
-                       nsmp,
-                       Λ,
-                       Ψ)
+iters = test_several_chains_01(nchains,
+                               Π_amg_0,
+                               Π_lorasc_0,
+                               Π_bj_0,
+                               Π_chol16_0,
+                               verbose,
+                               do_amg_0_pcg,
+                               do_lorasc_0_pcg,
+                               nsmp,
+                               Λ,
+                               Ψ)
