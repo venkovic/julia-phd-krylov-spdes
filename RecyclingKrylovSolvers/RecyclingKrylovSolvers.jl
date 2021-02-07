@@ -4,6 +4,7 @@ using LinearAlgebra: mul!, axpy!, axpby!, dot, norm2, iszero, Eigen
 using LinearAlgebra: Symmetric, eigvecs, eigen, svd, rank, diagm
 using SparseArrays: SparseMatrixCSC
 using LinearMaps: FunctionMap
+import JLD
 
 export cg, pcg
 export eigcg, eigpcg

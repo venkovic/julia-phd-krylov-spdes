@@ -29,7 +29,7 @@ load_existing_partition = false
 nbj = ndom
 
 nvec = ndom + 5
-spdim = floor(Int, 2 * nvec)
+spdim = floor(Int, 2.5 * nvec)
 
 do_amg_0_pcg = false
 do_lorasc_0_pcg = false
@@ -322,6 +322,11 @@ function test_several_chains_01(nchains::Int,
 end
 
 
+
+
+
+
+
 iters = test_several_chains_01(nchains,
                                Π_amg_0,
                                Π_lorasc_0,
@@ -332,4 +337,4 @@ iters = test_several_chains_01(nchains,
                                do_lorasc_0_pcg,
                                nsmp,
                                Λ,
-                               Ψ)
+                               Ψ
