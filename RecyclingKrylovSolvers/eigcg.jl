@@ -308,6 +308,7 @@ Init-PCG: 92, PCG: 259
 Init-PCG: 100, PCG: 257
 ```
 """
+import JLD
 function eigpcg(A::SparseMatrixCSC{T}, 
                 b::Vector{T},
                 x::Vector{T},
@@ -352,6 +353,14 @@ function eigpcg(A::SparseMatrixCSC{T},
       hlpr = sqrt(rTz)
     end
     rTz = dot(r, z)
+    if rTz < 0
+      I, J, V = findnz(A)
+      JLD.write("A_I.jld", "I", I)
+      JLD.write("A_J.jld", "J", J)
+      JLD.write("A_V.jld", "V", V)
+      JLD.write("b.jld", "b", b)
+      break
+    end
     beta *= rTz
     if ivec == spdim
       tvec -= beta * Ap
