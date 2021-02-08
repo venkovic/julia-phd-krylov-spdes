@@ -35,7 +35,7 @@ do_lorasc_0_pcg = false
 verbose = true
 
 nchains = 50
-nsmp = 10
+nsmp = 5
 seed!(481_456)
 
 model = "SExp"
@@ -249,10 +249,10 @@ function test_one_chain_01(Π_amg_0,
     print("bj$(nbj)_0-eigdefpcg solve of A * u = b ...")
     x .= 0.
     try
-      Δt = @elapsed _, it, _, W_bJ = eigdefpcg(A, b, x, Π_bJ_0, W_bJ, spdim)
+      Δt = @elapsed _, it, _, W_bj = eigdefpcg(A, b, x, Π_bj_0, W_bj, spdim)
     catch 
-      Δt = @elapsed _, it, _, W_bJ = eigpcg(A, b, x, Π_bJ_0, nvec, spdim)
-      save_deflated_system(A, b, W_bJ, s, "bJ", print_error=true)
+      Δt = @elapsed _, it, _, W_bj = eigpcg(A, b, x, Π_bj_0, nvec, spdim)
+      save_deflated_system(A, b, W_bj, s, "bj", print_error=true)
     end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["bj$(nbj)_0-eigdefpcg"][s] = it
@@ -298,7 +298,8 @@ function test_several_chains_01(nchains::Int,
                                 do_lorasc_0_pcg::Bool,
                                 nsmp::Int,
                                 Λ::Array{Float64,1},
-                                Ψ::Array{Float64,2})
+                                Ψ::Array{Float64,2};
+                                save_progressively=false)
 
   iters = Dict{String,Array{Int,2}}()
 
