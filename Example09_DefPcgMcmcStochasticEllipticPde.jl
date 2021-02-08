@@ -229,6 +229,7 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_amg = eigdefpcg(A, b, x, Π_amg_0, W_amg, spdim)
     catch
+      x .= 0.
       Δt = @elapsed _, it, _, W_amg = eigpcg(A, b, x, Π_amg_0, nvec, spdim)
       save_deflated_system(A, b, W_amg, s, "amg", print_error=true)
     end 
@@ -240,6 +241,7 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_lorasc = eigdefpcg(A, b, x, Π_lorasc_0, W_lorasc, spdim)
     catch 
+      x .= 0.
       Δt = @elapsed _, it, _, W_lorasc = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
       save_deflated_system(A, b, W_lorasc, s, "lorasc", print_error=true)
     end 
@@ -251,6 +253,7 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_bj = eigdefpcg(A, b, x, Π_bj_0, W_bj, spdim)
     catch 
+      x .= 0.
       Δt = @elapsed _, it, _, W_bj = eigpcg(A, b, x, Π_bj_0, nvec, spdim)
       save_deflated_system(A, b, W_bj, s, "bj", print_error=true)
     end 
@@ -262,6 +265,7 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_chol16 = eigdefpcg(A, b, x, Π_chol16_0, W_chol16, spdim)
     catch 
+      x .= 0.
       Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
       save_deflated_system(A, b, W_chol16, s, "chol16", print_error=true)
     end 

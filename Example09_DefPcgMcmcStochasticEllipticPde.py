@@ -7,7 +7,7 @@ from postproc_utils import get_root_filename
 #pl.rcParams['text.usetex'] = True
 #pl.rcParams.update(params)
 
-tentative_nnode = 200_000
+tentative_nnode = 20_000
 model = 'SExp'
 L = .1
 sig2 = 1.
@@ -17,7 +17,7 @@ nsmp_max = 4
 
 ndom = 20
 nvec = ndom + 5
-spdim = int(2.5 * nvec)
+spdim = int(2 * nvec)
 nbj = ndom
 
 it_eigdefpcg_amg = np.load("data/test01_%s_amg_0-eigdefpcg_nvec%d_spdim%d.it.npz" % (root_fname, nvec, spdim))
@@ -40,25 +40,25 @@ axes.errorbar(svals, np.mean(it_eigdefpcg_bj[:nsmp, :], axis=1), yerr=np.std(it_
               fmt='', lw=1,
               marker='s', ms=4,
               capsize=3, capthick=1.5,
-              elinewidth=0.8)
+              elinewidth=1.1)
 axes.errorbar(svals, np.mean(it_eigdefpcg_lorasc[:nsmp, :], axis=1), yerr=np.std(it_eigdefpcg_lorasc[:nsmp, :], axis=1),
               label='lorasc%d-eigdefpcg' % ndom,
               fmt='', lw=1,
               marker='^', ms=4,
               capsize=3, capthick=1.5,
-              elinewidth=0.8)
+              elinewidth=1.1)
 axes.errorbar(svals, np.mean(it_eigdefpcg_amg[:nsmp, :], axis=1), yerr=np.std(it_eigdefpcg_amg[:nsmp, :], axis=1),
               label='amg-eigdefpcg',
               fmt='', lw=1,
               marker='D', ms=4,
               capsize=3, capthick=1.5,
-              elinewidth=0.8)
+              elinewidth=1.1)
 axes.errorbar(svals, np.mean(it_eigdefpcg_chol16[:nsmp, :], axis=1), yerr=np.std(it_eigdefpcg_chol16[:nsmp, :], axis=1),
               label='chol16-eigdefpcg',
               fmt='', lw=1,
               marker='o', ms=4,
               capsize=3, capthick=1.5,
-              elinewidth=0.8)
+              elinewidth=1.1)
 
 axes.xaxis.set_major_locator(MaxNLocator(integer=True))
 
