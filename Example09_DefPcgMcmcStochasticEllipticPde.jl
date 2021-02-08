@@ -113,6 +113,8 @@ printlnln("prepare chol16_0 preconditioner for A_0 ...")
 M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
+
+flush(stdout)
                                               
 function test_one_chain_01(Π_amg_0,
                            Π_lorasc_0::LorascPreconditioner,
@@ -271,6 +273,8 @@ function test_one_chain_01(Π_amg_0,
     end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["chol16_0-eigdefpcg"][s] = it
+
+    flush(stdout)
   end
 
   if save_pcg_results
