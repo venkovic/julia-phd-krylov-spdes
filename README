@@ -7,7 +7,7 @@ Dependencies:
     $ export PATH="$PATH:/path/to/<Julia directory>/bin"
     $ source ~/.bashrc
 
- 2. build-tools
+ 2. build-tools (to build TriangleMesh.jl)
     $ sudo apt-get update && sudo apt-get install build-essential
  
  3. metis
@@ -15,7 +15,7 @@ Dependencies:
 
 Change julia worker timeout (on each machine)
 Modify and add following line to ~/.bashrc
-$ export JULIA_WORKER_TIMEOUT=10000.
+$ export JULIA_WORKER_TIMEOUT=172800
 
 Launch examples as follows:
 $ nohup time julia <NameOfExample.jl> 1> sim.out 2> err.out &
