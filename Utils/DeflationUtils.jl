@@ -5,7 +5,7 @@ function save_deflated_system(A::SparseMatrixCSC{Float64,Int},
                               precond_id::String;
                               print_error=false)
   
-  I, J, V = sparse(A)
+  I, J, V = findnz(A)
   
   JLD.save("data/A_$(s)_I.jld", "I", I)
   JLD.save("data/A_$(s)_J.jld", "J", J)

@@ -1,6 +1,6 @@
 module Utils
   
-  using SparseArrays: SparseMatrixCSC
+  using SparseArrays: SparseMatrixCSC, findnz
   import JLD
 
   # from PrintUtils.jl,
