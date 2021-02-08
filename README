@@ -1,24 +1,26 @@
-Dependencies:
+Instructions:
 
- 1. julia
+ 1. install julia
     $ wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
     $ tar zxvf julia-1.5.3-linux-x86_64.tar.gz
     modify ~/.bashrc and add to PATH 
     $ export PATH="$PATH:/path/to/<Julia directory>/bin"
     $ source ~/.bashrc
 
- 2. build-tools (to build TriangleMesh.jl)
+ 2. install build-tools (necessary to build TriangleMesh.jl)
     $ sudo apt-get update && sudo apt-get install build-essential
  
- 3. metis
+ 3. install metis
     $ sudo apt-get install metis
 
-Change julia worker timeout (on each machine)
-Modify and add following line to ~/.bashrc
-$ export JULIA_WORKER_TIMEOUT=172800
+ 4. Change julia worker timeout on each machine.
+    For 48 hrs, modify and add following line to ~/.bashrc
+    $ export JULIA_WORKER_TIMEOUT=172800
 
-Launch examples as follows:
-$ nohup time julia <NameOfExample.jl> 1> sim.out 2> err.out &
+ 5. Set-up passwordless ssh between all machines.
+
+ 6. Launch examples as follows:
+    $ nohup time julia <NameOfExample.jl> 1> sim.out 2> err.out &
 
 
 Description of examples:
