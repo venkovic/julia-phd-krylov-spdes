@@ -12,14 +12,16 @@ using MyPreconditioners: BJPreconditioner, BJop,
                          Cholesky16, get_cholesky16,
                          Cholesky32, get_cholesky32
 
-using Utils: space_println, printlnln, save_deflated_system
+using Utils: space_println, printlnln, 
+             save_deflated_system, save_system,
+             load_system 
 
 using NPZ: npzread, npzwrite
 using Random: seed!
 using LinearMaps: LinearMap
 import SuiteSparse
 
-tentative_nnode = 200_000
+tentative_nnode = 20_000
 load_existing_mesh = false
 
 ndom = 20
@@ -88,6 +90,7 @@ A_0, _ = @time do_isotropic_elliptic_assembly(cells, points,
 
 printlnln("prepare amg_0 preconditioner for A_0 ...")
 Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
+flush(stdout)
 
 printlnln("prepare_lorasc_precond for A_0 ...")
 Π_lorasc_0 = @time prepare_lorasc_precond(tentative_nnode,
@@ -100,12 +103,15 @@ printlnln("prepare_lorasc_precond for A_0 ...")
                                           not_dirichlet_inds_g2l,
                                           f,
                                           uexact)
+flush(stdout)
 
 printlnln("prepare bj_0 preconditioner for A_0 ...")
 Π_bj_0 = @time BJPreconditioner(nbj, A_0);
+flush(stdout)
 
 printlnln("prepare chol16_0 preconditioner for A_0 ...")
 Π_chol16_0 = @time get_cholesky16(A_0);
+flush(stdout)
 
 #
 # Load kl representation and prepare mcmc sampler
@@ -114,8 +120,6 @@ M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
 
-flush(stdout)
-                                              
 function test_one_chain_01(Π_amg_0,
                            Π_lorasc_0::LorascPreconditioner,
                            Π_bj_0::BJop,
@@ -152,6 +156,7 @@ function test_one_chain_01(Π_amg_0,
                                                       exp.(sampler.g),
                                                       f, uexact)
   verbose ? println("$Δt seconds") : nothing
+  save_system(A, b)
 
   x = zeros(Float64, A.n)
 
@@ -173,24 +178,28 @@ function test_one_chain_01(Π_amg_0,
   Δt = @elapsed _, it, _, W_amg = eigpcg(A, b, x, Π_amg_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
   iter["amg_0-eigdefpcg"][1] = it
+  flush(stdout)
 
   print("lorasc_0-eigpcg solve of A * u = b ...")
   x .= 0.
   Δt = @elapsed _, it, _, W_lorasc = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
   iter["lorasc$(ndom)_0-eigdefpcg"][1] = it
-
+  flush(stdout)
+  
   print("bj_0-eigpcg solve of A * u = b ...")
   x .= 0.
   Δt = @elapsed _, it, _, W_bj = eigpcg(A, b, x, Π_bj_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
   iter["bj$(nbj)_0-eigdefpcg"][1] = it
+  flush(stdout)
 
   print("chol16_0-eigpcg solve of A * u = b ...")
   x .= 0.
   Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
   verbose ? println("$Δt seconds, iter = $it") : nothing
   iter["chol16_0-eigdefpcg"][1] = it
+  flush(stdout)
 
   #
   # Sample ξ by mcmc and solve linear systems by def-pcg with 
@@ -274,7 +283,6 @@ function test_one_chain_01(Π_amg_0,
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["chol16_0-eigdefpcg"][s] = it
 
-    flush(stdout)
   end
 
   if save_pcg_results
@@ -334,14 +342,14 @@ function test_several_chains_01(nchains::Int,
       end
     end
                                 
-    npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-             iters["amg_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-             iters["lorasc$(ndom)_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-             iters["bj$(nbj)_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-             iters["chol16_0-eigdefpcg"])
+    #npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+    #         iters["amg_0-eigdefpcg"])
+    #npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+    #         iters["lorasc$(ndom)_0-eigdefpcg"])
+    #npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+    #         iters["bj$(nbj)_0-eigdefpcg"])
+    #npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+    #         iters["chol16_0-eigdefpcg"])
 
     println("\n\n ... done working on chain $ichain / $nchains.")
   end
