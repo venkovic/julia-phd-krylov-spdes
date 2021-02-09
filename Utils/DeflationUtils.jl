@@ -20,3 +20,29 @@ function save_deflated_system(A::SparseMatrixCSC{Float64,Int},
              data was saved for further investigation")
   end
 end
+
+
+function save_system(A::SparseMatrixCSC{Float64,Int},
+                     b::Array{Float64,1})
+
+  I, J, V = findnz(A)
+
+  JLD.save("data/A_I.jld", "I", I)
+  JLD.save("data/A_J.jld", "J", J)
+  JLD.save("data/A_V.jld", "V", V)
+
+  JLD.save("data/b.jld", "b", b)
+end
+
+
+function load_system(;fname="")
+
+  I = JLD.load("data/A_I.jld", "I")
+  J = JLD.load("data/A_J.jld", "J")
+  V = JLD.load("data/A_V.jld", "V")
+  A = sparse(I, J, V)
+
+  b = JLD.load("data/b.jld", "b")
+
+  return A, b
+end

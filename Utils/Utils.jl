@@ -1,6 +1,6 @@
 module Utils
   
-  using SparseArrays: SparseMatrixCSC, findnz
+  using SparseArrays: SparseMatrixCSC, findnz, sparse
   import JLD
 
   # from PrintUtils.jl,
@@ -8,6 +8,7 @@ module Utils
   export space_println
 
   # from DeflationUtils.jl,
+  export save_system, load_system
   export save_deflated_system
 
   include("PrintUtils.jl")
