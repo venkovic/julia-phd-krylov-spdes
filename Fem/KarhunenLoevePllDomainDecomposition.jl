@@ -243,7 +243,8 @@ end
 function solve_global_reduced_kl(nnode::Int,
                                  K::Array{Float64,2},
                                  energy_expected::Float64,
-                                 domain::Dict{Int,SubDomain};
+                                 domain::Union{Dict{Int,SubDomain},
+                                               Array{SubDomain,1}};
                                  relative=.99)
     
   Ksym = LinearAlgebra.Symmetric(K)
