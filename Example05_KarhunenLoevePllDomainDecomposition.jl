@@ -1,15 +1,15 @@
 using Distributed
 
-addprocs(([("lucien", :auto)]), tunnel=true, topology=:master_worker)
-addprocs(([("hector", :auto)]), tunnel=true, topology=:master_worker)
-#addprocs(([("marcel", :auto)]), tunnel=true, topology=:master_worker)
+#addprocs(([("nicolas@lucien", :auto)]), tunnel=true, topology=:master_worker)
+#addprocs(([("hector", :auto)]), tunnel=true, topology=:master_worker)
+addprocs(([("nicolas@marcel", :auto)]), tunnel=true, topology=:master_worker)
 #addprocs(([("andrew", :auto)]), tunnel=true, topology=:master_worker)
 #addprocs(([("celine", :auto)]), tunnel=true, topology=:master_worker)
 #addprocs(([("venkovic@moorcock", :auto)]), tunnel=true,
 #             dir="/home/venkovic/Dropbox/Git/julia-fem/",
 #             exename="/home/venkovic/julia-1.5.3/bin/julia",
 #             topology=:master_worker)
-addprocs(Sys.CPU_THREADS - 2, topology=:master_worker) # Add local procs after remote procs to avoid issues with ClusterManagers
+addprocs(Sys.CPU_THREADS, topology=:master_worker) # Add local procs after remote procs to avoid issues with ClusterManagers
 
 @everywhere begin
   push!(LOAD_PATH, "./Fem/")
@@ -87,11 +87,20 @@ space_println("nnode = $(size(points)[2])")
 space_println("nel = $(size(cells)[2])")
 
 printlnln("pll_solve_local_kl ...")
-@time domain = @sync @distributed merge! for idom in 1:ndom
-  relative_local, _ = suggest_parameters(nnode)
-  pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
-                     relative=relative_local)
-end
+#@time domain = @sync @distributed merge! for idom in 1:ndom
+#  relative_local, _ = suggest_parameters(nnode)
+#  pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
+#                     relative=relative_local)
+#end
+relative_local, _ = suggest_parameters(nnode)
+domain = pmap(idom -> pll_solve_local_kl(cells,
+                                         points,
+                                         epart,
+                                         cov,
+                                         nev,
+                                         idom,
+                                         relative=relative_local),
+              1:ndom)
 println("... done with pll_solve_local_kl.")
 
 energy_expected = 0.
@@ -109,12 +118,21 @@ end
 
 printlnln("pll_do_global_mass_covariance_reduced_assembly ...")
 @time begin
-  K = @sync @distributed (+) for idom in 1:ndom
-  pll_do_global_mass_covariance_reduced_assembly(cells, points, 
-                                                 domain, idom, md, cov,
-                                                 forget=forget)
-  end
+  #K = @sync @distributed (+) for idom in 1:ndom
+  #pll_do_global_mass_covariance_reduced_assembly(cells, points, 
+  #                                               domain, idom, md, cov,
+  #                                               forget=forget)
+  #end
+  Kd = pmap(idom -> pll_do_global_mass_covariance_reduced_assembly(cells,
+                                                                   points,
+                                                                   domain,
+                                                                   idom,
+                                                                   md, 
+                                                                   cov,
+                                                                   forget=forget),
+            1:ndom)
 end
+K = reduce(+, Kd)
 println("... done with pll_do_global_mass_covariance_reduced_assembly.")
 
 printlnln("solve_global_reduced_kl ...")
