@@ -270,7 +270,8 @@ end
 
 function project_on_mesh(nnode::Int,
                          Φ::Array{Float64,2},
-                         domain:: Dict{Int,SubDomain})
+                         domain::Union{Dict{Int,SubDomain},
+                                       Array{SubDomain,1}})
 
   ndom = length(domain) # Number of subdomains
   _, nmodes = size(Φ) # Number of reduced modes
