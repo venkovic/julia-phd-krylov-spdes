@@ -14,7 +14,8 @@ end
 
 function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                         points::Array{Float64,2},
-                                                        domain::Dict{Int,SubDomain},
+                                                        domain::Union{Dict{Int,SubDomain},
+                                                                      Array{SubDomain,1}},
                                                         idom::Int,
                                                         md::Array{Int,1},
                                                         cov::Function;
@@ -223,12 +224,19 @@ function pll_solve_local_kl(cells::Array{Int,2},
   str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
   println("$str relative energy")
 
-  return Dict(idom => SubDomain(inds_g2l,
-                                inds_l2g,
-                                elems,
-                                ϕ[:, 1:nvec],
-                                center,
-                                energy_expected / relative))
+  #return Dict(idom => SubDomain(inds_g2l,
+  #                              inds_l2g,
+  #                              elems,
+  #                              ϕ[:, 1:nvec],
+  #                              center,
+  #                              energy_expected / relative))
+
+  return SubDomain(inds_g2l,
+                   inds_l2g,
+                   elems,
+                   ϕ[:, 1:nvec],
+                   center,
+                   energy_expected / relative)
 end
 
 
