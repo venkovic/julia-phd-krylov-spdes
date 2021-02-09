@@ -268,6 +268,36 @@ function solve_global_reduced_kl(nnode::Int,
   return Λ[1:nvec], Ψ
 end
 
+
+function compute_kl();
+              prebatch=true,
+              verbose=true)
+
+  printlnln("pll_solve_local_kl ...")
+
+
+  if true
+    @time domain = @sync @distributed merge! for idom in 1:ndom
+      relative_local, _ = suggest_parameters(nnode)
+      pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
+                         relative=relative_local)
+    end
+
+  else
+    relative_local, _ = suggest_parameters(nnode)
+    domain = pmap(idom -> pll_solve_local_kl(cells,
+                                             points,
+                                             epart,
+                                             cov,
+                                             nev,
+                                             idom,
+                                             relative=relative_local),
+                  1:ndom)
+    println("... done with pll_solve_local_kl.")
+  end
+end
+
+
 function project_on_mesh(nnode::Int,
                          Φ::Array{Float64,2},
                          domain::Union{Dict{Int,SubDomain},
