@@ -31,7 +31,8 @@ function dynamic_mapreduce!(func::Function,
                             redop::Function,
                             coll::Array{Int,1},
                             K::Array{Float64,2};
-                            verbose=true)
+                            verbose=true,
+                            Δt=2.)
  
   njobs = length(coll)
   
@@ -47,7 +48,7 @@ function dynamic_mapreduce!(func::Function,
 
   while length(done_jobs_id) < njobs
     
-    sleep(2)
+    sleep(Δt)
 
     # Loop over running jobs
     for (worker, job_id) in running_jobs_id
@@ -99,10 +100,10 @@ function dynamic_mapreduce!(func::Function,
 
         # Status non-treated yet
         else
-          println("worker $worker ended job $job_id with status $(running_jobs[worker].state).")
+          println("worker $worker stopped running $job_id with status $(running_jobs[worker].state).")
         end        
       end
-      
+
     end # for (worker, job_id)
   end # while length(done_jobs_id) < njobs
 
