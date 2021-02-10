@@ -86,16 +86,20 @@ function dynamic_mapreduce!(func::Function,
           running_jobs_id[worker] = 0
 
         # Worker failed at completing its job
-        elseif running_jobs[job_id].state == :failed
+        elseif running_jobs[worker].state == :failed
           println("worker $worker failed to complete job $job_id.")
           enqueue!(pending_jobs_id, new_job_id)
+        
+        # Status non-treated yet
+        else
+          println("worker $worker ended job $job_id with status $(running_jobs[worker].state).")
         end
+
       end
 
     end # for (worker, job_id)
   end # while length(done_jobs_id) < njobs
 
-  return K
 end
   
 #n = 2_000
