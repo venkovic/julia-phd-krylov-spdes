@@ -1,5 +1,11 @@
 module Fem
 
+using Distributed
+import Arpack
+using LinearAlgebra
+using SparseArrays
+using NPZ: npzwrite
+ 
 # from Mesh.jl
 export get_mesh,
        save_mesh,
@@ -79,11 +85,15 @@ export draw,
 # from KarhunenLoevePllDomainDecomposition.jl, 
 export pll_do_global_mass_covariance_reduced_assembly
 export pll_solve_local_kl
+export pll_compute_kl
 export pll_draw
 
 # from KarhunenLoeveDomainDecompositionHelper.jl
 export suggest_parameters
 export get_root_filename
+
+# from Covariances.jl
+export cov_sexp
 
 # from Samplers.jl,
 export McSampler,
@@ -91,6 +101,15 @@ export McSampler,
 export McmcSampler,
        prepare_mcmc_sampler
 
+function printlnln(str::String, width=2)
+  println()
+  println(str)
+  print(" " ^ width)
+end
+        
+function space_println(str::String, width=4)
+  println(" " ^ width * str)
+end
 
 include("Mesh.jl")
 include("BoundaryConditions.jl")
@@ -100,5 +119,6 @@ include("KarhunenLoeve.jl")
 include("KarhunenLoeveDomainDecomposition.jl")
 include("KarhunenLoevePllDomainDecomposition.jl")
 include("KarhunenLoeveDomainDecompositionHelper.jl")
+include("Covariances.jl")
 include("Samplers.jl")
 end

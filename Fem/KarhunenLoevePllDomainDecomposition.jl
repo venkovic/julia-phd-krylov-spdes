@@ -1,8 +1,3 @@
-using Distributed
-import Arpack
-using LinearAlgebra
-using SparseArrays
-
 struct SubDomain
   inds_g2l::Dict{Int,Int}  #
   inds_l2g::Vector{Int}    #
@@ -165,7 +160,8 @@ function pll_solve_local_kl(cells::Array{Int,2},
                             cov::Function,
                             nev::Int,
                             idom::Int;
-                            relative=.99)
+                            relative=.99,
+                            prebatch=true)
 
   ndom = maximum(epart) # Number of subdomains
 
@@ -224,19 +220,18 @@ function pll_solve_local_kl(cells::Array{Int,2},
   str *= @sprintf "%.5f" (energy_achieved / energy_expected * relative)
   println("$str relative energy")
 
-  #return Dict(idom => SubDomain(inds_g2l,
-  #                              inds_l2g,
-  #                              elems,
-  #                              ϕ[:, 1:nvec],
-  #                              center,
-  #                              energy_expected / relative))
+  subdomain = SubDomain(inds_g2l,
+              inds_l2g,
+              elems,
+              ϕ[:, 1:nvec],
+              center,
+              energy_expected / relative)
 
-  return SubDomain(inds_g2l,
-                   inds_l2g,
-                   elems,
-                   ϕ[:, 1:nvec],
-                   center,
-                   energy_expected / relative)
+  if prebatch
+    return Dict(idom => subdomain)
+  else
+    return subdomain
+  end
 end
 
 
@@ -269,32 +264,188 @@ function solve_global_reduced_kl(nnode::Int,
 end
 
 
-function compute_kl();
-              prebatch=true,
-              verbose=true)
+"""
+     pll_compute_kl(ndom::Int,
+                    nev::Int,
+                    tentative_nnode::Int,
+                    cov::Function,
+                    root_fname::String;
+                    forget=1e-6,
+                    load_existing_mesh=false,
+                    load_existing_partition=false,
+                    prebatch=true,
+                    verbose=true)
+  
+Function called by the master node to compute a Karhunen-Loeve (KL) by distributed
+domain decomposition.
+  
+Input:
 
-  printlnln("pll_solve_local_kl ...")
+ `ndom::Int`, `ndom > 1`,
+  number of subdomains.
 
+ `nev::Int`, 
+  maximum number of eigenpairs computed for each local KL expansion.
 
-  if true
-    @time domain = @sync @distributed merge! for idom in 1:ndom
-      relative_local, _ = suggest_parameters(nnode)
-      pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
-                         relative=relative_local)
-    end
+ `tentative_nnode`,
+  approximate number of DoFs wanted.
 
+ `cov::Function`,
+  covariance function, must be available everywhere.
+
+ `rootfname::String`
+  filename's root.
+
+ `forget=1e-6`,
+  threshold of covariance between points in distinct subdomains under which
+  subdomain pairs are ignored for the assembly of the reduced global mass
+  covariance matrix. Note that `forget<0` ⟹ all pairs are considered.
+
+ `load_existing_mesh=false`.
+
+ `load_existing_partition=false`.
+
+ `prebatch=true`,
+  loosely refers to how the work load of the distributed loops is defined.
+  If `prebatch==true`, @distributed (op) for loops are used, i.e., the load of each 
+  worker is planned ahead of the loop's execution, which works well for cases with 
+  a small `tentative_nnode`. For cases with a larger `tentative_nnode`, unexpected 
+  worker termination is more likely to happen, in which case the whole computation 
+  fails. We recommend using `prebatch=false`, which consists of using pmap, is more 
+  fault tolerant (? and dynamically dispatches loads to workers ?). There is no julia
+  implementation of distributed mapreduce. Therefore, We need to store local contri-
+  -butions to the global reduced mass covariance matrix. Fortunately, the number of
+  reduced kl modes does not increase with tentative_nnode.
+  
+  `verbose=true`.
+
+Output:
+
+ `ind_Id_g2l::Array{Dict{Int,Int}}`, 
+  conversion tables from global to local indices of nodes strictly inside each subdomain.
+
+ `ind_Γd_g2l::Array{Dict{Int,Int}}`,
+  conversion table from global to local indices of nodes on the interface of each subdomain.
+
+```
+"""
+function pll_compute_kl(ndom::Int,
+                        nev::Int,
+                        tentative_nnode::Int,
+                        cov::Function,
+                        root_fname::String;
+                        forget=1e-6,
+                        load_existing_mesh=false,
+                        load_existing_partition=false,
+                        prebatch=true,
+                        verbose=true)
+   
+  if load_existing_mesh
+    cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
+    _, nnode = size(points)
   else
-    relative_local, _ = suggest_parameters(nnode)
+    mesh = get_mesh(tentative_nnode)
+    save_mesh(mesh, tentative_nnode)
+    cells = mesh.cell
+    points = mesh.point
+    point_markers = mesh.point_marker
+    cell_neighbors = mesh.cell_neighbor
+    _, nnode = size(points)
+  end
+
+  if load_existing_partition
+    epart, npart = load_partition(tentative_nnode, ndom)
+  else
+    epart, npart = mesh_partition(cells, ndom)
+    save_partition(epart, npart, tentative_nnode, ndom)
+  end
+
+  # Broadcast
+  @everywhere begin
+    ndom = $ndom
+    nev = $nev
+    tentative_nnode = $tentative_nnode
+    forget = $forget
+    nnode = $nnode
+    cells = $cells
+    points = $points
+    epart = $epart
+  end  
+
+  if verbose
+    space_println("nnode = $(size(points)[2])")
+    space_println("nel = $(size(cells)[2])")
+  end
+
+  # Get cutoff energy levels
+  relative_local, relative_global = suggest_parameters(nnode)
+
+  verbose ? printlnln("pll_solve_local_kl ...") : nothing
+  if prebatch
+    @time domain = @sync @distributed merge! for idom in 1:ndom
+      pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
+                         relative=relative_local,
+                         prebatch=prebatch)
+    end
+  else
     domain = pmap(idom -> pll_solve_local_kl(cells,
                                              points,
                                              epart,
                                              cov,
                                              nev,
                                              idom,
-                                             relative=relative_local),
+                                             relative=relative_local,
+                                             prebatch=prebatch),
                   1:ndom)
-    println("... done with pll_solve_local_kl.")
   end
+  verbose ? println("... done with pll_solve_local_kl.") : nothing
+
+  energy_expected = 0.
+  for idom in 1:ndom
+    energy_expected += domain[idom].energy
+  end
+
+  # Store number of local modes retained for each subdomain
+  md = zeros(Int, ndom) 
+  for idom in 1:ndom
+    md[idom] = size(domain[idom].ϕ)[2]
+  end
+
+  # Broadcast
+  @everywhere md = $md
+
+  verbose ? printlnln("pll_do_global_mass_covariance_reduced_assembly ...") : nothing
+  @time begin
+    if prebatch
+      K = @sync @distributed (+) for idom in 1:ndom
+      pll_do_global_mass_covariance_reduced_assembly(cells, points, 
+                                                     domain, idom, md, cov,
+                                                     forget=forget)
+      end
+    else
+      Kd = pmap(idom -> pll_do_global_mass_covariance_reduced_assembly(cells,
+                                                                       points,
+                                                                       domain,
+                                                                       idom,
+                                                                       md, 
+                                                                       cov,
+                                                                       forget=forget),
+                1:ndom)
+
+      K = reduce(+, Kd)
+    end
+  end
+  verbose ? println("... done with pll_do_global_mass_covariance_reduced_assembly.") : nothing
+  
+  verbose ? printlnln("solve_global_reduced_kl ...") : nothing
+  Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected, domain, 
+                                       relative=relative_global)
+  verbose ? println("... done with do_global_mass_covariance_reduced_assembly.") : nothing
+
+  npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
+  npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
+
+  return Λ, Ψ
 end
 
 
