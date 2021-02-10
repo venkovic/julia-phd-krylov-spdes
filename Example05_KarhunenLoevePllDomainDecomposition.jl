@@ -10,9 +10,11 @@ add_my_procs(machines, Sys.CPU_THREADS)
   Pkg.activate(".")
 end
 
-@everywhere push!(LOAD_PATH, "./Fem/")
+@everywhere begin
+  push!(LOAD_PATH, "./Utils/")
+  push!(LOAD_PATH, "./Fem/")
+end
 
-push!(LOAD_PATH, "./Utils/")
 using Utils: space_println, printlnln
 
 @everywhere begin 
