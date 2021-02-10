@@ -74,8 +74,11 @@ function dynamic_mapreduce!(func::Function,
       # Worker is (or was) busy
       elseif job_id > 0
 
+        # Get status
+        job_status = running_jobs[worker].state
+        
         # Worker is done
-        if running_jobs[worker].state == :done
+        if job_status == :done
           
           # Fetch and reduce
           K .= redop(K, fetch(running_jobs[worker]))
@@ -86,17 +89,20 @@ function dynamic_mapreduce!(func::Function,
           running_jobs_id[worker] = 0
 
         # Worker failed at completing its job
-        elseif running_jobs[worker].state == :failed
+        elseif job_status == :failed
           println("worker $worker failed to complete job $job_id.")
           enqueue!(pending_jobs_id, new_job_id)
         
+        # Job still running
+        elseif job_status in (:running, :runnable)
+          nothing
+
         # Status non-treated yet
         else
           println("worker $worker ended job $job_id with status $(running_jobs[worker].state).")
-        end
-
+        end        
       end
-
+      
     end # for (worker, job_id)
   end # while length(done_jobs_id) < njobs
 
