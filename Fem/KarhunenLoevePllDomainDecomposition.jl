@@ -327,7 +327,6 @@ Output:
  `ind_Γd_g2l::Array{Dict{Int,Int}}`,
   conversion table from global to local indices of nodes on the interface of each subdomain.
 
-```
 """
 function pll_compute_kl(ndom::Int,
                         nev::Int,
