@@ -1,27 +1,44 @@
 Instructions:
+  
+ 1. On each machine:
 
- 1. install julia
-    $ wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
-    $ tar zxvf julia-1.5.3-linux-x86_64.tar.gz
-    modify ~/.bashrc and add to PATH 
-    $ export PATH="$PATH:/path/to/<Julia directory>/bin"
-    $ source ~/.bashrc
+  1.1 Install julia
+      $ wget https://julialang-s3.julialang.org/bin/linux/x64/1.5/julia-1.5.3-linux-x86_64.tar.gz
+      $ tar zxvf julia-1.5.3-linux-x86_64.tar.gz
+      modify ~/.bashrc by adding  
+       export PATH="$PATH:/path/to/<Julia directory>/bin"
+      $ source ~/.bashrc
 
- 2. install build-tools (necessary to build TriangleMesh.jl)
-    $ sudo apt-get update && sudo apt-get install build-essential
+  1.2 Install build-tools (necessary to build TriangleMesh.jl)
+      $ sudo apt-get update && sudo apt-get install build-essential
  
- 3. install metis
-    $ sudo apt-get install metis
+  1.3 Install metis
+      $ sudo apt-get install metis
 
- 4. Change julia worker timeout on each machine.
-    For 48 hrs, modify and add following line to ~/.bashrc
-    $ export JULIA_WORKER_TIMEOUT=172800
+  1.4 Change julia worker timeout, e.g., for 48 hrs, 
+      modify ~/.bashrc by adding 
+       export variable JULIA_WORKER_TIMEOUT=172800      
+      $ source ~/.bashrc
 
- 5. Set-up passwordless ssh between all machines.
+  1.5 Set-up julia environment and precompile packages/modules
+      $ julia -i Example00_SetUpEnvironment.jl
+      if errors occur, do the following
+      julia> Pkg.resolve()
+      julia> Pkg.instantiate()
+      julia> #precompile
 
- 6. Launch examples as follows:
-    $ nohup time julia <NameOfExample.jl> 1> sim.out 2> err.out &
+  1.6 Type-in machine info in add_my_procs() of PllUtils.jl
 
+ 2. Set-up passwordless ssh between all machines.
+
+ 3. From master node:
+
+  3.1 Create the directories ./data/ and ./img/  
+
+  3.2 Launch example
+  $ nohup time julia <NameOfExample.jl> 1> sim.out 2> err.out &
+
+    
 
 Description of examples:
 
