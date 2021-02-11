@@ -393,7 +393,7 @@ function pll_compute_kl(ndom::Int,
                          pll=pll)
     end
 
-  elseif pll in (:pmap, :dynamic_scheduling)
+  elseif pll == :pmap
     domain = pmap(idom -> pll_solve_local_kl(cells,
                                              points,
                                              epart,
@@ -403,11 +403,18 @@ function pll_compute_kl(ndom::Int,
                                              relative=relative_local,
                                              pll=pll),
                   1:ndom)
-  end
+
+  elseif pll == :dynamic_scheduling
+    domain = Dict{Int,SubDomain}()
+    dynamic_map!(idom -> pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
+                                                  relative=relative_local, pll=pll),
+                 1:ndom, domain)
+
+  end # if pll
 
   if verbose 
     println("... done with pll_solve_local_kl.")
-    fush(stdout)
+    flush(stdout)
   end
 
   energy_expected = 0.

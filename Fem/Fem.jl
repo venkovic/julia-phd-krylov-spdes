@@ -1,5 +1,7 @@
 module Fem
 
+using DataStructures: Queue, enqueue!, dequeue!,
+                      Stack, push!, pop!
 using Utils: dynamic_mapreduce!
 using Distributed
 import Arpack
@@ -122,4 +124,5 @@ include("KarhunenLoevePllDomainDecomposition.jl")
 include("KarhunenLoeveDomainDecompositionHelper.jl")
 include("Covariances.jl")
 include("Samplers.jl")
+include("PllUtils.jl")
 end
