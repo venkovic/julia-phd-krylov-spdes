@@ -5,7 +5,7 @@ function add_my_procs(machines::Array{String,1},
                       n_local_proc::Int)
 
   for machine in machines
-    if machine in ("hector", "lucien", "marcel", "andrew")
+    if machine in ("rejean", "hector", "lucien", "marcel", "andrew")
       addprocs(([("nicolas@$machine", :auto)]), 
                tunnel=true,
                dir="/home/nicolas/Dropbox/Git/julia-fem/",
@@ -21,12 +21,56 @@ function add_my_procs(machines::Array{String,1},
     end
   end
 
-  # Add local procs after remote procs to avoid issues with ClusterManagers
+  # Add local procs after remote procs to avoid issues with ClusterManagers.jl
   addprocs(n_local_proc, topology=:master_worker) 
   
 end
 
 
+"""
+     function dynamic_mapreduce!(func::Function,
+                                 redop::Function,
+                                 coll::Array{Int,1},
+                                 K::Array{Float64,2};
+                                 verbose=true,
+                                 Δt=2.)
+
+
+Does parallel map reduce of arrays with dynamic scheduling. This is an alternative 
+to @distributed (redop) for c in coll, which does static scheduling. Another approach
+consists of reduce(pmap), which requires more memory allocations. 
+
+Input:
+
+ `func::Function`, ``,
+  function used to map the collection of parameters.
+
+ `redop::Function`, 
+  shape-preserving reduction operator, e.g., (+), ...
+
+ `coll::Array{Int,1}`,
+  approximate number of DoFs wanted.
+
+ `K::Array{Float64,2}`,
+  covariance function, must be available everywhere.
+
+ `verbose=true`
+  filename's root.
+
+ `forget=1e-6`,
+  threshold of covariance between points in distinct subdomains under which
+  subdomain pairs are ignored for the assembly of the reduced global mass
+  covariance matrix. Note that `forget<0` ⟹ all pairs are considered.
+
+Output:
+
+ `ind_Id_g2l::Array{Dict{Int,Int}}`, 
+  conversion tables from global to local indices of nodes strictly inside each subdomain.
+
+ `ind_Γd_g2l::Array{Dict{Int,Int}}`,
+  conversion table from global to local indices of nodes on the interface of each subdomain.
+
+"""
 function dynamic_mapreduce!(func::Function,
                             redop::Function,
                             coll::Array{Int,1},
