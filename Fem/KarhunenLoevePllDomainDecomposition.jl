@@ -161,7 +161,7 @@ function pll_solve_local_kl(cells::Array{Int,2},
                             nev::Int,
                             idom::Int;
                             relative=.99,
-                            prebatch=true)
+                            pll=:pmap)
 
   ndom = maximum(epart) # Number of subdomains
 
@@ -227,9 +227,9 @@ function pll_solve_local_kl(cells::Array{Int,2},
               center,
               energy_expected / relative)
 
-  if prebatch
+  if pll == :static_scheduling
     return Dict(idom => subdomain)
-  else
+  else 
     return subdomain
   end
 end
@@ -337,7 +337,7 @@ function pll_compute_kl(ndom::Int,
                         forget=1e-6,
                         load_existing_mesh=false,
                         load_existing_partition=false,
-                        scheduling=:dynamic,
+                        pll=:pmap,
                         verbose=true)
    
   if load_existing_mesh
@@ -385,7 +385,7 @@ function pll_compute_kl(ndom::Int,
     @time domain = @sync @distributed merge! for idom in 1:ndom
       pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
                          relative=relative_local,
-                         prebatch=prebatch)
+                         pll=pll)
     end
 
   elseif pll in (:pmap, :dynamic_scheduling)
@@ -396,7 +396,7 @@ function pll_compute_kl(ndom::Int,
                                              nev,
                                              idom,
                                              relative=relative_local,
-                                             prebatch=prebatch),
+                                             pll=pll),
                   1:ndom)
   end
   verbose ? println("... done with pll_solve_local_kl.") : nothing
