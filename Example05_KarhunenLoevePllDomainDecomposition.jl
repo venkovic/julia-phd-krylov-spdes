@@ -17,7 +17,7 @@ add_my_procs(machines, Sys.CPU_THREADS)
 end
 
 @everywhere begin
-  #push!(LOAD_PATH, "./Utils/")
+  push!(LOAD_PATH, "./Utils/")
   push!(LOAD_PATH, "./Fem/")
 end
 
@@ -47,7 +47,7 @@ root_fname = get_root_filename(model, sig2, L, tentative_nnode)
                       tentative_nnode,
                       cov,
                       root_fname,
-                      pll=:pmap )
+                      pll=:dynamic_scheduling)
 
 printlnln("sample ...")
 ξ, g = @time draw(Λ, Ψ)
