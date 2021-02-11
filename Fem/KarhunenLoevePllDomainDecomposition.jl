@@ -381,7 +381,11 @@ function pll_compute_kl(ndom::Int,
   # Get cutoff energy levels
   relative_local, relative_global = suggest_parameters(nnode)
 
-  verbose ? printlnln("pll_solve_local_kl ...") : nothing
+  if verbose 
+    printlnln("pll_solve_local_kl ...")
+    flush(stdout)
+  end
+
   if pll == :static_scheduling
     @time domain = @sync @distributed merge! for idom in 1:ndom
       pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
@@ -400,7 +404,11 @@ function pll_compute_kl(ndom::Int,
                                              pll=pll),
                   1:ndom)
   end
-  verbose ? println("... done with pll_solve_local_kl.") : nothing
+
+  if verbose 
+    println("... done with pll_solve_local_kl.")
+    fush(stdout)
+  end
 
   energy_expected = 0.
   for idom in 1:ndom
@@ -416,7 +424,11 @@ function pll_compute_kl(ndom::Int,
   # Broadcast
   @everywhere md = $md
 
-  verbose ? printlnln("pll_do_global_mass_covariance_reduced_assembly ...") : nothing
+  if verbose
+    printlnln("pll_do_global_mass_covariance_reduced_assembly ...")
+    flush(stdout)
+  end
+
   @time begin
     K = zeros(Float64, sum(md), sum(md))
 
@@ -451,12 +463,20 @@ function pll_compute_kl(ndom::Int,
     end # if
 
   end # @time
-  verbose ? println("... done with pll_do_global_mass_covariance_reduced_assembly.") : nothing
+
+  if verbose 
+    println("... done with pll_do_global_mass_covariance_reduced_assembly.") : nothing
   
-  verbose ? printlnln("solve_global_reduced_kl ...") : nothing
+    printlnln("solve_global_reduced_kl ...")
+  end
+
   Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected, domain, 
                                        relative=relative_global)
-  verbose ? println("... done with do_global_mass_covariance_reduced_assembly.") : nothing
+  
+  if verbose 
+    println("... done with do_global_mass_covariance_reduced_assembly.")
+    flush(stdout)
+  end
 
   npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
   npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
