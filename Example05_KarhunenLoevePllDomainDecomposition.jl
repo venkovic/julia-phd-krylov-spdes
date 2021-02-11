@@ -1,6 +1,15 @@
 using Distributed
 
-include("PllUtils.jl")
+import Pkg
+Pkg.activate(".")
+
+#include("PllUtils.jl")
+push!(LOAD_PATH, "./Utils/")
+push!(LOAD_PATH, "./Fem/")
+
+using Utils: space_println, printlnln,
+             add_my_procs,
+             dynamic_mapreduce!
 
 machines = ["",]
 add_my_procs(machines, Sys.CPU_THREADS)
@@ -14,8 +23,6 @@ end
   push!(LOAD_PATH, "./Utils/")
   push!(LOAD_PATH, "./Fem/")
 end
-
-using Utils: space_println, printlnln
 
 @everywhere begin 
   using Fem
@@ -33,6 +40,7 @@ model = "SExp"
 sig2 = 1.
 L = .1
 
+"""
 @everywhere cov = (x1, y1, x2, y2) -> cov_sexp(x1, y1, x2, y2, sig2, L)
 
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
@@ -48,5 +56,5 @@ printlnln("sample ...")
 ξ, g = @time draw(Λ, Ψ)
 
 printlnln("sample in place ...")
-@time draw!(Λ, Ψ, ξ, g)
-npzwrite("data/$root_fname.greal.npz", g)
+@time draw!(Λ, Ψ, ξ, g)"""
+#npzwrite("data/$root_fname.greal.npz", g)
