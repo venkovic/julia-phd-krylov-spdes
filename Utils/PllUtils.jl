@@ -1,6 +1,3 @@
-using DataStructures: Queue, enqueue!, dequeue!,
-                      Stack, push!, pop!
-
 function add_my_procs(machines::Array{String,1},
                       n_local_proc::Int)
 
@@ -36,9 +33,22 @@ end
                                  Δt=2.)
 
 
-Does parallel map reduce of arrays with dynamic scheduling. This is an alternative 
-to @distributed (redop) for c in coll, which does static scheduling. Another approach
-consists of reduce(pmap), which requires more memory allocations. 
+Does parallel mapreduce of arrays with dynamic scheduling. This is an alternative to 
+
+K .= @distributed (redop) for c in coll
+  func(c)
+end
+
+which does static scheduling and tends to crash for time consuming and unbalanced work 
+loads. 
+
+Another approach is given by 
+
+reduce(redop, Distributed.pmap(func, K))
+
+which requires to allocate enough memory to store Distributed.pmap(func, K). Since func
+is ***, this becomes a problem when the number of workers and the dimensions of K are 
+increased. 
 
 Input:
 
