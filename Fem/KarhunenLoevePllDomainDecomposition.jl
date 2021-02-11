@@ -14,7 +14,8 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
                                                         idom::Int,
                                                         md::Array{Int,1},
                                                         cov::Function;
-                                                        forget=-1.)
+                                                        forget=-1.,
+                                                        verbose=false)
 
     _, nel = size(cells) # Number of elements
     _, nnode = size(points) # Number of nodes
@@ -148,7 +149,7 @@ function pll_do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
     end # if subdomain are significantly correlated 
   end # for jdom
   
-  println("Done with idom = $idom.")
+  verbose ? println("Done with idom = $idom.") : nothing
   
   return K
 end
