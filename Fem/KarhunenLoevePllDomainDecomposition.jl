@@ -465,16 +465,17 @@ function pll_compute_kl(ndom::Int,
                                                                                 md, 
                                                                                 cov,
                                                                                 forget=forget),
-                         +, 1:ndom, K) 
+                         +, 1:ndom, K)
 
     end # if
 
   end # @time
 
   if verbose 
-    println("... done with pll_do_global_mass_covariance_reduced_assembly.") : nothing
+    println("... done with pll_do_global_mass_covariance_reduced_assembly.")
   
     printlnln("solve_global_reduced_kl ...")
+    flush(stdout)
   end
 
   Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected, domain, 
