@@ -305,8 +305,9 @@ Input:
 
  `load_existing_partition=false`.
 
- `prebatch=true`,
-  loosely refers to how the work load of the distributed loops is defined.
+
+ `pll=:dynamic_scheduling`, `pll ∈ (:dynamic_scheduling, :pmap, :static_scheduling)`,
+  refers to how the work load of the distributed loops is handled.
   If `prebatch==true`, @distributed (op) for loops are used, i.e., the load of each 
   worker is planned ahead of the loop's execution, which works well for cases with 
   a small `tentative_nnode`. For cases with a larger `tentative_nnode`, unexpected 
@@ -336,7 +337,7 @@ function pll_compute_kl(ndom::Int,
                         forget=1e-6,
                         load_existing_mesh=false,
                         load_existing_partition=false,
-                        prebatch=true,
+                        scheduling=:dynamic,
                         verbose=true)
    
   if load_existing_mesh
@@ -380,13 +381,14 @@ function pll_compute_kl(ndom::Int,
   relative_local, relative_global = suggest_parameters(nnode)
 
   verbose ? printlnln("pll_solve_local_kl ...") : nothing
-  if prebatch
+  if pll == :static_scheduling
     @time domain = @sync @distributed merge! for idom in 1:ndom
       pll_solve_local_kl(cells, points, epart, cov, nev, idom, 
                          relative=relative_local,
                          prebatch=prebatch)
     end
-  else
+
+  elseif pll in (:pmap, :dynamic_scheduling)
     domain = pmap(idom -> pll_solve_local_kl(cells,
                                              points,
                                              epart,
@@ -415,13 +417,15 @@ function pll_compute_kl(ndom::Int,
 
   verbose ? printlnln("pll_do_global_mass_covariance_reduced_assembly ...") : nothing
   @time begin
-    if prebatch
+    
+    if pll == :static_scheduling
       K = @sync @distributed (+) for idom in 1:ndom
       pll_do_global_mass_covariance_reduced_assembly(cells, points, 
                                                      domain, idom, md, cov,
                                                      forget=forget)
       end
-    else
+
+    elseif pll == :pmap
       Kd = pmap(idom -> pll_do_global_mass_covariance_reduced_assembly(cells,
                                                                        points,
                                                                        domain,
@@ -430,10 +434,14 @@ function pll_compute_kl(ndom::Int,
                                                                        cov,
                                                                        forget=forget),
                 1:ndom)
-
       K = reduce(+, Kd)
-    end
-  end
+
+    elseif pll == :dynamic_scheduling
+      nothing
+
+    end # if
+
+  end # @time
   verbose ? println("... done with pll_do_global_mass_covariance_reduced_assembly.") : nothing
   
   verbose ? printlnln("solve_global_reduced_kl ...") : nothing
