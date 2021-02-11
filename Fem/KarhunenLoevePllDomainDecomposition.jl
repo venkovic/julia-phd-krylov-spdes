@@ -417,9 +417,10 @@ function pll_compute_kl(ndom::Int,
 
   verbose ? printlnln("pll_do_global_mass_covariance_reduced_assembly ...") : nothing
   @time begin
-    
+    K = zeros(Float64, sum(md), sum(md))
+
     if pll == :static_scheduling
-      K = @sync @distributed (+) for idom in 1:ndom
+      K .= @sync @distributed (+) for idom in 1:ndom
       pll_do_global_mass_covariance_reduced_assembly(cells, points, 
                                                      domain, idom, md, cov,
                                                      forget=forget)
@@ -434,10 +435,17 @@ function pll_compute_kl(ndom::Int,
                                                                        cov,
                                                                        forget=forget),
                 1:ndom)
-      K = reduce(+, Kd)
+      K .= reduce(+, Kd)
 
     elseif pll == :dynamic_scheduling
-      nothing
+      dynamic_mapreduce!(idom -> pll_do_global_mass_covariance_reduced_assembly(cells,
+                                                                                points,
+                                                                                domain,
+                                                                                idom,
+                                                                                md, 
+                                                                                cov,
+                                                                                forget=forget),
+                         +, 1:ndom, K) 
 
     end # if
 

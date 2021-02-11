@@ -83,7 +83,8 @@ Output:
 """
 function dynamic_mapreduce!(func::Function,
                             redop::Function,
-                            coll::Array{Int,1},
+                            coll::Union{UnitRange{Int},  
+                                        Array{Int,1}},
                             K::Array{Float64,2};
                             verbose=true,
                             Δt=2.)
@@ -112,7 +113,7 @@ function dynamic_mapreduce!(func::Function,
         
         # Launch a new job
         new_job_id = dequeue!(pending_jobs_id)
-        new_job = @async remotecall_fetch(func, worker, coll[new_job_id], coll[new_job_id])
+        new_job = @async remotecall_fetch(func, worker, coll[new_job_id])
         
         # New job was successfully launched
         if new_job.state in (:runnable, :running, :done)
@@ -146,7 +147,10 @@ function dynamic_mapreduce!(func::Function,
         # Worker failed at completing its job
         elseif job_status == :failed
           println("worker $worker failed to complete job $job_id.")
-          enqueue!(pending_jobs_id, new_job_id)
+          enqueue!(pending_jobs_id, job_id)
+          
+          # Free worker
+          running_jobs_id[worker] = 0
         
         # Job still running
         elseif job_status in (:running, :runnable)

@@ -1,5 +1,6 @@
 module Fem
 
+using Utils: dynamic_mapreduce!
 using Distributed
 import Arpack
 using LinearAlgebra
