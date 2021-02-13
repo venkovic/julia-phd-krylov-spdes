@@ -168,10 +168,9 @@ function dynamic_mapreduce!(func::Function,
           if cnt_failures[worker] >= nfails_allowed 
             running_jobs_id[worker] = -1
           end
-
         end
 
-      end # if job_id
+      end # if job_id ...
     end # for (worker, job_id)
   end # while length(done_jobs_id) < njobs
 end
