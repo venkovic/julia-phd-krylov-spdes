@@ -14,7 +14,8 @@ Input:
  `func::Function`,
   function used to map the collection of subdomains.
 
- `coll::Array{Int,1}`.
+ `coll::Union{UnitRange{Int},
+              Array{Int,1}}`.
 
  `domains::Dict{Int,SubDomain}`,
   dictionary of subdomains.
