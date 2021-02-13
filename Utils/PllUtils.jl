@@ -87,7 +87,8 @@ function dynamic_mapreduce!(func::Function,
                                         Array{Int,1}},
                             K::Array{Float64,2};
                             verbose=true,
-                            Δt=2.)
+                            Δt=2.,
+                            nfails_allowed=3)
  
   njobs = length(coll)
   
@@ -100,6 +101,8 @@ function dynamic_mapreduce!(func::Function,
 
   running_jobs_id = Dict{Int,Int}(worker => 0 for worker in workers())
   running_jobs = Dict{Int,Task}()
+
+  cnt_failures = Dict{Int,Int}(worker => 0 for worker in workers())
 
   while length(done_jobs_id) < njobs
     
@@ -156,26 +159,19 @@ function dynamic_mapreduce!(func::Function,
           println("worker $worker failed to complete job $job_id.")
           flush(stdout)
           enqueue!(pending_jobs_id, job_id)
-          
+
           # Free worker
           running_jobs_id[worker] = 0
-        
-        # Job still running
-        elseif job_status in (:running, :runnable)
-          nothing
+          cnt_failures[worker] += 1
 
-        # Status non-treated yet
-        else
-          println("worker $worker stopped running $job_id with status $(running_jobs[worker].state).")
-          flush(stdout)
-        end        
-      end
+          # Terminate worker
+          if cnt_failures[worker] >= nfails_allowed 
+            running_jobs_id[worker] = -1
+          end
 
+        end
+
+      end # if job_id
     end # for (worker, job_id)
   end # while length(done_jobs_id) < njobs
-
 end
-  
-#n = 2_000
-#K = zeros(n, n)
-#K = dynamic_mapreduce!(ones, + , [n for _ in 1:20], K)
