@@ -7,7 +7,9 @@ using Distributed
 import Arpack
 using LinearAlgebra
 using SparseArrays
-using NPZ: npzwrite
+import TriangleMesh
+using NPZ: npzread, npzwrite
+using Distributions: MvNormal
  
 # from Mesh.jl
 export get_mesh,

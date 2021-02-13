@@ -1,23 +1,34 @@
-using Distributions: MvNormal
-
-
 struct McSampler
-  n::Int
-  m::Int
+  n::Int # number of DoFs
+  m::Int # number of modes in Karhunen Loeve (KL) expansion
   
-  Ξ::MvNormal{Float64}
-  ξ::Array{Float64,1}
+  Ξ::MvNormal{Float64} # multvariate latent random vector (rv)
+  ξ::Array{Float64,1} # realization of rv
 
-  Λ::Array{Float64,1}
-  Ψ::Array{Float64,2}
-  g::Array{Float64,1}
+  Λ::Array{Float64,1} # dominant eigenvalues of KL expansion
+  Ψ::Array{Float64,2} # eigenvectors of KL expansion stored by columns
+  g::Array{Float64,1} # realization
 end
 
 
 """
-     prepare_mc_sampler(Λ::Array{Float64,1}
+     prepare_mc_sampler(Λ::Array{Float64,1},
                         Ψ::Array{Float64,2})
-        
+
+Prepares and returns instance of McSampler.
+  
+Input:
+
+ `Λ::Array{Float64,1}`,
+  dominant eigenvalues of Karhunen Loeve (KL) expansion.
+
+ `Ψ::Array{Float64,2}`, 
+  eigenvectors of KL expansion stored by columns.
+
+Output:
+
+ Instance of `McSampler`.
+
 """
 function prepare_mc_sampler(Λ::Array{Float64,1},
                             Ψ::Array{Float64,2})
@@ -41,6 +52,12 @@ end
 """
      function draw!(smp::McSampler)
 
+Draws a realization of McSampler in place of smp.g.
+
+Input:
+
+ `smp::McSampler`
+
 """
 function draw!(smp::McSampler)
   smp.ξ .= rand(smp.Ξ)
@@ -52,27 +69,41 @@ end
 
 
 struct McmcSampler
-  n::Int
-  m::Int
+  n::Int # number of DoFs
+  m::Int # number of modes in Karhunen Loeve (KL) expansion
 
-  σ2::Float64
-  Ξ::MvNormal{Float64}
-  ξ::Array{Float64,1}
+  σ2::Float64 # variance
+  Ξ::MvNormal{Float64} # multvariate latent random vector (rv)
+  ξ::Array{Float64,1} # realization of rv
 
-  ϑ2::Float64
-  ΔΧ::MvNormal{Float64}
-  χ::Array{Float64,1}
+  ϑ2::Float64 # variance
+  ΔΧ::MvNormal{Float64} # multvariate latent rv
+  χ::Array{Float64,1} # realization of rv
 
-  Λ::Array{Float64,1}
-  Ψ::Array{Float64,2}
-  g::Array{Float64,1}
+  Λ::Array{Float64,1} # dominant eigenvalues of KL expansion
+  Ψ::Array{Float64,2} # eigenvectors of KL expansion stored by columns
+  g::Array{Float64,1} # realization
 end
 
 
 """
      prepare_mcmc_sampler(Λ::Array{Float64,1}
                           Ψ::Array{Float64,2})
-        
+
+Prepares and returns instance of McSampler.
+  
+Input:
+                          
+ `Λ::Array{Float64,1}`,
+  dominant eigenvalues of Karhunen Loeve (KL) expansion.
+                          
+ `Ψ::Array{Float64,2}`, 
+  eigenvectors of KL expansion stored by columns.
+                          
+Output:
+                          
+  Instance of `McSampler`.
+
 """
 function prepare_mcmc_sampler(Λ::Array{Float64,1},
                               Ψ::Array{Float64,2})
@@ -101,6 +132,12 @@ end
 
 """
      function draw!(smp::McmcSampler)
+
+Draws a realization of McmcSampler in place of smp.g.
+
+Input:
+
+ `smp::McmcSampler`
 
 """
 function draw!(smp::McmcSampler)
