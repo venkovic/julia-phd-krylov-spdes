@@ -1,57 +1,28 @@
 """
-function dynamic_map!(func::Function,
-                      coll::Array{Int,1},
-                      domains::Dict{Int,SubDomain};
-                      verbose=true,
-                      Δt=2.)
+     function dynamic_map!(func::Function,
+                           coll::Union{UnitRange{Int},  
+                                       Array{Int,1}},
+                           domains::Dict{Int,SubDomain};
+                           verbose=true,
+                           Δt=2.)
 
-
-Does parallel mapreduce of arrays with dynamic scheduling. This is an alternative to 
-
-K .= @distributed (redop) for c in coll
-func(c)
-end
-
-which does static scheduling and tends to crash for time consuming and unbalanced work 
-loads. 
-
-Another approach is given by 
-
-reduce(redop, Distributed.pmap(func, K))
-
-which requires to allocate enough memory to store Distributed.pmap(func, K). Since func
-is ***, this becomes a problem when the number of workers and the dimensions of K are 
-increased. 
+Does parallel map from collection `coll` of subdomains with the 
+function `func`, doing a dynamic task scheduling over multiple hosts.
 
 Input:
 
-`func::Function`, ``,
-function used to map the collection of parameters.
+ `func::Function`,
+  function used to map the collection of subdomains.
 
-`redop::Function`, 
-shape-preserving reduction operator, e.g., (+), ...
+ `coll::Array{Int,1}`.
 
-`coll::Array{Int,1}`,
-approximate number of DoFs wanted.
+ `domains::Dict{Int,SubDomain}`,
+  dictionary of subdomains.
 
-`K::Array{Float64,2}`,
-covariance function, must be available everywhere.
+ `verbose=true`.
 
-`verbose=true`
-filename's root.
-
-`forget=1e-6`,
-threshold of covariance between points in distinct subdomains under which
-subdomain pairs are ignored for the assembly of the reduced global mass
-covariance matrix. Note that `forget<0` ⟹ all pairs are considered.
-
-Output:
-
-`ind_Id_g2l::Array{Dict{Int,Int}}`, 
-conversion tables from global to local indices of nodes strictly inside each subdomain.
-
-`ind_Γd_g2l::Array{Dict{Int,Int}}`,
-conversion table from global to local indices of nodes on the interface of each subdomain.
+ `Δt=2.`,
+  time elapsed between checks on workers.
 
 """
 function dynamic_map!(func::Function,
