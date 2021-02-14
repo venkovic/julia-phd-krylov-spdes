@@ -1,15 +1,3 @@
-using DelimitedFiles: readdlm
-using SparseArrays: sparse
-using LinearMaps: LinearMap, FunctionMap
-using Preconditioners: AMGPreconditioner, SmoothedAggregation
-import SuiteSparse
-import LinearAlgebra
-import IterativeSolvers
-import Arpack
-import Preconditioners
-import KrylovKit
-
-
 """
      set_subdomains(cells::Array{Int,2},
                     cell_neighbors::Array{Int,2},

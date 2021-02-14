@@ -1,5 +1,3 @@
-using SparseArrays
-
 """
 get_dirichlet_inds(points::Array{Float64,2}, point_marker::Array{Int,2})
 

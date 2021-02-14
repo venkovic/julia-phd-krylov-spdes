@@ -1,10 +1,3 @@
-using SparseArrays
-import TriangleMesh
-import Distributions
-import LinearAlgebra
-using Printf
-
-
 """
 set_subdomain(mesh::TriangleMesh.TriMesh, epart::Array{Int64,2}, npart::Array{Int64,2})
   

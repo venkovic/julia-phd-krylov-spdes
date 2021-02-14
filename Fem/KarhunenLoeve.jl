@@ -1,7 +1,3 @@
-using SparseArrays
-import Arpack
-using Printf
-
 """
 do_covariance_mass_assembly(cells, points, cov)
 

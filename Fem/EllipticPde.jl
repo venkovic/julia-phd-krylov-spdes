@@ -1,5 +1,3 @@
-using SparseArrays
-
 """
      function do_isotropic_elliptic_assembly(cells::Array{Int,2},
                                              points::Array{Float64,2},
