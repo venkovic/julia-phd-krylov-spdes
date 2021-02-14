@@ -4,23 +4,32 @@
 Returns suggested values for relative_local and relative_global, 
 to be used for the truncation of local and global Karhunen expansions.
 
-(relative_local, relative_global) = (.9993, .995), for a SExp 
-covariance model with sig2=1 and L=0.1, leads to satisfactory results 
-in these cases:
+Input:
 
-  ndom = 400, dev = 25, tentative_nnode =   100_000, forget=1e-6
+`nnode::Int`,
+ number of mesh nodes.
 
-  ndom = 400, dev = 25, tentative_nnode =   200_000, forget=1e-6
+Remarks:
 
-  ndom = 400, dev = 25, tentative_nnode =   400_000, forget=1e-6
+ - (relative_local, relative_global) = (.9993, .995), for a SExp 
+   covariance model with sig2=1 and L=0.1, leads to satisfactory results 
+   in these cases:
+
+   ndom = 400, nev = 25, tentative_nnode =   100_000, forget=1e-6
+
+   ndom = 400, nev = 25, tentative_nnode =   200_000, forget=1e-6
+
+   ndom = 400, nev = 25, tentative_nnode =   400_000, forget=1e-6
   
-  ndom = 500, dev = 35, tentative_nnode = 1_000_000, forget=1e-6
+   ndom = 500, nev = 35, tentative_nnode = 1_000_000, forget=1e-6
 
-(relative_local, relative_global) = (.9986, .995), for a SExp 
-covariance model with sig2=1 and L=0.1, leads to satisfactory results 
-in these cases:
+   ndom = 500, nev = 25, tentative_nnode = 2_000_000, forget=1e-6
 
-  ndom = 300, dev = 25, tentative_nnode =    50_000, forget=1e-6
+ - (relative_local, relative_global) = (.9986, .995), for a SExp 
+   covariance model with sig2=1 and L=0.1, leads to satisfactory results 
+   in these cases:
+
+   ndom = 300, dev = 25, tentative_nnode =    50_000, forget=1e-6
 
 """
 function suggest_parameters(nnode::Int)
@@ -38,7 +47,26 @@ end
                                 L::Float64,
                                 nnode::Int)
 
-Returns filenames' basis for covariance model and # of DoFs.
+Returns filenames' root for covariance model and number of DoFs.
+
+Input:
+ 
+ `model::String`, `model ∈ ("SExp", "Exp")`,
+  type of covariance model.
+ 
+ `sig2::Float64`,
+  variance.
+
+ `L::Float64`,
+  correlation length.
+
+ `nnode::Int`,
+  number of mesh nodes.
+
+Output:
+
+ `fname::String`,
+  filenames' root.
 
 """
 function get_root_filename(model::String,
