@@ -1,22 +1,35 @@
 """
-get_dirichlet_inds(points::Array{Float64,2}, point_marker::Array{Int,2})
+get_dirichlet_inds(points::Array{Float64,2}, 
+                   point_marker::Array{Int,2})
 
 Get global to local indices maps for nodes in the boundary with Dirichlet
 boundary condition, and .
 
 Input:
 
-points[1:2, 1:nnode]: coordinates of all nodal points
-points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
-points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
+ `points::Array{Float64,2}`, `size(cells) = (2, nnode)`,
+ (x,y)-coordinates of all mesh nodes.
 
-point_marker[inode]: coordinates of all nodal points
+ `point_marker::Array{Int,1}`, `size(point_marker) = (nnode,)`,
+  indicates if a node is Dirichlet (1) or not (0).
 
 Output:
 
-dirichlet_inds_g2l: 
+ `dirichlet_inds_g2l::Dict{Int,Int}`,
+  conversion table from global mesh node indices to indices
+  for Dirichlet nodes. 
 
-not_dirichlet_inds_g2l:
+ `not_dirichlet_inds_g2l::Dict{Int,Int}`,
+  conversion table from global mesh node indices to indices
+  for non-Dirichlet nodes. 
+
+ `dirichlet_inds_l2g::Array{Int,1}`,
+  conversion table from local indices of Dirichlet nodes to global 
+  mesh node indices.
+
+ `not_dirichlet_inds_l2g::Array{Int,1}`, 
+  conversion table from local indices of non-Dirichlet nodes to global 
+  mesh node indices.
 
 """
 function get_dirichlet_inds(points::Array{Float64,2},
@@ -43,10 +56,40 @@ function get_dirichlet_inds(points::Array{Float64,2},
          dirichlet_inds_l2g, not_dirichlet_inds_l2g 
 end
 
+
 """
-append_bc()
+append_bc(dirichlet_inds_l2g::Array{Int,1},
+          not_dirichlet_inds_l2g::Array{Int,1},
+          u_no_dirichlet::Array{Float64,1},
+          points::Array{Float64,2},
+          uexact::Function)
 
 Appends solution to Dirichlet nodes
+
+Input:
+
+ `dirichlet_inds_l2g::Array{Int,1}`,
+  conversion table from local indices of Dirichlet nodes to global 
+  mesh node indices.
+
+ `not_dirichlet_inds_l2g::Array{Int,1}`, 
+  conversion table from local indices of non-Dirichlet nodes to global 
+  mesh node indices.
+
+ `u_no_dirichlet::Array{Float64,1}`,
+  solution at non-Dirichlet mesh nodes.
+
+ `points::Array{Float64,2}`, `size(cells) = (2, nnode)`,
+ (x,y)-coordinates of all mesh nodes.
+
+ `uexact::Function`,
+  prescribed u.
+
+Output:
+
+ `u::Array{Float64,1}`, `size(u) = (nnode,)`,
+  solution at all the mesh nodes.
+
 """
 function append_bc(dirichlet_inds_l2g::Array{Int,1},
                    not_dirichlet_inds_l2g::Array{Int,1},
@@ -79,56 +122,31 @@ Applies Dirichlet boundary condition.
 
 Input:
 
-segments[1:2, nbndseg]: Global node indices of boundary segments
-segments[1, iseg]: node index at begining of segment iseg ∈ [1, nbndseg]
-segments[2, iseg]: node index at end of segment iseg ∈ [1, nbndseg]
+ `segments::Array{Int,2}`, `size(segments) = (2, nbndseg)`,
+  pairs of global node indices of each boundary segment.
 
-points[1:2, 1:nnode]: coordinates of all nodal points
-points[1, inode]: x-coordinate of global node indexed inode ∈ [1, nnode]
-points[2, inode]: y-coordinate of global node indexed inode ∈ [1, nnode]
+ `points::Array{Float64,2}`, `size(cells) = (2, nnode)`,
+ (x,y)-coordinates of all mesh nodes.
 
-A_mat::SparseMatrixCSC{Float64}
+ `A_mat::SparseMatrixCSC{Float64}`, `size(A_mat) = (nnode, nnode)`,
+  sparse array of Galerkin formulation before application Dirichlet boundary conditions.
 
-b_vec::Vector{Float64}
+ `b_vec::Array{Float64,1}`, `size(b_vec) = (nnode,)`,
+  right hand side vector of Galerkin formulation before application of Dirichlet 
+  boundary conditions.
 
-uexact: function(x::Float64, y::Float64)::Float64 > 0 ∀ x, y
+ `uexact::Function`, `uexact(x::Float64, y::Float64)::Float64`,
+  prescribed u.
 
 Output:
 
-A_mat: sparse array of Galerkin formulation (nnode-by-nnode)
-       with Dirichlet boundary condition applied.
+ `A_mat::SparseMatrixCSC{Float64}`, `size(A_mat) = (nnode, nnode)`,
+  sparse array of Galerkin formulation with Dirichlet boundary condition applied.
 
-b_vec: right hand side vector of Galerkin formulation (nnode-by-1)
-       with Dirichlet boundary condition applied.
+ `b_vec::Array{Float64,1}`, `size(b_vec) = (nnode,)`
+  right hand side vector of Galerkin formulation with Dirichlet 
+  boundary condition applied.
 
-# Examples
-```jldoctest
-julia>
-using TriangleMesh
-using Fem
-
-poly = polygon_Lshape();
-mesh = create_mesh(poly, info_str="my mesh", voronoi=true, delaunay=true, set_area_max=true);
-
-function a(x::Float64, y::Float64)
-  return 1.
-end
-
-function f(x::Float64, y::Float64)
-  return -1.
-end
-
-function uexact(xx, yy)
-    return .734
-end
-
-# Assembly for 1_165_446 DoFs
-A, b = @time do_isotropic_elliptic_assembly(mesh.cell, mesh.point);
-
-# Apply Dirichlet boundary conditions
-A, b = apply_dirichlet(e, mesh.point, A, b, uexact)
-
-```
 """
 function apply_dirichlet(segments::Array{Int,2},
                          points::Array{Float64,2},
