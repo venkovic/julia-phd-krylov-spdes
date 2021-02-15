@@ -1,3 +1,18 @@
+"""
+     add_my_procs(machines::Array{String,1},
+                  n_local_proc::Int)
+
+Launches workers on remote and local host.
+
+Input:
+
+ `machines::Array{String,1}`,
+  array of user@host.
+
+ `n_local_proc::Int`,
+  number of workers on local machine.
+
+"""
 function add_my_procs(machines::Array{String,1},
                       n_local_proc::Int)
 
@@ -42,35 +57,33 @@ end
 which does static scheduling and tends to crash for time consuming and unbalanced work 
 loads. 
 
-Another approach is given by 
-
-reduce(redop, Distributed.pmap(func, K))
-
-which requires to allocate enough memory to store Distributed.pmap(func, K). Since func
-is ***, this becomes a problem when the number of workers and the dimensions of K are 
-increased. 
+Another approach is given by reduce(redop, Distributed.pmap(func, K)), which requires to 
+allocate enough memory to store Distributed.pmap(func, K). This becomes a problem when the
+number of workers and the dimensions of K are increased. 
 
 Input:
 
- `func::Function`, ``,
+ `func::Function`, `func(Int)::Array{Float64,2}`,
   function used to map the collection of parameters.
 
- `redop::Function`, 
-  shape-preserving reduction operator, e.g., (+), ...
+ `redop::Function`, `redop(Float64, Float64)::Float64`,
+  reduction operator, e.g., (+), ...
 
  `coll::Array{Int,1}`,
-  approximate number of DoFs wanted.
+  array of indices (collection) to map from.
 
  `K::Array{Float64,2}`,
-  covariance function, must be available everywhere.
+  should be an array of zeros, used to store the result of mapreduce.
 
  `verbose=true`
-  filename's root.
 
  `forget=1e-6`,
   threshold of covariance between points in distinct subdomains under which
   subdomain pairs are ignored for the assembly of the reduced global mass
   covariance matrix. Note that `forget<0` ⟹ all pairs are considered.
+
+ `nfails_allowed=3`,
+  number of failed tasks allowed before terminating a worker. 
 
 Output:
 

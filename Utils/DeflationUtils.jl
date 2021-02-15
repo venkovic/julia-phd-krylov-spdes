@@ -1,3 +1,14 @@
+"""
+     save_deflated_system(A::SparseMatrixCSC{Float64,Int},
+                          b::Array{Float64,1},
+                          W::Array{Float64,2},
+                          s::Int,
+                          precond_id::String;
+                          print_error=false)
+
+Saves linear system and basis of deflation subspace to JLD files.
+
+"""
 function save_deflated_system(A::SparseMatrixCSC{Float64,Int},
                               b::Array{Float64,1},
                               W::Array{Float64,2},
@@ -21,7 +32,13 @@ function save_deflated_system(A::SparseMatrixCSC{Float64,Int},
   end
 end
 
+"""
+     save_system(A::SparseMatrixCSC{Float64,Int},
+                 b::Array{Float64,1})
 
+Saves linear system to JLD files.
+
+"""
 function save_system(A::SparseMatrixCSC{Float64,Int},
                      b::Array{Float64,1})
 
@@ -34,8 +51,13 @@ function save_system(A::SparseMatrixCSC{Float64,Int},
   JLD.save("data/b.jld", "b", b)
 end
 
+"""
+     load_system()
 
-function load_system(;fname="")
+Loads sparse linear system from JLD files.
+
+"""
+function load_system()
 
   I = JLD.load("data/A_I.jld", "I")
   J = JLD.load("data/A_J.jld", "J")
