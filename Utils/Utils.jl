@@ -13,6 +13,7 @@ module Utils
   # from DeflationUtils.jl,
   export save_system, load_system
   export save_deflated_system
+  export load_deflated_system
 
   # from PllUtils.jl
   export add_my_procs
