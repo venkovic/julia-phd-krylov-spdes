@@ -32,10 +32,6 @@ nbj = ndom
 nvec = ndom + 5
 spdim = floor(Int, 2.5 * nvec)
 
-do_amg_0_pcg = false
-do_lorasc_0_pcg = false
-verbose = true
-
 nchains = 50
 nsmp = 5
 seed!(481_456)
@@ -127,6 +123,7 @@ function test_one_chain_01(Π_amg_0,
                            verbose::Bool,
                            do_amg_0_pcg::Bool,
                            do_lorasc_0_pcg::Bool,
+                           do_chol16::Bool,
                            nsmp::Int,
                            Λ::Array{Float64,1},
                            Ψ::Array{Float64,2};
@@ -137,10 +134,12 @@ function test_one_chain_01(Π_amg_0,
   ndom, = size(Π_lorasc_0.x_Id)
   methods = ["amg_0-eigdefpcg",
              "lorasc$(ndom)_0-eigdefpcg",
-             "bj$(nbj)_0-eigdefpcg",
-             "chol16_0-eigdefpcg"]
+             "bj$(nbj)_0-eigdefpcg"]
+
   do_amg_0_pcg ? push!(methods, "amg_0-pcg") : nothing
   do_lorasc_0_pcg ? push!(methods, "lorasc$(ndom)_0-pcg") : nothing
+  
+  do_chol16 ? push!(methods, "chol16_0-eigdefpcg") : nothing
 
   iter = Dict{String,Array{Int,1}}()
   for method in methods
@@ -194,12 +193,14 @@ function test_one_chain_01(Π_amg_0,
   iter["bj$(nbj)_0-eigdefpcg"][1] = it
   flush(stdout)
 
-  print("chol16_0-eigpcg solve of A * u = b ...")
-  x .= 0.
-  Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
-  verbose ? println("$Δt seconds, iter = $it") : nothing
-  iter["chol16_0-eigdefpcg"][1] = it
-  flush(stdout)
+  if do_chol16
+    print("chol16_0-eigpcg solve of A * u = b ...")
+    x .= 0.
+    Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
+    verbose ? println("$Δt seconds, iter = $it") : nothing
+    iter["chol16_0-eigdefpcg"][1] = it
+    flush(stdout)
+  end
 
   #
   # Sample ξ by mcmc and solve linear systems by def-pcg with 
@@ -240,9 +241,9 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_amg = eigdefpcg(A, b, x, Π_amg_0, W_amg, spdim)
     catch
+      save_deflated_system(A, b, W_amg, s, "amg", print_error=true)
       x .= 0.
       Δt = @elapsed _, it, _, W_amg = eigpcg(A, b, x, Π_amg_0, nvec, spdim)
-      save_deflated_system(A, b, W_amg, s, "amg", print_error=true)
     end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["amg_0-eigdefpcg"][s] = it
@@ -252,9 +253,9 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_lorasc = eigdefpcg(A, b, x, Π_lorasc_0, W_lorasc, spdim)
     catch 
+      save_deflated_system(A, b, W_lorasc, s, "lorasc", print_error=true)
       x .= 0.
       Δt = @elapsed _, it, _, W_lorasc = eigpcg(A, b, x, Π_lorasc_0, nvec, spdim)
-      save_deflated_system(A, b, W_lorasc, s, "lorasc", print_error=true)
     end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["lorasc$(ndom)_0-eigdefpcg"][s] = it
@@ -264,24 +265,26 @@ function test_one_chain_01(Π_amg_0,
     try
       Δt = @elapsed _, it, _, W_bj = eigdefpcg(A, b, x, Π_bj_0, W_bj, spdim)
     catch 
+      save_deflated_system(A, b, W_bj, s, "bj", print_error=true)
       x .= 0.
       Δt = @elapsed _, it, _, W_bj = eigpcg(A, b, x, Π_bj_0, nvec, spdim)
-      save_deflated_system(A, b, W_bj, s, "bj", print_error=true)
     end 
     verbose ? println("$Δt seconds, iter = $it") : nothing
     iter["bj$(nbj)_0-eigdefpcg"][s] = it
 
-    print("chol16_0-eigdefpcg solve of A * u = b ...")
-    x .= 0.
-    try
-      Δt = @elapsed _, it, _, W_chol16 = eigdefpcg(A, b, x, Π_chol16_0, W_chol16, spdim)
-    catch 
+    if do_chol16
+      print("chol16_0-eigdefpcg solve of A * u = b ...")
       x .= 0.
-      Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
-      save_deflated_system(A, b, W_chol16, s, "chol16", print_error=true)
-    end 
-    verbose ? println("$Δt seconds, iter = $it") : nothing
-    iter["chol16_0-eigdefpcg"][s] = it
+      try
+        Δt = @elapsed _, it, _, W_chol16 = eigdefpcg(A, b, x, Π_chol16_0, W_chol16, spdim)
+      catch 
+        save_deflated_system(A, b, W_chol16, s, "chol16", print_error=true)
+        x .= 0.
+        Δt = @elapsed _, it, _, W_chol16 = eigpcg(A, b, x, Π_chol16_0, nvec, spdim)
+      end 
+      verbose ? println("$Δt seconds, iter = $it") : nothing
+      iter["chol16_0-eigdefpcg"][s] = it
+    end
 
   end
 
@@ -296,8 +299,10 @@ function test_one_chain_01(Π_amg_0,
              iter["lorasc$(ndom)_0-eigdefpcg"])
     npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
              iter["bj$(nbj)_0-eigdefpcg"])
-    npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
-             iter["chol16_0-eigdefpcg"])
+    if do_chol16
+      npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_sdpim$(spdim).it.npz",
+               iter["chol16_0-eigdefpcg"])
+    end
   end
 
   return iter
@@ -312,10 +317,10 @@ function test_several_chains_01(nchains::Int,
                                 verbose::Bool,
                                 do_amg_0_pcg::Bool,
                                 do_lorasc_0_pcg::Bool,
+                                do_chol16::Bool,
                                 nsmp::Int,
                                 Λ::Array{Float64,1},
-                                Ψ::Array{Float64,2};
-                                save_progressively=false)
+                                Ψ::Array{Float64,2})
 
   iters = Dict{String,Array{Int,2}}()
 
@@ -330,6 +335,7 @@ function test_several_chains_01(nchains::Int,
                              verbose,
                              do_amg_0_pcg,
                              do_lorasc_0_pcg,
+                             do_chol16,
                              nsmp,
                              Λ,
                              Ψ)
@@ -342,14 +348,16 @@ function test_several_chains_01(nchains::Int,
       end
     end
                                 
-    #npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-    #         iters["amg_0-eigdefpcg"])
-    #npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-    #         iters["lorasc$(ndom)_0-eigdefpcg"])
-    #npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-    #         iters["bj$(nbj)_0-eigdefpcg"])
-    #npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
-    #         iters["chol16_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_amg_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+             iters["amg_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_lorasc$(ndom)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+             iters["lorasc$(ndom)_0-eigdefpcg"])
+    npzwrite("data/test01_$(root_fname)_bj$(nbj)_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+             iters["bj$(nbj)_0-eigdefpcg"])
+    if do_chol16
+      npzwrite("data/test01_$(root_fname)_chol16_0-eigdefpcg_nvec$(nvec)_spdim$(spdim).it.npz",
+               iters["chol16_0-eigdefpcg"])
+    end
 
     println("\n\n ... done working on chain $ichain / $nchains.")
   end
@@ -357,6 +365,11 @@ function test_several_chains_01(nchains::Int,
   return iters
 end
 
+
+verbose = true
+do_amg_0_pcg = false
+do_lorasc_0_pcg = false
+do_chol16 = true
 
 iters = test_several_chains_01(nchains,
                                Π_amg_0,
@@ -366,6 +379,7 @@ iters = test_several_chains_01(nchains,
                                verbose,
                                do_amg_0_pcg,
                                do_lorasc_0_pcg,
+                               do_chol16,
                                nsmp,
                                Λ,
                                Ψ)
