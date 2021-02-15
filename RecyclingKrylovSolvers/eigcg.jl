@@ -352,14 +352,6 @@ function eigpcg(A::SparseMatrixCSC{T},
       hlpr = sqrt(rTz)
     end
     rTz = dot(r, z)
-    if rTz < 0
-      I, J, V = findnz(A)
-      JLD.write("A_I.jld", "I", I)
-      JLD.write("A_J.jld", "J", J)
-      JLD.write("A_V.jld", "V", V)
-      JLD.write("b.jld", "b", b)
-      break
-    end
     beta *= rTz
     if ivec == spdim
       tvec -= beta * Ap
