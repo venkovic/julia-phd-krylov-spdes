@@ -1,5 +1,10 @@
 """
-eigcg(A, b, x, nvec, spdim)
+     eigcg(A::Union{SparseMatrixCSC{T},
+                    FunctionMap},
+           b::Array{T,1},
+           x::Array{T,1},
+           nvec::Int,
+           spdim::Int)
 
 Performs eigCG (Stathopoulos & Orginos, 2010).
 
@@ -18,122 +23,37 @@ Computing and deflating eigenvalues while solving multiple right-hand side
 linear systems with an application to quantum chromodynamics,
 SIAM Journal on Scientific Computing, SIAM, 2010, 32, 439-462.
 
-# Examples
-```jldoctest
-julia>
-using LinearAlgebra: SymTridiagonal;
-using SparseArrays: sparse, SparseMatrixCSC;
-push!(LOAD_PATH, "./MyRecyclingKrylovSolvers");
-using MyRecyclingKrylovSolvers: eigcg, initcg, cg;
-using Random: seed!
-seed!(1234);
-const n = 1_000;
-const T = Float64;
-A = sparse(SymTridiagonal(2 .+ .5 * rand(T, n), -1 .+ .05 * rand(T, n-1)));
-A = A * A;
-nsmp, neigcg, nvec, spdim = 10, 3, 20, 50;
-#
-# Example 1: eigCG for SPD A with multiple right-hand sides bs
-function mrhs_eigcg(A::SparseMatrixCSC{T}, nvec::Int, spdim::Int, nsmp::Int)
-  W = Array{T}(undef, (n, nvec));
-  println("\\n* eigCG results *");
-  for ismp in 1:nsmp
-    b = rand(T, n);
-    _, itcg, _ = cg(A, b, zeros(T, n));
-    if ismp == 1
-      _, iteigcg, _, W = eigcg(A, b, zeros(T, n), nvec, spdim);
-      println("eigCG: ", iteigcg, ", CG: ", itcg);
-    else
-      _, itinitcg, _ = initcg(A, b, zeros(T, n), W);
-      println("Init-CG: ", itinitcg, ", CG: ", itcg);
-    end
-  end
-end
-#
-seed!(4321);
-mrhs_eigcg(A, nvec, spdim, nsmp);
-#
-# Example 2: Incremental eigCG for SPD A with multiple right-hand sides bs
-function mrhs_incr_eigcg(A::SparseMatrixCSC{T}, nvec::Int, spdim::Int, nsmp::Int, neigcg::Int)
-  U = Array{T}(undef, (n, neigcg * nvec));
-  H = Array{T}(undef, (neigcg * nvec, neigcg * nvec));
-  println("\\n* Incremental eigCG results *");
-  for ismp in 1:nsmp
-    b = rand(T, n);
-    _, itcg, _ = cg(A, b, zeros(T, n));
-    if ismp <= neigcg
-      sl1 = 1 : (ismp - 1) * nvec;
-      sl2 = (ismp - 1) * nvec + 1 : ismp * nvec;
-      if ismp == 1
-        x = zeros(T, n);
-      else
-        x = U[:, sl1] * (H[sl1, sl1] \\ (U[:, sl1]' * b));
-      end
-      _, iteigcg, _, U[:, sl2] = eigcg(A, b, x, nvec, spdim);
-      WtA = U[:, sl2]' * A;
-      H[sl2, sl2] = WtA * U[:, sl2];
-      if ismp > 1
-        H[sl2, sl1] = WtA * U[:, sl1];
-        H[sl1, sl2] = H[sl2, sl1]';
-      end
-      println("eigCG: ", iteigcg, ", CG: ", itcg);
-    else
-      _, itinitcg, _ = initcg(A, b, zeros(T, n), U);
-      println("Init-CG: ", itinitcg, ", CG: ", itcg);
-    end
-  end
-end
-#
-seed!(4321);
-mrhs_incr_eigcg(A, nvec, spdim, nsmp, neigcg);
-
-* eigCG results *
-eigCG: 183, CG: 183
-Init-CG: 166, CG: 183
-Init-CG: 163, CG: 183
-Init-CG: 162, CG: 183
-Init-CG: 160, CG: 183
-Init-CG: 164, CG: 182
-Init-CG: 164, CG: 183
-Init-CG: 158, CG: 182
-Init-CG: 161, CG: 183
-Init-CG: 160, CG: 183
-
-* Incremental eigCG results *
-eigCG: 183, CG: 183
-eigCG: 166, CG: 183
-eigCG: 160, CG: 183
-Init-CG: 158, CG: 183
-Init-CG: 154, CG: 183
-Init-CG: 161, CG: 182
-Init-CG: 157, CG: 183
-Init-CG: 158, CG: 182
-Init-CG: 155, CG: 183
-Init-CG: 154, CG: 183
-```
 """
-function eigcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, nvec::Int, spdim::Int)
-  r, Ap, p, res_norm = similar(x), similar(x), similar(x), similar(x)
-  #
-  n = size(x)[1]
-  V = Array{T}(undef, (n, spdim))
+function eigcg(A::Union{SparseMatrixCSC{T},
+                        FunctionMap},
+               b::Array{T,1},
+               x::Array{T,1},
+               nvec::Int,
+               spdim::Int)
+
+  n, = size(x)
+  r = Array{T,1}(undef, n)
+  Ap = Array{T,1}(undef, n)
+  p = Array{T,1}(undef, n)
+  res_norm = Array{T,1}(undef, n)
+
+  V = Array{T,2}(undef, n, spdim)
   VtAV = zeros(T, spdim, spdim)
-  Y = zeros(T, (spdim, 2 * nvec))
-  tvec = Vector{T}(undef, n)
+  Y = zeros(T, spdim, 2 * nvec)
+  tvec = Array{T,1}(undef, n)
   just_restarted = false
-  #
+
   it = 1
-  r = b - A * x
+  r .= b .- A * x
   rTr = dot(r, r)
   p .= r
   res_norm[it] = sqrt(rTr)
-  #
   ivec = 1
   V[:, ivec] = r / res_norm[it]
-  #
+
   bnorm = norm2(b)
   tol = eps * bnorm
-  #
+
   while (it < A.n) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
@@ -144,20 +64,20 @@ function eigcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, nvec::Int, spd
     rTr = dot(r, r)
     beta *= rTr
     if ivec == spdim
-      tvec -= beta * Ap
+      tvec .-= beta * Ap
     end
     axpby!(1, r, beta, p) # p = beta * p + r
     it += 1
     res_norm[it] = sqrt(rTr)
-    #
+
     VtAV[ivec, ivec] += 1 / alpha
     if just_restarted
-      tvec += Ap
+      tvec .+= Ap
       nev = ivec - 1
       VtAV[1:nev, ivec] = V[:, 1:nev]' * (tvec / res_norm[it - 1])
       just_restarted = false
     end
-    #
+
     if ivec == spdim
       Tm = Symmetric(VtAV) # spdim-by-spdim
       Y[:, 1:nvec] = eigvecs(Tm)[:, 1:nvec] # spdim-by-nvec
@@ -167,7 +87,7 @@ function eigcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, nvec::Int, spd
       H = Q' * (Tm * Q) # nev-by-nev
       vals, Z = eigen(H)::Eigen{T,T,Array{T,2},Array{T,1}}
       V[:, 1:nev] = V * (Q * Z) # n-by-nev
-      #
+
       ivec = nev + 1
       V[:, ivec] = r / res_norm[it]
       VtAV .= 0
@@ -175,7 +95,7 @@ function eigcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, nvec::Int, spd
         VtAV[j, j] = vals[j]
       end
       VtAV[ivec, ivec] = beta / alpha
-      tvec = - beta * Ap
+      tvec .= - beta * Ap
       just_restarted = true
       #VtAV[1:nev, ivec] = V[:, 1:nev]' * (A * V[:, ivec]) # Matrix-vector product avoided with tvec
     else
@@ -185,11 +105,18 @@ function eigcg(A::SparseMatrixCSC{T}, b::Vector{T}, x::Vector{T}, nvec::Int, spd
       VtAV[ivec, ivec] = beta / alpha
     end
   end
+
   return x, it, res_norm[1:it], V[:, 1:nvec]
 end
 
+
 """
-eigpcg(A, b, x, M, nvec, spdim)
+     eigpcg(A::SparseMatrixCSC{T}, 
+            b::Array{T,1},
+            x::Array{T,1},
+            M,
+            nvec::Int,
+            spdim::Int)
 
 Performs eigPCG (Stathopoulos & Orginos, 2010).
 
@@ -209,136 +136,43 @@ Computing and deflating eigenvalues while solving multiple right-hand side
 linear systems with an application to quantum chromodynamics,
 SIAM Journal on Scientific Computing, SIAM, 2010, 32, 439-462.
 
-# Examples
-```jldoctest
-julia>
-using LinearAlgebra: I;
-using SparseArrays: SparseMatrixCSC, sprand;
-push!(LOAD_PATH, "./MyRecyclingKrylovSolvers");
-using MyRecyclingKrylovSolvers: eigpcg, initpcg, pcg;
-push!(LOAD_PATH, "./MyPreconditioners");
-using MyPreconditioners: BJPreconditioner;
-using Random: seed!
-seed!(1234);
-const n = 5_000;
-const T = Float64;
-const nblock = 5;
-A = sprand(T, n, n, .0001);
-A += A' + 2 * I;
-A = A * A;
-M = BJPreconditioner(nblock, A);
-nsmp, neigpcg, nvec, spdim = 10, 3, 20, 50;
-#
-# Example 1: eigPCG for SPD A with multiple right-hand sides bs
-function mrhs_eigpcg(A::SparseMatrixCSC{T}, M, nvec::Int, spdim::Int, nsmp::Int)
-  W = Array{T}(undef, (n, nvec));
-  println("\\n* eigPCG results *");
-  for ismp in 1:nsmp
-    b = rand(T, n);
-    _, itpcg, _ = pcg(A, b, zeros(T, n), M);
-    if ismp == 1
-      _, iteigpcg, _, W = eigpcg(A, b, zeros(T, n), M, nvec, spdim);
-      println("eigPCG: ", iteigpcg, ", PCG: ", itpcg);
-    else
-      _, itinitpcg, _ = initpcg(A, b, zeros(T, n), M, W);
-      println("Init-PCG: ", itinitpcg, ", PCG: ", itpcg);
-    end
-  end
-end
-#
-seed!(4321);
-mrhs_eigpcg(A, M, nvec, spdim, nsmp);
-#
-# Example 2: Incremental eigPCG for SPD A with multiple right-hand sides bs
-function mrhs_incr_eigpcg(A::SparseMatrixCSC{T}, M, nvec::Int, spdim::Int, nsmp::Int, neigpcg::Int)
-  U = Array{T}(undef, (n, neigpcg * nvec));
-  H = Array{T}(undef, (neigpcg * nvec, neigpcg * nvec));
-  println("\\n* Incremental eigPCG results *");
-  for ismp in 1:nsmp
-    b = rand(T, n);
-    _, itpcg, _ = pcg(A, b, zeros(T, n), M);
-    if ismp <= neigpcg
-      sl1 = 1 : (ismp - 1) * nvec;
-      sl2 = (ismp - 1) * nvec + 1 : ismp * nvec;
-      if ismp == 1
-        x = zeros(T, n);
-      else
-        x = U[:, sl1] * (H[sl1, sl1] \\ (U[:, sl1]' * b));
-      end
-      _, iteigpcg, _, U[:, sl2] = eigpcg(A, b, x, M, nvec, spdim);
-      WtA = U[:, sl2]' * A;
-      H[sl2, sl2] = WtA * U[:, sl2];
-      if ismp > 1
-        H[sl2, sl1] = WtA * U[:, sl1];
-        H[sl1, sl2] = H[sl2, sl1]';
-      end
-      println("eigPCG: ", iteigpcg, ", PCG: ", itpcg);
-    else
-      _, itinitpcg, _ = initpcg(A, b, zeros(T, n), M, U);
-      println("Init-PCG: ", itinitpcg, ", PCG: ", itpcg);
-    end
-  end
-end
-#
-seed!(4321);
-mrhs_incr_eigpcg(A, M, nvec, spdim, nsmp, neigpcg);
-
-* eigPCG results *
-eigPCG: 257, PCG: 257
-Init-PCG: 113, PCG: 259
-Init-PCG: 126, PCG: 258
-Init-PCG: 128, PCG: 264
-Init-PCG: 127, PCG: 260
-Init-PCG: 124, PCG: 259
-Init-PCG: 125, PCG: 263
-Init-PCG: 127, PCG: 260
-Init-PCG: 125, PCG: 259
-Init-PCG: 126, PCG: 257
-
-* Incremental eigCG results *
-eigPCG: 257, PCG: 257
-eigPCG: 113, PCG: 259
-eigPCG: 96, PCG: 258
-Init-PCG: 98, PCG: 264
-Init-PCG: 87, PCG: 260
-Init-PCG: 95, PCG: 259
-Init-PCG: 100, PCG: 263
-Init-PCG: 96, PCG: 260
-Init-PCG: 92, PCG: 259
-Init-PCG: 100, PCG: 257
-```
 """
 function eigpcg(A::SparseMatrixCSC{T}, 
-                b::Vector{T},
-                x::Vector{T},
+                b::Array{T,1},
+                x::Array{T,1},
                 M,
                 nvec::Int,
                 spdim::Int)
                 
-  r, Ap, p, res_norm, z = similar(x), similar(x), similar(x), similar(x), similar(x)
-  #
-  n = size(x)[1]
-  V = Array{T}(undef, (n, spdim))
+
+
+  n, = size(x)
+  r = Array{T,1}(undef, n)
+  Ap = Array{T,1}(undef, n)
+  p = Array{T,1}(undef, n)
+  res_norm = Array{T,1}(undef, n)
+
+  V = Array{T,2}(undef, n, spdim)
   VtAV = zeros(T, spdim, spdim)
-  Y = zeros(T, (spdim, 2 * nvec))
-  tvec = Vector{T}(undef, n)
+  Y = zeros(T, spdim, 2 * nvec)
+  tvec = Array{T,1}(undef, n)
   just_restarted = false
-  #
+
   it = 1
-  r = b - A * x
+  r .= b .- A * x
   rTr = dot(r, r)
-  z = (M \ r)::Vector{T}
+  z .= M \ r
   rTz = dot(r, z)
   p .= z
   res_norm[it] = sqrt(rTr)
-  #
+
   ivec = 1
   V[:, ivec] = z / sqrt(rTz)
   just_restarted = false
-  #
+
   bnorm = norm2(b)
   tol = eps * bnorm
-  #
+
   while (it < A.n) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
@@ -347,14 +181,14 @@ function eigpcg(A::SparseMatrixCSC{T},
     axpy!(alpha, p, x) # x += alpha * p
     axpy!(-alpha, Ap, r) # r -= alpha * Ap
     rTr = dot(r, r)
-    z = (M \ r)::Vector{T}
+    z .= M \ r
     if just_restarted
       hlpr = sqrt(rTz)
     end
     rTz = dot(r, z)
     beta *= rTz
     if ivec == spdim
-      tvec -= beta * Ap
+      tvec .-= beta * Ap
     end
     axpby!(1, z, beta, p) # p = beta * p + z
     it += 1
@@ -362,7 +196,7 @@ function eigpcg(A::SparseMatrixCSC{T},
     #
     VtAV[ivec, ivec] += 1 / alpha
     if just_restarted
-      tvec += Ap
+      tvec .+= Ap
       nev = ivec - 1
       VtAV[1:nev, ivec] = V[:, 1:nev]' * (tvec / hlpr)
       just_restarted = false
@@ -387,7 +221,7 @@ function eigpcg(A::SparseMatrixCSC{T},
         VtAV[j, j] = vals[j]
       end
       VtAV[ivec, ivec] = beta / alpha
-      tvec = - beta * Ap
+      tvec .= - beta * Ap
       just_restarted = true
       #VtAV[1:nev, ivec] = V[:, 1:nev]' * (A * V[:, ivec]) # Matrix-vector product avoided with tvec
     else
@@ -414,5 +248,6 @@ function eigpcg(A::SparseMatrixCSC{T},
               "eigenvectors wanted. Only Lanczos vectors may be returned.")
     end
   end
+
   return x, it, res_norm[1:it], V[:, 1:nvec]
 end
