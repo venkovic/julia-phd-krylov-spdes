@@ -144,8 +144,6 @@ function eigpcg(A::SparseMatrixCSC{T},
                 nvec::Int,
                 spdim::Int)
                 
-
-
   n, = size(x)
   r = Array{T,1}(undef, n)
   Ap = Array{T,1}(undef, n)
