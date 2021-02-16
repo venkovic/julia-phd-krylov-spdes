@@ -2,8 +2,8 @@
      function get_mesh(tentative_nnode::Int;
                        keep_segments=true)
 
-Does parallel map from collection `coll` of subdomains with the 
-function `func`, doing a dynamic task scheduling over multiple hosts.
+Generates and returns a triangular mesh of a 2D square with approximately
+tentative_nnode mesh nodes.  
 
 Input:
 
