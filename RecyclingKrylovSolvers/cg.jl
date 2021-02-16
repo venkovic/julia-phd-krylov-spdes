@@ -16,8 +16,7 @@ function cg(A::Union{SparseMatrixCSC{T},
             b::Array{T,1},
             x::Array{T,1})
 
-  isa(A, SparseMatrixCSC) ? n = A.n : n = A.N
-
+  n, = size(x)
   r = Array{T,1}(undef, n)
   p = Array{T,1}(undef, n)
   Ap = Array{T,1}(undef, n)
@@ -69,8 +68,7 @@ function pcg(A::Union{SparseMatrixCSC{T},
              x::Array{T,1},
              M)
   
-  isa(A, SparseMatrixCSC) ? n = A.n : n = A.N
-
+  n, = size(x)
   r = Array{T,1}(undef, n)
   z = Array{T,1}(undef, n)
   p = Array{T,1}(undef, n)
