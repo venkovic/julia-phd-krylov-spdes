@@ -111,7 +111,8 @@ end
 
 
 """
-     eigpcg(A::SparseMatrixCSC{T}, 
+     eigpcg(A::Union{SparseMatrixCSC{T},
+                     FunctionMap},
             b::Array{T,1},
             x::Array{T,1},
             M,
@@ -137,7 +138,8 @@ linear systems with an application to quantum chromodynamics,
 SIAM Journal on Scientific Computing, SIAM, 2010, 32, 439-462.
 
 """
-function eigpcg(A::SparseMatrixCSC{T}, 
+function eigpcg(A::Union{SparseMatrixCSC{T},
+                         FunctionMap},
                 b::Array{T,1},
                 x::Array{T,1},
                 M,
@@ -191,7 +193,7 @@ function eigpcg(A::SparseMatrixCSC{T},
     axpby!(1, z, beta, p) # p = beta * p + z
     it += 1
     res_norm[it] = sqrt(rTr)
-    #
+
     VtAV[ivec, ivec] += 1 / alpha
     if just_restarted
       tvec .+= Ap
@@ -199,7 +201,7 @@ function eigpcg(A::SparseMatrixCSC{T},
       VtAV[1:nev, ivec] = V[:, 1:nev]' * (tvec / hlpr)
       just_restarted = false
     end
-    #
+
     if ivec == spdim
       VtAV = V' * (A * V)
       Tm = Symmetric(VtAV) # spdim-by-spdim
@@ -211,7 +213,7 @@ function eigpcg(A::SparseMatrixCSC{T},
       #println("H:", typeof(H), ", ", issymmetric(H))
       vals, Z = eigen(Symmetric(H))::Eigen{T,T,Array{T,2},Array{T,1}}
       V[:, 1:nev] = V * (Q * Z) # n-by-nev
-      #
+
       ivec = nev + 1
       V[:, ivec] = z / sqrt(rTz)
       VtAV .= 0
@@ -229,6 +231,7 @@ function eigpcg(A::SparseMatrixCSC{T},
       VtAV[ivec, ivec] = beta / alpha
     end
   end
+
   if !just_restarted
     if ivec > nvec
       ivec -= 1
