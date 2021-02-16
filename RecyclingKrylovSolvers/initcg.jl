@@ -74,8 +74,13 @@ end
 
 
 """
-initpcg(A, b, x, M, W)
-
+initpcg(A::Union{SparseMatrixCSC{T},
+                 FunctionMap},
+        b::Vector{T},
+        x::Vector{T},
+        M,
+        W::Array{T,2})
+        
 Performs Init-PCG (Erhel & Guyomarc'h, 2000).
 
 Used to solve A x = b with an SPD matrix A and an SPD preconditioner M when a
@@ -96,7 +101,8 @@ for SPD systems,
 SIAM Journal on Scientific Computing, SIAM, 2006, 27, 1760-1786.
 
 """
-function initpcg(A::SparseMatrixCSC{T},
+function initpcg(A::Union{SparseMatrixCSC{T},
+                          FunctionMap},
                  b::Vector{T},
                  x::Vector{T},
                  M,
