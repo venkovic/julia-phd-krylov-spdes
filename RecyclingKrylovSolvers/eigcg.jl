@@ -150,6 +150,7 @@ function eigpcg(A::Union{SparseMatrixCSC{T},
   r = Array{T,1}(undef, n)
   Ap = Array{T,1}(undef, n)
   p = Array{T,1}(undef, n)
+  z = Array{T,1}(undef, n)
   res_norm = Array{T,1}(undef, n)
 
   V = Array{T,2}(undef, n, spdim)
