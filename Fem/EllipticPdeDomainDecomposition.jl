@@ -1115,6 +1115,29 @@ end
 
 
 """
+     apply_bmat!(A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                 chol_A_ΓΓ::SuiteSparse.CHOLMOD.Factor{Float64},
+                 S::FunctionMap,
+                 x::Array{Float64,1})
+
+Computes L \ ((A_ΓΓ - S) * (L' \ x)), where A_ΓΓ = L*L', 
+as needed for the randomized computation of low rank corrections.
+
+"""
+function apply_bmat!(A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                     chol_A_ΓΓ::SuiteSparse.CHOLMOD.Factor{Float64},
+                     S::FunctionMap,
+                     x::Array{Float64,1})
+
+  y = Array{Float64,1}(undef, A_ΓΓ.n)
+  y .= chol_A_ΓΓ.L' \ x
+  x .= S * y
+  y .= A_ΓΓ * y .- x
+  x .= chol_A_ΓΓ.L \ y
+end
+
+
+"""
      prepare_lorasc_precond(S::FunctionMap{Float64},
                             A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                             A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -1146,8 +1169,11 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 not_dirichlet_inds_g2l::Dict{Int,Int};
                                 verbose=true,
                                 compute_A_ΓΓ_chol=true,
+                                low_rank_correction=:exact,
+                                ℓ=10,
                                 nvec=25, 
-                                ε=.01) 
+                                ε=.01,
+                                q=2)
 
   ndom, = size(A_IId)
   chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
@@ -1170,13 +1196,45 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
   end
   verbose ? println("$time seconds") : nothing
 
-
-  verbose ? print("solve for general ld eigenpairs of (S, A_ΓΓ) ... ") : nothing
-  time = @elapsed Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
+  if low_rank_correction == :exact
+    verbose ? print("solve for general ld eigenpairs of (S, A_ΓΓ) ... ") : nothing
+    time = @elapsed Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
                                                      A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
                                                      isposdef=true, ishermitian=true,
                                                      issymmetric=true)
-  verbose ? println("$time seconds") : nothing
+    verbose ? println("$time seconds") : nothing
+
+  elseif low_rank_correction == :randomized
+    verbose ? print("randomly approximate md eigenpairs of L^-1(A_ΓΓ - S)L^⁻T ... ") : nothing
+
+    H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+    Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+    U = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+    C = Array{Float64,2}(undef, ℓ, ℓ)
+
+    Ξ = MvNormal(A_ΓΓ.n, 1.)
+    H .= rand(Ξ, ℓ)
+
+    for ivec in 1:ℓ
+      for j in 1:2*q+1
+        apply_bmat!(A_ΓΓ, chol_A_ΓΓ, S, H[:, ivec])
+      end
+    end
+
+    Q .= Matrix(qr(H).Q)
+    C .= Q'H
+
+    vals, vecs = LinearAlgebra.eigen(C)
+
+    Σ = 1 .- vals
+    
+    E = Array{Float64,1}[]
+    for ivec in 1:ℓ
+      push!(E, chol_A_ΓΓ.L'(Q * vecs[:, ivec]))
+    end
+    
+    verbose ? println("$time seconds") : nothing
+  end
   
   nev = 0
   for (k, σ) in enumerate(Σ)
@@ -1259,7 +1317,7 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                 f::Function,
                                 uexact::Function;
                                 verbose=true,
-                                do_local_schur_assembly=true,
+                                do_local_schur_assembly=false,
                                 load_partition=false,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25, 
@@ -1310,7 +1368,6 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                                                       f,
                                                                       uexact)
   verbose ? println("$time seconds") : nothing
-
 
   if do_local_schur_assembly
     verbose ? print("assemble_local_schurs ... ") : nothing
