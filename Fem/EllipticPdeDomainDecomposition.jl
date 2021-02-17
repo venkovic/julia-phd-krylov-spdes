@@ -1120,7 +1120,7 @@ end
                  S::FunctionMap,
                  x::Array{Float64,1})
 
-Computes L \ ((A_ΓΓ - S) * (L' \ x)), where A_ΓΓ = L*L', 
+Computes L  ((A_ΓΓ - S) * (L'  x)), where A_ΓΓ = L*L', 
 as needed for the randomized computation of low rank corrections.
 
 """
@@ -1165,18 +1165,20 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
                                 A_ΓΓ::SparseMatrixCSC{Float64,Int},
                                 ind_Id_g2l::Array{Dict{Int,Int},1},
-                                ind_Γ_g2l::Dict{Int,Int}, 
+                                ind_Γ_g2l::Dict{Int,Int},
                                 not_dirichlet_inds_g2l::Dict{Int,Int};
                                 verbose=true,
                                 compute_A_ΓΓ_chol=true,
+                                nvec=25,
                                 low_rank_correction=:exact,
-                                ℓ=10,
-                                nvec=25, 
+                                ℓ=25,
                                 ε=.01,
                                 q=2)
 
   ndom, = size(A_IId)
   chol_A_IId = SuiteSparse.CHOLMOD.Factor{Float64}[]
+
+  low_rank_correction == :randomized ? compute_A_ΓΓ_chol = true : nothing
 
   if compute_A_ΓΓ_chol
     ΠA_ΓΓ = nothing
@@ -1196,6 +1198,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
   end
   verbose ? println("$time seconds") : nothing
 
+  # Compute low rank correction with exact generalized eigenpairs (σ, e) s.t. S * e == σ * A_ΓΓ * e
   if low_rank_correction == :exact
     verbose ? print("solve for general ld eigenpairs of (S, A_ΓΓ) ... ") : nothing
     time = @elapsed Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
@@ -1204,38 +1207,46 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                                      issymmetric=true)
     verbose ? println("$time seconds") : nothing
 
+  # Compute low rank correction with approximate eigenpairs (ζ, u) s.t. L u 
   elseif low_rank_correction == :randomized
     verbose ? print("randomly approximate md eigenpairs of L^-1(A_ΓΓ - S)L^⁻T ... ") : nothing
+    
+    time = @elapsed begin
+      H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+      Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+      C = Array{Float64,2}(undef, ℓ, ℓ)
 
-    H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-    Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-    U = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-    C = Array{Float64,2}(undef, ℓ, ℓ)
+      Ξ = MvNormal(A_ΓΓ.n, 1.)
+      H .= rand(Ξ, ℓ)
 
-    Ξ = MvNormal(A_ΓΓ.n, 1.)
-    H .= rand(Ξ, ℓ)
-
-    for ivec in 1:ℓ
-      for j in 1:2*q+1
-        apply_bmat!(A_ΓΓ, chol_A_ΓΓ, S, H[:, ivec])
+      for ivec in 1:ℓ
+        for j in 1:2*q+1
+          apply_bmat!(A_ΓΓ, chol_A_ΓΓ, S, H[:, ivec])
+        end
       end
-    end
 
-    Q .= Matrix(qr(H).Q)
-    C .= Q'H
+      Q .= Matrix(qr(H).Q)
+      C .= Q'H
 
-    vals, vecs = LinearAlgebra.eigen(C)
+      Σ, E, info = KrylovKit.eigsolve(C)
+      Σ .= 1 .- Σ
+      for ivec in 1:ℓ
+        E[ivec] .= chol_A_ΓΓ.L'(Q * E[ivec])
+      end  
 
-    Σ = 1 .- vals
-    
-    E = Array{Float64,1}[]
-    for ivec in 1:ℓ
-      push!(E, chol_A_ΓΓ.L'(Q * vecs[:, ivec]))
-    end
-    
+    end # time @elapsed
     verbose ? println("$time seconds") : nothing
-  end
-  
+
+  end # if low_rank_correction == :randomized
+
+  # Order eigenpairs from least to more dominant
+  println(Σ)
+  order = sortperm(Σ)
+  Σ .= Σ[order]
+  E .= E[order]
+  println(Σ)
+
+  # Only keep necessary least dominant eigenpairs 
   nev = 0
   for (k, σ) in enumerate(Σ)
     if σ < ε
@@ -1245,6 +1256,8 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
       break
     end
   end 
+
+  println(Σ)
 
   if nev == nvec
     println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
@@ -1321,6 +1334,8 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                 load_partition=false,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25, 
+                                low_rank_correction=:randomized,
+                                ℓ=25,
                                 ε=.01)
 
   if load_partition
@@ -1398,7 +1413,8 @@ function prepare_lorasc_precond(tentative_nnode::Int,
   return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
                                 ind_Γ_g2l, not_dirichlet_inds_g2l, 
                                 compute_A_ΓΓ_chol=compute_A_ΓΓ_chol,
-                                nvec=nvec, ε=ε, verbose=verbose)
+                                nvec=nvec, low_rank_correction=low_rank_correction,
+                                ℓ=ℓ, ε=ε, verbose=verbose)
 
 end
 
