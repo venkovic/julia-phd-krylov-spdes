@@ -1115,6 +1115,31 @@ end
 
 
 """
+     apply_bmat(A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                chol_A_ΓΓ::SuiteSparse.CHOLMOD.Factor{Float64},
+                S::FunctionMap,
+                x::Array{Float64,1})
+
+Computes L  ((A_ΓΓ - S) * (L'  x)), where A_ΓΓ = L*L', 
+as needed for the randomized computation of low rank corrections.
+
+"""
+function apply_bmat(A_ΓΓ::SparseMatrixCSC{Float64,Int},
+                    chol_A_ΓΓ::SuiteSparse.CHOLMOD.Factor{Float64},
+                    S::FunctionMap,
+                    x::Array{Float64,1})
+
+  y = Array{Float64,1}(undef, A_ΓΓ.n)
+  z = Array{Float64,1}(undef, A_ΓΓ.n)
+  y .= chol_A_ΓΓ.L' \ x
+  z .= S * y
+  y .= A_ΓΓ * y .- z
+  z .= chol_A_ΓΓ.L \ y
+  return z
+end
+
+
+"""
      apply_bmat!(A_ΓΓ::SparseMatrixCSC{Float64,Int},
                  chol_A_ΓΓ::SuiteSparse.CHOLMOD.Factor{Float64},
                  S::FunctionMap,
@@ -1212,12 +1237,20 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
     verbose ? print("randomly approximate md eigenpairs of L^-1(A_ΓΓ - S)L^⁻T ... ") : nothing
     
     time = @elapsed begin
+      #L_ΓΓ = sparse(chol_A_ΓΓ.L)
+      L_ΓΓ = sparse(chol_A_ΓΓ.L)[invperm(chol_A_ΓΓ.p),:]
+
       H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
       Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-      C = Array{Float64,2}(undef, ℓ, ℓ)
-
+      C = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+      E = [Array{Float64,1}(undef, A_ΓΓ.n) for _ in 1:ℓ]
       Ξ = MvNormal(A_ΓΓ.n, 1.)
       H .= rand(Ξ, ℓ)
+
+      x = rand(A_ΓΓ.n)
+      println(extrema(A_ΓΓ * x .- L_ΓΓ * (L_ΓΓ' * x)))
+
+
 
       for ivec in 1:ℓ
         for j in 1:2*q+1
@@ -1226,12 +1259,16 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
       end
 
       Q .= Matrix(qr(H).Q)
-      C .= Q'H
 
-      Σ, E, info = KrylovKit.eigsolve(C)
+      for ivec in 1:ℓ
+        C[:, ivec] .= apply_bmat(A_ΓΓ, chol_A_ΓΓ, S, Q[:, ivec])
+      end
+
+      U, Σ, V = svd(C)
+
       Σ .= 1 .- Σ
       for ivec in 1:ℓ
-        E[ivec] .= chol_A_ΓΓ.L'(Q * E[ivec])
+        E[ivec] .= L_ΓΓ' * (Q * V[:, ivec])
       end  
 
     end # time @elapsed
@@ -1239,12 +1276,14 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
 
   end # if low_rank_correction == :randomized
 
-  # Order eigenpairs from least to more dominant
+
   println(Σ)
+
+
+  # Order eigenpairs from least to more dominant
   order = sortperm(Σ)
   Σ .= Σ[order]
   E .= E[order]
-  println(Σ)
 
   # Only keep necessary least dominant eigenpairs 
   nev = 0
@@ -1256,8 +1295,6 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
       break
     end
   end 
-
-  println(Σ)
 
   if nev == nvec
     println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
@@ -1335,7 +1372,7 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25, 
                                 low_rank_correction=:randomized,
-                                ℓ=25,
+                                ℓ=50,
                                 ε=.01)
 
   if load_partition
