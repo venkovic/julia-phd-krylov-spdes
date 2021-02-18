@@ -16,6 +16,7 @@ import Arpack
 
 using LinearMaps: LinearMap, FunctionMap
 using Distributions: MvNormal
+import Distributions
 
 import TriangleMesh
 
