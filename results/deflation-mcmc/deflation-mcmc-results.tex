@@ -1,0 +1,157 @@
+\documentclass{article}
+\usepackage{blindtext}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\title{Deflation results with MCMC}
+%\author{Gubert Farnsworth}
+%\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Constant preconditioners}
+
+\subsection{Block Jacobi (bJ)}
+
+\subsection{Algebraic multigrid (AMG)}
+
+\subsection{Low rank (LORASC)}
+
+
+\subsection{Neumann-Neumann (NN)}
+
+\section{Deflation results}
+
+\subsection{Weak scaling}
+Results in Tab.~\ref{Tab:005} are *.
+
+
+\begin{table}[ht]
+	\caption{Weak scaling results of deflation for a constant bJ preconditioner with $spdim=\lfloor 2.5 \times nb\rfloor$.}
+	\centering
+	\begin{tabular}{|r|r|r|r|r|r|r|}
+		%\hline
+		%\multicolumn{4}{|c|}{Country List} \\
+		\hline
+		n & nb & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		\hline
+		20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		\hline
+	\end{tabular}
+	\label{Tab:005}
+\end{table}
+
+
+
+\begin{table}[ht]
+\caption{Weak scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0.01$ and $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+\centering
+\begin{tabular}{|r|r|r|r|r|r|r|}
+	%\hline
+	%\multicolumn{4}{|c|}{Country List} \\
+	\hline
+	n & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+	\hline
+	20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+	40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+	80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+	160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+	320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+	\hline
+\end{tabular}
+\label{Tab:010}
+\end{table}
+
+\begin{table}[ht]
+	\caption{Weak scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0$ and $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+	\centering
+	\begin{tabular}{|r|r|r|r|r|r|r|}
+		%\hline
+		%\multicolumn{4}{|c|}{Country List} \\
+		\hline
+		n & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		\hline
+		20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		\hline
+	\end{tabular}
+	\label{Tab:015}
+\end{table}
+
+\begin{table}[ht]
+	\caption{Weak scaling results of deflation for a constant AMG preconditioner.}
+	\centering
+	\begin{tabular}{|r|r|r|r|r|r|r|}
+		%\hline
+		%\multicolumn{4}{|c|}{Country List} \\
+		\hline
+		n & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		\hline
+		20,000  &  10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		40,000  & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		80,000  & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		160,000 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		320,000 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		\hline
+	\end{tabular}
+	\label{Tab:020}
+\end{table}
+
+\subsubsection{Condensed linear system}
+
+\begin{table}[ht]
+	\caption{Weak scaling results of deflation for a constant NN preconditioner with $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+	\centering
+	\begin{tabular}{|r|r|r|r|r|r|r|}
+		%\hline
+		%\multicolumn{4}{|c|}{Country List} \\
+		\hline
+		$n_\Gamma$ & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		\hline
+		20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		\hline
+	\end{tabular}
+	\label{Tab:025}
+\end{table}
+
+\subsection{Strong scaling results}
+
+
+\begin{table}[ht]
+	\caption{Strong scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0.01$ and $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+	\centering
+	\begin{tabular}{|r|r|r|r|r|r|r|}
+		%\hline
+		%\multicolumn{4}{|c|}{Country List} \\
+		\hline
+		n & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		\hline
+		20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		\hline
+	\end{tabular}
+	\label{Tab:015}
+\end{table}
+
+
+
+
+\subsubsection{Condensed linear system}
+
+\end{document}
