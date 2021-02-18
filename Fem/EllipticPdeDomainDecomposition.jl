@@ -1155,10 +1155,10 @@ function apply_bmat!(A_ΓΓ::SparseMatrixCSC{Float64,Int},
                      x::Array{Float64,1})
 
   y = Array{Float64,1}(undef, A_ΓΓ.n)
-  y .= chol_A_ΓΓ.L' \ x
+  y .= chol_A_ΓΓ.PtL' \ x
   x .= S * y
   y .= A_ΓΓ * y .- x
-  x .= chol_A_ΓΓ.L \ y
+  x .= chol_A_ΓΓ.PtL \ y
 end
 
 
@@ -1247,11 +1247,6 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
       Ξ = MvNormal(A_ΓΓ.n, 1.)
       H .= rand(Ξ, ℓ)
 
-      x = rand(A_ΓΓ.n)
-      println(extrema(A_ΓΓ * x .- L_ΓΓ * (L_ΓΓ' * x)))
-
-
-
       for ivec in 1:ℓ
         for j in 1:2*q+1
           apply_bmat!(A_ΓΓ, chol_A_ΓΓ, S, H[:, ivec])
@@ -1268,7 +1263,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
 
       Σ .= 1 .- Σ
       for ivec in 1:ℓ
-        E[ivec] .= L_ΓΓ' * (Q * V[:, ivec])
+        E[ivec] .= chol_A_ΓΓ.PtL' \ (Q * V[:, ivec])
       end  
 
     end # time @elapsed
@@ -1277,8 +1272,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
   end # if low_rank_correction == :randomized
 
 
-  println(Σ)
-
+  println(extrema(Σ))
 
   # Order eigenpairs from least to more dominant
   order = sortperm(Σ)
@@ -1301,6 +1295,8 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
   elseif nev == 0 
     println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
     nev = nvec
+  else
+    println("ε = $ε, nev = $nev.")
   end
 
   n_Γ = ind_Γ_g2l.count
@@ -1372,8 +1368,8 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25, 
                                 low_rank_correction=:randomized,
-                                ℓ=50,
-                                ε=.01)
+                                ℓ=100,
+                                ε=.2)
 
   if load_partition
     epart, npart = load_partition(tentative_nnode, ndom)
@@ -1446,6 +1442,8 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                           preconds=Π_IId), 
                                           nothing, n_Γ, issymmetric=true)
   end
+
+  ℓ = floor(Int, ndom + .1 * A_ΓΓ.n)
 
   return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
                                 ind_Γ_g2l, not_dirichlet_inds_g2l, 
