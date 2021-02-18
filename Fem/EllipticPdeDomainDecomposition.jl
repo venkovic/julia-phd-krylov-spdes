@@ -1195,7 +1195,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 verbose=true,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25,
-                                low_rank_correction=:exact,
+                                low_rank_correction=:randomized,
                                 ℓ=25,
                                 ε=.01,
                                 q=2)
@@ -1235,11 +1235,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
   # Compute low rank correction with approximate eigenpairs (ζ, u) s.t. L u 
   elseif low_rank_correction == :randomized
     verbose ? print("randomly approximate md eigenpairs of L^-1(A_ΓΓ - S)L^⁻T ... ") : nothing
-    
     time = @elapsed begin
-      #L_ΓΓ = sparse(chol_A_ΓΓ.L)
-      L_ΓΓ = sparse(chol_A_ΓΓ.L)[invperm(chol_A_ΓΓ.p),:]
-
       H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
       Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
       C = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
@@ -1259,7 +1255,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
         C[:, ivec] .= apply_bmat(A_ΓΓ, chol_A_ΓΓ, S, Q[:, ivec])
       end
 
-      U, Σ, V = svd(C)
+      _, Σ, V = svd(C)
 
       Σ .= 1 .- Σ
       for ivec in 1:ℓ
