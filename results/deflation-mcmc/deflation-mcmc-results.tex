@@ -2,6 +2,7 @@
 \usepackage{blindtext}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
+\usepackage{makecell}
 
 \title{Deflation results with MCMC}
 %\author{Gubert Farnsworth}
@@ -31,17 +32,17 @@ Results in Tab.~\ref{Tab:005} are *.
 \begin{table}[ht]
 	\caption{Weak scaling results of deflation for a constant bJ preconditioner with $spdim=\lfloor 2.5 \times nb\rfloor$.}
 	\centering
-	\begin{tabular}{|r|r|r|r|r|r|r|}
+	\begin{tabular}{|c|c|c|c|c|c|c|}
 		%\hline
 		%\multicolumn{4}{|c|}{Country List} \\
 		\hline
-		n & nb & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		n & nb & \makecell{pcg\\ iter} & spdim & \makecell{eigpcg\\ iter} & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 		\hline
 		20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		40,406  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		80,598  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		160,941 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		321,386 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
 		\hline
 	\end{tabular}
 	\label{Tab:005}
