@@ -1195,7 +1195,7 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                                 verbose=true,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25,
-                                low_rank_correction=:randomized,
+                                low_rank_correction=:exact,
                                 ℓ=25,
                                 ε=.01,
                                 q=2)
@@ -1223,77 +1223,84 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
   end
   verbose ? println("$time seconds") : nothing
 
-  # Compute low rank correction with exact generalized eigenpairs (σ, e) s.t. S * e == σ * A_ΓΓ * e
-  if low_rank_correction == :exact
-    verbose ? print("solve for general ld eigenpairs of (S, A_ΓΓ) ... ") : nothing
-    time = @elapsed Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
-                                                     A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
-                                                     isposdef=true, ishermitian=true,
-                                                     issymmetric=true)
-    verbose ? println("$time seconds") : nothing
+  # Compute mow rank correction ...
+  if ε > 0
+    
+    # ... with exact generalized eigenpairs (σ, e) s.t. S * e == σ * A_ΓΓ * e
+    if low_rank_correction == :exact
+      verbose ? print("solve for general ld eigenpairs of (S, A_ΓΓ) ... ") : nothing
+      time = @elapsed Σ, E, info = KrylovKit.geneigsolve(x_Γ -> (S * x_Γ, A_ΓΓ * x_Γ), 
+                                                         A_ΓΓ.n, nvec, :SR, krylovdim=2*nvec, 
+                                                         isposdef=true, ishermitian=true,
+                                                         issymmetric=true)
+      verbose ? println("$time seconds") : nothing
 
-  # Compute low rank correction with approximate eigenpairs (ζ, u) s.t. L u 
-  elseif low_rank_correction == :randomized
-    verbose ? print("randomly approximate md eigenpairs of L^-1(A_ΓΓ - S)L^⁻T ... ") : nothing
-    time = @elapsed begin
-      H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-      Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-      C = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
-      E = [Array{Float64,1}(undef, A_ΓΓ.n) for _ in 1:ℓ]
-      Ξ = MvNormal(A_ΓΓ.n, 1.)
-      H .= rand(Ξ, ℓ)
+    # ... with approximate eigenpairs (ζ, u) s.t. L u 
+    elseif low_rank_correction == :randomized
+      verbose ? print("randomly approximate md eigenpairs of L^-1(A_ΓΓ - S)L^⁻T ... ") : nothing
+      time = @elapsed begin
+        H = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+        Q = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+        C = Array{Float64,2}(undef, A_ΓΓ.n, ℓ)
+        E = [Array{Float64,1}(undef, A_ΓΓ.n) for _ in 1:ℓ]
+        Ξ = MvNormal(A_ΓΓ.n, 1.)
+        H .= rand(Ξ, ℓ)
 
-      for ivec in 1:ℓ
-        for j in 1:2*q+1
-          apply_bmat!(A_ΓΓ, chol_A_ΓΓ, S, H[:, ivec])
+        for ivec in 1:ℓ
+          for j in 1:2*q+1
+            apply_bmat!(A_ΓΓ, chol_A_ΓΓ, S, H[:, ivec])
+          end
         end
+
+        Q .= Matrix(qr(H).Q)
+
+        for ivec in 1:ℓ
+          C[:, ivec] .= apply_bmat(A_ΓΓ, chol_A_ΓΓ, S, Q[:, ivec])
+        end
+
+        _, Σ, V = svd(C)
+
+        Σ .= 1 .- Σ
+        for ivec in 1:ℓ
+          E[ivec] .= chol_A_ΓΓ.PtL' \ (Q * V[:, ivec])
+        end  
+
+      end # time @elapsed
+      verbose ? println("$time seconds") : nothing
+
+    end # if low_rank_correction == :randomized
+
+    # Order eigenpairs from least to more dominant
+    order = sortperm(Σ)
+    Σ .= Σ[order]
+    E .= E[order]
+
+    # Only keep necessary least dominant eigenpairs 
+    nev = 0
+    for (k, σ) in enumerate(Σ)
+      if σ < ε
+        Σ[k] = (ε - σ) / σ
+        nev += 1
+      else
+        break
       end
+    end 
 
-      Q .= Matrix(qr(H).Q)
-
-      for ivec in 1:ℓ
-        C[:, ivec] .= apply_bmat(A_ΓΓ, chol_A_ΓΓ, S, Q[:, ivec])
-      end
-
-      _, Σ, V = svd(C)
-
-      Σ .= 1 .- Σ
-      for ivec in 1:ℓ
-        E[ivec] .= chol_A_ΓΓ.PtL' \ (Q * V[:, ivec])
-      end  
-
-    end # time @elapsed
-    verbose ? println("$time seconds") : nothing
-
-  end # if low_rank_correction == :randomized
-
-
-  println(extrema(Σ))
-
-  # Order eigenpairs from least to more dominant
-  order = sortperm(Σ)
-  Σ .= Σ[order]
-  E .= E[order]
-
-  # Only keep necessary least dominant eigenpairs 
-  nev = 0
-  for (k, σ) in enumerate(Σ)
-    if σ < ε
-      Σ[k] = (ε - σ) / σ
-      nev += 1
+    if nev == nvec
+      println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
+    elseif nev == 0 
+      println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
+      nev = nvec
     else
-      break
+      println("ε = $ε, nev = $nev.")
     end
-  end 
 
-  if nev == nvec
-    println("Warning in prepare_lorasc_precond: nev == nvec -> pick a larger nvec.")
-  elseif nev == 0 
-    println("Warning in prepare_lorasc_precond: nev == 0 -> pick a larger ε.")
-    nev = nvec
   else
-    println("ε = $ε, nev = $nev.")
-  end
+    nev = 0
+    E = Array{Float64,2}(undef, A_ΓΓ.n, nev)
+    Σ = Array{Float64,1}(undef, nev)
+
+  end # if ε > 0
 
   n_Γ = ind_Γ_g2l.count
   n = not_dirichlet_inds_g2l.count
@@ -1359,13 +1366,12 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                 f::Function,
                                 uexact::Function;
                                 verbose=true,
-                                do_local_schur_assembly=false,
+                                do_local_schur_assembly=true,
                                 load_partition=false,
                                 compute_A_ΓΓ_chol=true,
                                 nvec=25, 
-                                low_rank_correction=:randomized,
-                                ℓ=100,
-                                ε=.2)
+                                low_rank_correction=:exact,
+                                ε=.01)
 
   if load_partition
     epart, npart = load_partition(tentative_nnode, ndom)
@@ -1439,6 +1445,7 @@ function prepare_lorasc_precond(tentative_nnode::Int,
                                           nothing, n_Γ, issymmetric=true)
   end
 
+  # ℓ-value suggested in Grigori et al.
   ℓ = floor(Int, ndom + .1 * A_ΓΓ.n)
 
   return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
