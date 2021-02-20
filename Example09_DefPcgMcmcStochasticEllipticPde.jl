@@ -248,6 +248,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p])
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
+        flush(stdout)
       end
 
       if do_eigpcg
@@ -263,6 +264,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
+        flush(stdout)
       end
 
       if do_eigdefpcg
@@ -276,6 +278,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         end
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
+        flush(stdout)
       end
 
       if do_defpcg
@@ -290,6 +293,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         end
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
+        flush(stdout)
       end
 
     end # for (p, precond)
