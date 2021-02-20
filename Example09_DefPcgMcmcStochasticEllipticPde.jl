@@ -381,16 +381,14 @@ end
 # Is assemble_local_schurs necessary with ε = 0 
 #
 
-Π = [Π_amg_0, Π_lorasc_0, Π_lorasc_1, Π_bj_0]
-preconds = ["amg_0",
-            "lorasc$(ndom)_0",
-            "lorasc$(ndom)_1",
-            "bj$(nbj)_0"]
+Π = [Π_lorasc_0, Π_lorasc_1]
+preconds = ["lorasc$(ndom)_0",
+            "lorasc$(ndom)_1"]
  
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
                                        preconds, nvec, spdim,
                                        do_pcg=false,
-                                       do_eigpcg=true,
+                                       do_eigpcg=false,
                                        do_eigdefpcg=true,
                                        do_defpcg=false,
                                        save_results=true)
