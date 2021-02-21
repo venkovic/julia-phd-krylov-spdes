@@ -294,7 +294,6 @@ function test_solvers_on_single_chain(nsmp::Int,
         method = precond * "-eigdefpcg"
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
-        println(isposdef(A), " ", extrema(b), " ", extrema(A * x .- b))
         if s == 1
           troubleshoot ? save_system(A, b) : nothing
           try
