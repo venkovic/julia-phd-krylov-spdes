@@ -16,12 +16,11 @@
 
 \subsection{Block Jacobi (bJ)}
 
-\subsection{Algebraic multigrid (AMG)}
-
 \subsection{Low rank (LORASC)}
 
-
 \subsection{Neumann-Neumann (NN)}
+
+\subsection{Algebraic multigrid (AMG)}
 
 \section{Deflation results}
 
@@ -32,15 +31,15 @@ Results in Tab.~\ref{Tab:005} are *.
 \begin{table}[ht]
 	\caption{Weak scaling results of deflation for a constant bJ preconditioner with $nvec=\lfloor1.25\times nb\rfloor$ and $spdim=3\times nb$.}
 	\centering
-	\begin{tabular}{|c|c|c|c|c|c|c|c|}
+	\begin{tabular}{|c|c|c|c|c|c|c|}
 		\hline
-		n & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigpcg\\ iter} & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+		n & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 		\hline
-		20,208  &   8 & 10 $\pm$ 2 &  10 &  24 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		40,406  &  16 & 10 $\pm$ 2 &  20 &  48 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		80,598  &  32 & 10 $\pm$ 2 &  40 &  96 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		160,941 &  64 & 10 $\pm$ 2 &  80 & 192 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		321,386 & 128 & 10 $\pm$ 2 & 160 & 384 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		20,208  &   8 &   828.6 $\pm$ 166.5 &  10 &  24 &   488.6 $\pm$  93.4 & xxx.xx $\pm$ xx.xx \\
+		40,406  &  16 & 1,435.2 $\pm$ 357.2 &  20 &  48 &   715.3 $\pm$ 154.6 & xxx.xx $\pm$ xx.xx \\
+		80,598  &  32 & 2,241.5 $\pm$ 528.4 &  40 &  96 & 1,043.2 $\pm$ 294.2 & xxx.xx $\pm$ xx.xx \\
+		160,941 &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		321,386 & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
 		\hline
 	\end{tabular}
 	\label{Tab:005}
@@ -49,40 +48,36 @@ Results in Tab.~\ref{Tab:005} are *.
 
 
 \begin{table}[ht]
-\caption{Weak scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0.01$ and $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+\caption{Weak scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0$, $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
 \centering
-\begin{tabular}{|r|r|r|r|r|r|r|}
-	%\hline
-	%\multicolumn{4}{|c|}{Country List} \\
+	\begin{tabular}{|c|c|c|c|c|c|c|}
 	\hline
-	n & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+	n & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 	\hline
-	20,208  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-	40,406  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-	80,598  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-	160,941 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-	321,386 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+	20,208  &   8 & 243.9 $\pm$  49.9 &  10 &  24 & 158.6 $\pm$ 35.7 & xxx.x $\pm$ xx.x \\
+	40,406  &  16 & 348.3 $\pm$  89.6 &  20 &  48 & 181.7 $\pm$ 43.0 & xxx.x $\pm$ xx.x \\
+	80,598  &  32 & 453.9 $\pm$ 115.9 &  40 &  96 & 201.6 $\pm$ 51.1 & xxx.x $\pm$ xx.x \\
+	160,941 &  64 & 603.2 $\pm$ 134.7 &  80 & 192 & 239.5 $\pm$ 47.0 & xxx.x $\pm$ xx.x \\
+	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
 	\hline
 \end{tabular}
 \label{Tab:010}
 \end{table}
 
 \begin{table}[ht]
-	\caption{Weak scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0$ and $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+	\caption{Weak scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0.01$, $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
 	\centering
-	\begin{tabular}{|r|r|r|r|r|r|r|}
-		%\hline
-		%\multicolumn{4}{|c|}{Country List} \\
-		\hline
-		n & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
-		\hline
-		20,208  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		40,406  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		80,598  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		160,941 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		321,386 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		\hline
-	\end{tabular}
+	\begin{tabular}{|c|c|c|c|c|c|c|}
+	\hline
+	n & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+	\hline
+	20,208  &   8 & 231.6 $\pm$  47.8 &  10 &  24 & 160.0 $\pm$ 36.3 & xxx.x $\pm$ xx.x \\
+	40,406  &  16 & 324.5 $\pm$  84.0 &  20 &  48 & 182.3 $\pm$ 44.2 & xxx.x $\pm$ xx.x \\
+	80,598  &  32 & 388.7 $\pm$  98.3 &  40 &  96 & 202.5 $\pm$ 53.7 & xxx.x $\pm$ xx.x \\
+	160,941 &  64 & 498.3 $\pm$ 116.6 &  80 & 192 & 236.6 $\pm$ 45.4 & xxx.x $\pm$ xx.x \\
+	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	\hline
+\end{tabular}
 	\label{Tab:015}
 \end{table}
 
@@ -110,19 +105,17 @@ Results in Tab.~\ref{Tab:005} are *.
 \begin{table}[ht]
 	\caption{Weak scaling results of deflation for a constant NN preconditioner with $spdim=\lfloor 2.5 \times ndom\rfloor$.}
 	\centering
-	\begin{tabular}{|r|r|r|r|r|r|r|}
-		%\hline
-		%\multicolumn{4}{|c|}{Country List} \\
-		\hline
-		$n_\Gamma$ & ndom & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
-		\hline
-		20,000  &   8 & 10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		40,000  &  16 & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		80,000  &  32 & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		160,000 &  64 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		320,000 & 128 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		\hline
-	\end{tabular}
+	\begin{tabular}{|c|c|c|c|c|c|c|c|}
+	\hline
+	n & $n_\Gamma$ & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+	\hline
+	20,208  &  xx,xxx &   8 & xxx.xx $\pm$ xx.xx &  10 &  24 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+	40,406  &  xx,xxx &  16 & 348.28 $\pm$ 89.55 &  20 &  48 & 181.68 $\pm$ 43.03 & xxx.xx $\pm$ xx.xx \\
+	80,598  &  xx,xxx &  32 & xxx.xx $\pm$ xx.xx &  40 &  96 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+	160,941 &  xx,xxx &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+	321,386 &  xx,xxx & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+	\hline
+\end{tabular}
 	\label{Tab:025}
 \end{table}
 
