@@ -25,10 +25,10 @@ import JLD
 troubleshoot = true
 
 maxit = 4_000
-tentative_nnode = 80_000
+tentative_nnode = 320_000
 load_existing_mesh = false
 
-ndom = 32
+ndom = 128
 load_existing_partition = false
 
 nbj = ndom
@@ -228,6 +228,7 @@ function test_solvers_on_single_chain(nsmp::Int,
   # Sample ξ by mcmc and solve linear systems by def-pcg with 
   # online eigenvectors approximation
   #
+  it = 0
   cnt_reals = 1
   for s in 1:nsmp
 
@@ -253,7 +254,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         method = precond * "-pcg"
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
-        troobleshoot ? save_system(A, b) : nothing 
+        troubleshoot ? save_system(A, b) : nothing 
         try
           Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p], maxit=maxit)
         catch err
@@ -275,7 +276,7 @@ function test_solvers_on_single_chain(nsmp::Int,
           x .= W[method] * (H \ (W[method]'b))
         end
         verbose ? print("$method of A * u = b ... ") : nothing
-        troobleshoot ? save_system(A, b) : nothing 
+        troubleshoot ? save_system(A, b) : nothing 
         try
           Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
         catch err
@@ -292,7 +293,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
         if s == 1
-          troobleshoot ? save_system(A, b) : nothing
+          troubleshoot ? save_system(A, b) : nothing
           try
             Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
           catch err
@@ -300,7 +301,7 @@ function test_solvers_on_single_chain(nsmp::Int,
             return iter, status
           end
         else
-          troobleshoot ? save_deflated_system(A, b, W[method]) : nothing
+          troubleshoot ? save_deflated_system(A, b, W[method]) : nothing
           try
             Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim, maxit=maxit)
           catch err
@@ -319,7 +320,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         verbose ? print("$method of A * u = b ... ") : nothing
         if s == 1
           # Some work remains to do here
-          troobleshoot ? save_system(A, b) : nothing 
+          troubleshoot ? save_system(A, b) : nothing 
           try
             Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
           catch err
@@ -327,7 +328,7 @@ function test_solvers_on_single_chain(nsmp::Int,
             return iter, status
           end
         else
-          troobleshoot ? save_deflated_system(A, b, W[method]) : nothing 
+          troubleshoot ? save_deflated_system(A, b, W[method]) : nothing 
           try
             Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p], maxit=maxit)
           catch err
@@ -424,6 +425,7 @@ function test_solvers_on_several_chains(nchains::Int,
       end
 
       println("\n\n ... done working on chain $ichain / $nchains.")
+      ichain += 1
     end # if status = 0
   end
 
@@ -434,14 +436,12 @@ end
 #
 # Is assemble_local_schurs necessary with ε = 0 
 #
-"""
 Π = [Π_lorasc_0, Π_lorasc_1]
 preconds = ["lorasc$(ndom)_0",
             "lorasc$(ndom)_1"]
-"""
 
-Π = [Π_bj_0]
-preconds = ["bj$(nbj)_0"]
+#Π = [Π_bj_0]
+#preconds = ["bj$(nbj)_0"]
             
 
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
