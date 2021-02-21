@@ -20,11 +20,14 @@ using NPZ: npzread, npzwrite
 using Random: seed!
 using LinearMaps: LinearMap
 import SuiteSparse
+import JLD
 
-tentative_nnode = 20_000
+troubleshoot = true
+
+tentative_nnode = 80_000
 load_existing_mesh = false
 
-ndom = 8
+ndom = 32
 load_existing_partition = false
 
 nbj = ndom
@@ -165,7 +168,8 @@ function test_solvers_on_single_chain(nsmp::Int,
                                       do_eigdefpcg=true,
                                       do_defpcg=true,
                                       verbose=true,
-                                      save_results=false)
+                                      save_results=false,
+                                      troubleshoot=false)
 
   sampler = prepare_mcmc_sampler(Λ, Ψ)
 
@@ -245,6 +249,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         method = precond * "-pcg"
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
+        troobleshoot ? save_system(A, b) : nothing 
         Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p])
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
@@ -261,6 +266,7 @@ function test_solvers_on_single_chain(nsmp::Int,
           x .= W[method] * (H \ (W[method]'b))
         end
         verbose ? print("$method of A * u = b ... ") : nothing
+        troobleshoot ? save_system(A, b) : nothing 
         Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
@@ -272,8 +278,10 @@ function test_solvers_on_single_chain(nsmp::Int,
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
         if s == 1
+          troobleshoot ? save_system(A, b) : nothing 
           Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
         else
+          troobleshoot ? save_deflated_system(A, b, W[method]) : nothing 
           Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim)
         end
         verbose ? println("$Δt seconds, iter = $it") : nothing
@@ -287,8 +295,10 @@ function test_solvers_on_single_chain(nsmp::Int,
         verbose ? print("$method of A * u = b ... ") : nothing
         if s == 1
           # Some work remains to do here
+          troobleshoot ? save_system(A, b) : nothing 
           Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
         else
+          troobleshoot ? save_deflated_system(A, b, W[method]) : nothing 
           Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p])
         end
         verbose ? println("$Δt seconds, iter = $it") : nothing
@@ -340,7 +350,8 @@ function test_solvers_on_several_chains(nchains::Int,
                                         do_eigdefpcg=true,
                                         do_defpcg=true,
                                         verbose=true,
-                                        save_results=true)
+                                        save_results=true,
+                                        troubleshoot=false)
 
   iters = Dict{String,Array{Int,2}}()
 
@@ -353,7 +364,8 @@ function test_solvers_on_several_chains(nchains::Int,
                                         do_eigpcg=do_eigpcg,
                                         do_eigdefpcg=do_eigdefpcg,
                                         do_defpcg=do_defpcg,
-                                        verbose=verbose)
+                                        verbose=verbose,
+                                        troubleshoot=troubleshoot)
 
     for (method, _iter) in iter
       if haskey(iters, method) 
@@ -384,15 +396,21 @@ end
 #
 # Is assemble_local_schurs necessary with ε = 0 
 #
-
+"""
 Π = [Π_lorasc_0, Π_lorasc_1]
 preconds = ["lorasc$(ndom)_0",
             "lorasc$(ndom)_1"]
- 
+"""
+
+Π = [Π_bj_0]
+preconds = ["bj$(nbj)_0"]
+            
+
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
                                        preconds, nvec, spdim,
                                        do_pcg=false,
                                        do_eigpcg=false,
                                        do_eigdefpcg=true,
                                        do_defpcg=false,
-                                       save_results=true)
+                                       save_results=true,
+                                       troubleshoot=troubleshoot)
