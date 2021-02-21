@@ -171,6 +171,8 @@ function test_solvers_on_single_chain(nsmp::Int,
                                       save_results=false,
                                       troubleshoot=false)
 
+  status = 0 
+
   sampler = prepare_mcmc_sampler(Λ, Ψ)
 
   verbose ? println("\n1 / $nsmp") : nothing
@@ -250,7 +252,12 @@ function test_solvers_on_single_chain(nsmp::Int,
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
         troobleshoot ? save_system(A, b) : nothing 
-        Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p])
+        try
+          Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p])
+        catch err
+          status = -1
+          return iter, status
+        end
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
         flush(stdout)
@@ -267,7 +274,12 @@ function test_solvers_on_single_chain(nsmp::Int,
         end
         verbose ? print("$method of A * u = b ... ") : nothing
         troobleshoot ? save_system(A, b) : nothing 
-        Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+        try
+          Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+        catch err
+          status = -1
+          return iter, status
+        end
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
         flush(stdout)
@@ -278,11 +290,21 @@ function test_solvers_on_single_chain(nsmp::Int,
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
         if s == 1
-          troobleshoot ? save_system(A, b) : nothing 
-          Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+          troobleshoot ? save_system(A, b) : nothing
+          try
+            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+          catch err
+            status = -1
+            return iter, status
+          end
         else
-          troobleshoot ? save_deflated_system(A, b, W[method]) : nothing 
-          Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim)
+          troobleshoot ? save_deflated_system(A, b, W[method]) : nothing
+          try
+            Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim)
+          catch err
+            status = -1
+            return iter, status
+          end
         end
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
@@ -296,10 +318,20 @@ function test_solvers_on_single_chain(nsmp::Int,
         if s == 1
           # Some work remains to do here
           troobleshoot ? save_system(A, b) : nothing 
-          Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+          try
+            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+          catch err
+            status = -1
+            return iter, status
+          end
         else
           troobleshoot ? save_deflated_system(A, b, W[method]) : nothing 
-          Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p])
+          try
+            Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p])
+          catch err
+            status = -1
+            return iter, status
+          end
         end
         verbose ? println("$Δt seconds, iter = $it") : nothing
         iter[method][s] = it
@@ -316,7 +348,7 @@ function test_solvers_on_single_chain(nsmp::Int,
     end
   end
 
-  return iter
+  return iter, status
 end
 
 
@@ -355,38 +387,41 @@ function test_solvers_on_several_chains(nchains::Int,
 
   iters = Dict{String,Array{Int,2}}()
 
-  for ichain in 1:nchains
+  ichain = 1
+  while ichain <= nchains
 
     println("\n\nworking on chain $ichain / $nchains ...")
 
-    iter = test_solvers_on_single_chain(nsmp, Λ, Ψ, Π, preconds, nvec, spdim,
-                                        do_pcg=do_pcg,
-                                        do_eigpcg=do_eigpcg,
-                                        do_eigdefpcg=do_eigdefpcg,
-                                        do_defpcg=do_defpcg,
-                                        verbose=verbose,
-                                        troubleshoot=troubleshoot)
-
-    for (method, _iter) in iter
-      if haskey(iters, method) 
-        iters[method] = hcat(iters[method], _iter)
-      else
-        iters[method] = reshape(_iter, length(_iter), 1)
-      end
-    end
-
-    if save_results
-      for (method, _iters) in iters
-        if occursin("-eigpcg", method) | occursin("-eigdefpcg", method) | occursin("-defpcg", method)
-          npzwrite("data/$(root_fname)_$(method)_nvec$(nvec)_spdim$(spdim).it.npz", _iters)
+    iter, status = test_solvers_on_single_chain(nsmp, Λ, Ψ, Π, preconds, nvec, spdim,
+                                                do_pcg=do_pcg,
+                                                do_eigpcg=do_eigpcg,
+                                                do_eigdefpcg=do_eigdefpcg,
+                                                do_defpcg=do_defpcg,
+                                                verbose=verbose,
+                                                troubleshoot=troubleshoot)
+    
+    if status == 0
+      for (method, _iter) in iter
+        if haskey(iters, method) 
+          iters[method] = hcat(iters[method], _iter)
         else
-          npzwrite("data/$(root_fname)_$(method).it.npz", _iters)
+          iters[method] = reshape(_iter, length(_iter), 1)
         end
-
       end
-    end
 
-    println("\n\n ... done working on chain $ichain / $nchains.")
+      if save_results
+        for (method, _iters) in iters
+          if occursin("-eigpcg", method) | occursin("-eigdefpcg", method) | occursin("-defpcg", method)
+            npzwrite("data/$(root_fname)_$(method)_nvec$(nvec)_spdim$(spdim).it.npz", _iters)
+          else
+            npzwrite("data/$(root_fname)_$(method).it.npz", _iters)
+          end
+
+        end
+      end
+
+      println("\n\n ... done working on chain $ichain / $nchains.")
+    end # if status = 0
   end
 
   return iters
