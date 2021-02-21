@@ -25,7 +25,8 @@ function defcg(A::Union{SparseMatrixCSC{T},
                         FunctionMap},
                b::Array{T,1},
                x::Array{T,1},
-               W::Array{T,2})
+               W::Array{T,2};
+               maxit=0)
 
   n, nvec = size(W)
   r = Array{T,1}(undef, n)
@@ -43,6 +44,7 @@ function defcg(A::Union{SparseMatrixCSC{T},
   mu .= WtAW \ mu
   x .+= W * mu
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -53,7 +55,7 @@ function defcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < A.n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTr / d
@@ -102,7 +104,8 @@ function eigdefcg(A::Union{SparseMatrixCSC{T},
                   b::Array{T,1},
                   x::Array{T,1},
                   W::Array{T,2},
-                  spdim::Int)
+                  spdim::Int;
+                  maxit=0)
 
   n, nvec = size(W)
   r = Array{T,1}(undef, n)
@@ -126,6 +129,7 @@ function eigdefcg(A::Union{SparseMatrixCSC{T},
   Y = zeros(T, spdim, 2 * nvec)
   first_restart = true
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -142,7 +146,7 @@ function eigdefcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < A.n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTr / d
@@ -222,7 +226,8 @@ function defpcg(A::Union{SparseMatrixCSC{T},
                 b::Array{T,1},
                 W::Array{T,2},
                 x::Array{T,1},
-                M)
+                M;
+                maxit=0)
 
   n, nvec = size(W)
   r = Array{T,1}(undef, n)
@@ -241,6 +246,7 @@ function defpcg(A::Union{SparseMatrixCSC{T},
   mu .= WtAW \ mu
   x .+= W * mu
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -253,7 +259,7 @@ function defpcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap .= A * p
     d = dot(p, Ap)
     alpha = rTz / d
@@ -306,7 +312,8 @@ function eigdefpcg(A::Union{SparseMatrixCSC{T},
                    x::Array{T,1},
                    M,
                    W::Array{T,2},
-                   spdim::Int)
+                   spdim::Int;
+                   maxit=0)
 
   n, nvec = size(W)
   r = Array{T,1}(undef, n)
@@ -332,6 +339,7 @@ function eigdefpcg(A::Union{SparseMatrixCSC{T},
   Y = zeros(T, spdim, 2 * nvec)
   first_restart = true
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -351,7 +359,7 @@ function eigdefpcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTz / d

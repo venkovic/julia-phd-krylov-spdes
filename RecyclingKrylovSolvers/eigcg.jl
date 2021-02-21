@@ -29,7 +29,8 @@ function eigcg(A::Union{SparseMatrixCSC{T},
                b::Array{T,1},
                x::Array{T,1},
                nvec::Int,
-               spdim::Int)
+               spdim::Int;
+               maxit=0)
 
   n, = size(x)
   r = Array{T,1}(undef, n)
@@ -43,6 +44,7 @@ function eigcg(A::Union{SparseMatrixCSC{T},
   tvec = Array{T,1}(undef, n)
   just_restarted = false
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -54,7 +56,7 @@ function eigcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < A.n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTr / d
@@ -144,7 +146,8 @@ function eigpcg(A::Union{SparseMatrixCSC{T},
                 x::Array{T,1},
                 M,
                 nvec::Int,
-                spdim::Int)
+                spdim::Int;
+                maxit=0)
                 
   n, = size(x)
   r = Array{T,1}(undef, n)
@@ -159,6 +162,7 @@ function eigpcg(A::Union{SparseMatrixCSC{T},
   tvec = Array{T,1}(undef, n)
   just_restarted = false
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -174,7 +178,7 @@ function eigpcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < A.n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTz / d

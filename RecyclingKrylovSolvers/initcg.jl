@@ -29,7 +29,8 @@ function initcg(A::Union{SparseMatrixCSC{T},
                          FunctionMap},
                 b::Array{T,1},
                 x::Array{T,1},
-                W::Array{T,2})
+                W::Array{T,2};
+                maxit=0)
 
   n, nvec = size(W)
   r = Array{T,1}(undef,n)
@@ -46,6 +47,7 @@ function initcg(A::Union{SparseMatrixCSC{T},
   mu .= WtAW \ mu
   x .+= W * mu
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -55,7 +57,7 @@ function initcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < A.n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTr / d
@@ -106,7 +108,8 @@ function initpcg(A::Union{SparseMatrixCSC{T},
                  b::Vector{T},
                  x::Vector{T},
                  M,
-                 W::Array{T,2})
+                 W::Array{T,2};
+                 maxit=0)
 
   n, nvec = size(W)
   r = Array{T,1}(undef, n)
@@ -124,6 +127,7 @@ function initpcg(A::Union{SparseMatrixCSC{T},
   mu .= WtAW \ mu
   x .+= W * mu
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -135,7 +139,7 @@ function initpcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTz / d

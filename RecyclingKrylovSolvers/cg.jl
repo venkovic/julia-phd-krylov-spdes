@@ -14,7 +14,8 @@ SIAM, 2003, 82
 function cg(A::Union{SparseMatrixCSC{T},
                      FunctionMap}, 
             b::Array{T,1},
-            x::Array{T,1})
+            x::Array{T,1};
+            maxit=0)
 
   n, = size(x)
   r = Array{T,1}(undef, n)
@@ -22,6 +23,7 @@ function cg(A::Union{SparseMatrixCSC{T},
   Ap = Array{T,1}(undef, n)
   res_norm = Array{T,1}(undef, n)
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -30,7 +32,7 @@ function cg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTr / d
@@ -66,7 +68,8 @@ function pcg(A::Union{SparseMatrixCSC{T},
                       FunctionMap},
              b::Array{T,1},
              x::Array{T,1},
-             M)
+             M;
+             maxit=0)
   
   n, = size(x)
   r = Array{T,1}(undef, n)
@@ -75,6 +78,7 @@ function pcg(A::Union{SparseMatrixCSC{T},
   Ap = Array{T,1}(undef, n)
   res_norm = Array{T,1}(undef, n)
 
+  maxit == 0 ? maxit = n : nothing
   it = 1
   r .= b .- A * x
   rTr = dot(r, r)
@@ -85,7 +89,7 @@ function pcg(A::Union{SparseMatrixCSC{T},
   bnorm = norm2(b)
   tol = eps * bnorm
 
-  while (it < n) && (res_norm[it] > tol)
+  while (it < maxit) && (res_norm[it] > tol)
     mul!(Ap, A, p) # Ap = A * p
     d = dot(p, Ap)
     alpha = rTz / d
