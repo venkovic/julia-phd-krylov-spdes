@@ -22,13 +22,15 @@ using LinearMaps: LinearMap
 import SuiteSparse
 import JLD
 
+using LinearAlgebra: isposdef, rank
+
 troubleshoot = true
 
-maxit = 4_000
-tentative_nnode = 320_000
+maxit = 5_000
+tentative_nnode = 160_000
 load_existing_mesh = false
 
-ndom = 128
+ndom = 64
 load_existing_partition = false
 
 nbj = ndom
@@ -292,6 +294,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         method = precond * "-eigdefpcg"
         x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
+        println(isposdef(A), " ", extrema(b), " ", extrema(A * x .- b))
         if s == 1
           troubleshoot ? save_system(A, b) : nothing
           try
@@ -303,6 +306,10 @@ function test_solvers_on_single_chain(nsmp::Int,
         else
           troubleshoot ? save_deflated_system(A, b, W[method]) : nothing
           try
+            if rank(W[method]) < .9 * nvec
+              status = -1
+              return iter, status
+            end
             Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim, maxit=maxit)
           catch err
             status = -1
@@ -436,12 +443,12 @@ end
 #
 # Is assemble_local_schurs necessary with ε = 0 
 #
-Π = [Π_lorasc_0, Π_lorasc_1]
-preconds = ["lorasc$(ndom)_0",
-            "lorasc$(ndom)_1"]
+#Π = [Π_lorasc_0, Π_lorasc_1]
+#preconds = ["lorasc$(ndom)_0",
+#            "lorasc$(ndom)_1"]
 
-#Π = [Π_bj_0]
-#preconds = ["bj$(nbj)_0"]
+Π = [Π_bj_0]
+preconds = ["bj$(nbj)_0"]
             
 
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
