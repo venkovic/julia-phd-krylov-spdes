@@ -24,6 +24,7 @@ import JLD
 
 troubleshoot = true
 
+maxit = 4_000
 tentative_nnode = 80_000
 load_existing_mesh = false
 
@@ -162,7 +163,8 @@ function test_solvers_on_single_chain(nsmp::Int,
                                       Π,
                                       preconds::Array{String,1},
                                       nvec::Int,
-                                      spdim::Int;
+                                      spdim::Int,
+                                      maxit::Int;
                                       do_pcg=true,
                                       do_eigpcg=true,
                                       do_eigdefpcg=true,
@@ -253,7 +255,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         verbose ? print("$method of A * u = b ... ") : nothing
         troobleshoot ? save_system(A, b) : nothing 
         try
-          Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p])
+          Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p], maxit=maxit)
         catch err
           status = -1
           return iter, status
@@ -275,7 +277,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         verbose ? print("$method of A * u = b ... ") : nothing
         troobleshoot ? save_system(A, b) : nothing 
         try
-          Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+          Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
         catch err
           status = -1
           return iter, status
@@ -292,7 +294,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         if s == 1
           troobleshoot ? save_system(A, b) : nothing
           try
-            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
           catch err
             status = -1
             return iter, status
@@ -300,7 +302,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         else
           troobleshoot ? save_deflated_system(A, b, W[method]) : nothing
           try
-            Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim)
+            Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim, maxit=maxit)
           catch err
             status = -1
             return iter, status
@@ -319,7 +321,7 @@ function test_solvers_on_single_chain(nsmp::Int,
           # Some work remains to do here
           troobleshoot ? save_system(A, b) : nothing 
           try
-            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim)
+            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
           catch err
             status = -1
             return iter, status
@@ -327,7 +329,7 @@ function test_solvers_on_single_chain(nsmp::Int,
         else
           troobleshoot ? save_deflated_system(A, b, W[method]) : nothing 
           try
-            Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p])
+            Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p], maxit=maxit)
           catch err
             status = -1
             return iter, status
@@ -376,7 +378,8 @@ function test_solvers_on_several_chains(nchains::Int,
                                         Π,
                                         preconds::Array{String,1},
                                         nvec::Int,
-                                        spdim::Int;
+                                        spdim::Int,
+                                        maxit::Int;
                                         do_pcg=true,
                                         do_eigpcg=true,
                                         do_eigdefpcg=true,
@@ -392,7 +395,7 @@ function test_solvers_on_several_chains(nchains::Int,
 
     println("\n\nworking on chain $ichain / $nchains ...")
 
-    iter, status = test_solvers_on_single_chain(nsmp, Λ, Ψ, Π, preconds, nvec, spdim,
+    iter, status = test_solvers_on_single_chain(nsmp, Λ, Ψ, Π, preconds, nvec, spdim, maxit,
                                                 do_pcg=do_pcg,
                                                 do_eigpcg=do_eigpcg,
                                                 do_eigdefpcg=do_eigdefpcg,
@@ -442,7 +445,7 @@ preconds = ["bj$(nbj)_0"]
             
 
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
-                                       preconds, nvec, spdim,
+                                       preconds, nvec, spdim, maxit,
                                        do_pcg=false,
                                        do_eigpcg=false,
                                        do_eigdefpcg=true,
