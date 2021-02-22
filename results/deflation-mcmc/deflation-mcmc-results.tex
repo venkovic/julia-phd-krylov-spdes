@@ -38,7 +38,7 @@ Results in Tab.~\ref{Tab:005} are *.
 		20,208  &   8 &   828.6 $\pm$ 166.5 &  10 &  24 &   488.6 $\pm$  93.4 & xxx.xx $\pm$ xx.xx \\
 		40,406  &  16 & 1,435.2 $\pm$ 357.2 &  20 &  48 &   715.3 $\pm$ 154.6 & xxx.xx $\pm$ xx.xx \\
 		80,598  &  32 & 2,241.5 $\pm$ 528.4 &  40 &  96 & 1,043.2 $\pm$ 294.2 & xxx.xx $\pm$ xx.xx \\
-		160,941 &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		160,941 &  64 & 3,257.1 $\pm$ 519.7 &  80 & 192 & 1,272.9 $\pm$ 272.4   & xxx.xx $\pm$ xx.xx \\
 		321,386 & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
 		\hline
 	\end{tabular}
@@ -82,47 +82,96 @@ Results in Tab.~\ref{Tab:005} are *.
 \end{table}
 
 \begin{table}[ht]
-	\caption{Weak scaling results of deflation for a constant AMG preconditioner.}
+	\caption{Scaling results of the constant AMG preconditioner.}
 	\centering
-	\begin{tabular}{|r|r|r|r|r|r|r|}
+	\begin{tabular}{|c|c|}
 		%\hline
 		%\multicolumn{4}{|c|}{Country List} \\
 		\hline
-		n & pcg iter & spdim & eigdefpcg iter & eipcg iter & defpcg iter\\
+		n & pcg iter \\
 		\hline
-		20,208  &  10 $\pm$ 2 & 20 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		40,406  & 10 $\pm$ 2 & 40 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		80,598  & 10 $\pm$ 2 & 80 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		160,941 & 10 $\pm$ 2 & 160 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
-		321,386 & 10 $\pm$ 2 & 320 & 10 $\pm$ 2 & 10 $\pm$ 2 & 10 $\pm$ 2 \\
+		20,208  &  10 $\pm$ 2 \\
+		40,406  & 10 $\pm$ 2  \\
+		80,598  & 10 $\pm$ 2  \\
+		160,941 & 10 $\pm$ 2  \\
+		321,386 & 10 $\pm$ 2  \\
 		\hline
 	\end{tabular}
 	\label{Tab:020}
 \end{table}
 
-\subsubsection{Condensed linear system}
 
 \begin{table}[ht]
-	\caption{Weak scaling results of deflation for a constant NN preconditioner with $spdim=\lfloor 2.5 \times ndom\rfloor$.}
+	\caption{Weak scaling results of deflation for a constant NN preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
 	\centering
-	\begin{tabular}{|c|c|c|c|c|c|c|c|}
+	\begin{tabular}{|c|c|c|c|c|c|c|}
 	\hline
-	n & $n_\Gamma$ & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+	$n_\Gamma$ & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 	\hline
-	20,208  &  xx,xxx &   8 & xxx.xx $\pm$ xx.xx &  10 &  24 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-	40,406  &  xx,xxx &  16 & 348.28 $\pm$ 89.55 &  20 &  48 & 181.68 $\pm$ 43.03 & xxx.xx $\pm$ xx.xx \\
-	80,598  &  xx,xxx &  32 & xxx.xx $\pm$ xx.xx &  40 &  96 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-	160,941 &  xx,xxx &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-	321,386 &  xx,xxx & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+	20,208  &   8 & xxx.x $\pm$  xx.x &  10 &  24 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	40,406  &  16 & xxx.x $\pm$  xx.x &  20 &  48 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	80,598  &  32 & xxx.x $\pm$  xx.x &  40 &  96 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	160,941 &  64 & xxx.x $\pm$  xx.x &  80 & 192 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
 	\hline
-\end{tabular}
+    \end{tabular}
 	\label{Tab:025}
 \end{table}
 
 \subsection{Strong scaling results}
 
 
+\begin{table}[ht]
+	\caption{Strong scaling results of deflation for a constant bJ preconditioner with $nvec=\lfloor1.25\times nb\rfloor$ and $spdim=3\times nb$.}
+	\centering
+	\begin{tabular}{|c|c|c|c|c|c|c|}
+		\hline
+		n & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+		\hline
+		321,386 &   8 & xxx.xx $\pm$ xx.xx &  10 &  24 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 &  16 & xxx.xx $\pm$ xx.xx &  20 &  48 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 &  32 & xxx.xx $\pm$ xx.xx &  40 &  96 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		\hline
+	\end{tabular}
+	\label{Tab:030}
+\end{table}
 
-\subsubsection{Condensed linear system}
+
+\begin{table}[ht]
+	\caption{Strong scaling results of deflation for a constant bJ preconditioner with $nvec=\lfloor1.25\times nb\rfloor$ and $spdim=3\times nb$.}
+	\centering
+	\begin{tabular}{|c|c|c|c|c|c|c|}
+		\hline
+		n & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+		\hline
+		321,386 &   8 & xxx.xx $\pm$ xx.xx &  10 &  24 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		321,386 &  16 & xxx.xx $\pm$ xx.xx &  20 &  48 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		321,386 &  32 & xxx.xx $\pm$ xx.xx &  40 &  96 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		321,386 &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		321,386 & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		\hline
+	\end{tabular}
+	\label{Tab:035}
+\end{table}
+
+
+\begin{table}[ht]
+	\caption{Strong scaling results of deflation for a constant NN preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
+	\centering
+	\begin{tabular}{|c|c|c|c|c|c|c|}
+		\hline
+		$n_\Gamma$ & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+		\hline
+		xx  &   8 & xxx.x $\pm$  xx.x &  10 &  24 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+		xx  &  16 & xxx.x $\pm$  xx.x &  20 &  48 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+		xx  &  32 & xxx.x $\pm$  xx.x &  40 &  96 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+		xx  &  64 & xxx.x $\pm$  xx.x &  80 & 192 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+		xx  & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+		\hline
+	\end{tabular}
+	\label{Tab:040}
+\end{table}
 
 \end{document}
