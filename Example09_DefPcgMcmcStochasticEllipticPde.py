@@ -13,17 +13,21 @@ L = .1
 sig2 = 1.
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
-nsmp_max = 4
+nsmp_max = 5
 
-ndom = 20
-nvec = ndom + 5
-spdim = int(2 * nvec)
+ndom = 8
+nvec = int(1.25 * ndom)
+spdim = 3 * ndom
 nbj = ndom
 
 it_eigdefpcg_amg = np.load("data/test01_%s_amg_0-eigdefpcg_nvec%d_spdim%d.it.npz" % (root_fname, nvec, spdim))
 it_eigdefpcg_lorasc = np.load("data/test01_%s_lorasc%d_0-eigdefpcg_nvec%d_spdim%d.it.npz" % (root_fname, ndom, nvec, spdim))
 it_eigdefpcg_bj = np.load("data/test01_%s_bj%d_0-eigdefpcg_nvec%d_spdim%d.it.npz" % (root_fname, nbj, nvec, spdim))
-it_eigdefpcg_chol16 = np.load("data/test01_%s_chol16_0-eigdefpcg_nvec%d_spdim%d.it.npz" % (root_fname, nvec, spdim))
+try:
+  it_eigdefpcg_chol16 = np.load("data/test01_%s_chol16_0-eigdefpcg_nvec%d_spdim%d.it.npz" % (root_fname, nvec, spdim))
+  do_chol16 = True
+except:
+  do_chol16 = False
 
 nsmp, nchains = it_eigdefpcg_amg.shape
 
@@ -53,12 +57,13 @@ axes.errorbar(svals, np.mean(it_eigdefpcg_amg[:nsmp, :], axis=1), yerr=np.std(it
               marker='D', ms=4,
               capsize=3, capthick=1.5,
               elinewidth=1.1)
-axes.errorbar(svals, np.mean(it_eigdefpcg_chol16[:nsmp, :], axis=1), yerr=np.std(it_eigdefpcg_chol16[:nsmp, :], axis=1),
-              label='chol16-eigdefpcg',
-              fmt='', lw=1,
-              marker='o', ms=4,
-              capsize=3, capthick=1.5,
-              elinewidth=1.1)
+if do_chol16:
+  axes.errorbar(svals, np.mean(it_eigdefpcg_chol16[:nsmp, :], axis=1), yerr=np.std(it_eigdefpcg_chol16[:nsmp, :], axis=1),
+                label='chol16-eigdefpcg',
+                fmt='', lw=1,
+                marker='o', ms=4,
+                capsize=3, capthick=1.5,
+                elinewidth=1.1)
 
 axes.xaxis.set_major_locator(MaxNLocator(integer=True))
 
