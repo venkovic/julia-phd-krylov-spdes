@@ -27,10 +27,10 @@ using LinearAlgebra: isposdef, rank
 troubleshoot = true
 
 maxit = 5_000
-tentative_nnode = 160_000
+tentative_nnode = 320_000
 load_existing_mesh = false
 
-ndom = 64
+ndom = 32
 load_existing_partition = false
 
 nbj = ndom
