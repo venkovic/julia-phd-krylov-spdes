@@ -25,7 +25,6 @@ Instructions:
       if errors occur, do the following
       julia> Pkg.resolve()
       julia> Pkg.instantiate()
-      julia> #precompile
 
   1.6 Type-in machine info in add_my_procs() of PllUtils.jl
 
@@ -95,8 +94,5 @@ Example09_DefPcgMcmcStochasticEllipticPde:
 -mcmc sampling of lognormal coefficient field.
 -applies deflation with online eigenvector approximation.
 
-
-To do:
-1. light pll for Lorasc? for NeumannNeumannPreconditioner?
-2. Example09.
-3. Example07, Example08
+Example10_EllipticPdePllPcg:
+-work in progress.
