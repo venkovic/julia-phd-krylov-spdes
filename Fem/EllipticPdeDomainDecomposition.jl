@@ -1,8 +1,8 @@
 """
      set_subdomains(cells::Array{Int,2},
                     cell_neighbors::Array{Int,2},
-                    epart::Array{Int64,1},
-                    npart::Array{Int64,1},
+                    epart::Array{Int,1},
+                    npart::Array{Int,1},
                     dirichlet_inds_g2l::Dict{Int,Int})
   
 Returns helper data structures for non-overlaping domain decomposition (edge-based
@@ -17,7 +17,7 @@ Input:
  `cell_neighbors::Array{Int,2}`, `size(cell_neighbors) = (3, n_el)`,
   neighboring elements of each element, or `-1` if edge is at mesh boundary. 
 
- `epart::Array{Int64,1}`, `size(epart) = (n_el,)`,
+ `epart::Array{Int,1}`, `size(epart) = (n_el,)`,
   host subdomain of each element.
 
  `npart::Array{Int,1}`, `size(npart) = (nnode,)`,
@@ -85,8 +85,8 @@ elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
 """
 function set_subdomains(cells::Array{Int,2},
                         cell_neighbors::Array{Int,2},
-                        epart::Array{Int64,1},
-                        npart::Array{Int64,1},
+                        epart::Array{Int,1},
+                        npart::Array{Int,1},
                         dirichlet_inds_g2l::Dict{Int,Int})
 
     _, nel = size(cells) # Number of elements
@@ -829,6 +829,94 @@ end
 
 
 """
+     do_condensed_isotropic_elliptic_assembly(ndom::Int,
+                                              cells::Array{Int,2},
+                                              points::Array{Float64,2},
+                                              epart::Array{Int,1},
+                                              ind_Id_g2l::Array{Dict{Int,Int},1},
+                                              ind_Γd_g2l::Array{Dict{Int,Int}},
+                                              ind_Γ_g2l::Dict{Int,Int},
+                                              ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                              node_owner::Array{Int,1},
+                                              node_Γ_cnt::Array{Int,1},
+                                              a_vec::Array{Float64,1},
+                                              f::Function,
+                                              uexact::Function,
+                                              Π_IId;
+                                              verbose=true)
+
+Does assembly of Schur condensed system.
+
+"""
+function do_condensed_isotropic_elliptic_assembly(ndom::Int,
+                                                  cells::Array{Int,2},
+                                                  points::Array{Float64,2},
+                                                  epart::Array{Int,1},
+                                                  ind_Id_g2l::Array{Dict{Int,Int},1},
+                                                  ind_Γd_g2l::Array{Dict{Int,Int}},
+                                                  ind_Γ_g2l::Dict{Int,Int},
+                                                  ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                                  node_owner::Array{Int,1},
+                                                  node_Γ_cnt::Array{Int,1},
+                                                  a_vec::Array{Float64,1},
+                                                  f::Function,
+                                                  uexact::Function,
+                                                  Π_IId;
+                                                  verbose=true)
+  
+  n_Γ = ind_Γ_g2l.count
+
+  verbose ? printlnln("prepare_local_schurs ...") : nothing
+  Δt = @elapsed A_IIdd, A_IΓdd, A_ΓΓdd, b_Idd, b_Γ = prepare_local_schurs(cells,
+                                                                          points,
+                                                                          epart,
+                                                                          ind_Id_g2l,
+                                                                          ind_Γd_g2l,
+                                                                          ind_Γ_g2l,
+                                                                          node_owner,
+                                                                          a_vec,
+                                                                          f,
+                                                                          uexact)
+  verbose ? println("$Δt seconds") : nothing
+
+  verbose ? printlnln("get_schur_rhs ...") : nothing
+  b_schur = @time get_schur_rhs(b_Idd, A_IIdd, A_IΓdd, b_Γ, ind_Γd_Γ2l, preconds=Π_IId)
+  verbose ? println("$Δt seconds") : nothing
+  
+  verbose ? printlnln("assemble_local_schurs ...") : nothing
+  Δt = @elapsed Sd_local_mat = assemble_local_schurs(A_IIdd,
+                                                     A_IΓdd,
+                                                     A_ΓΓdd,
+                                                     preconds=Π_IId)
+  verbose ? println("$Δt seconds") : nothing
+
+  S_local_mat = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                                  ind_Γd_Γ2l,
+                                                  node_Γ_cnt,
+                                                  x),
+                                                  n_Γ, issymmetric=true)
+
+  return S_local_mat, b_schur
+end
+
+
+
+
+
+function update_condensed_isotropic_elliptic_assembly!(S, b,
+  cells, points,
+  dirichlet_inds_g2l,
+  not_dirichlet_inds_g2l,
+  point_markers,
+  a_vec,
+  f, uexact)
+  return
+end
+
+
+
+
+"""
      get_subdomain_solutions(u_Γ::Array{Float64,1},
                              A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                              A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
@@ -951,6 +1039,15 @@ struct NeumannNeumannSchurPreconditioner
   ΠSd::Array{Array{Float64,2},1}
   ind_Γd_Γ2l::Array{Dict{Int,Int},1}
   node_Γ_cnt::Array{Int,1}
+  
+  #ind_Id_g2l::Array{Dict{Int,Int},1}
+  #ind_Γ_g2l::Dict{Int,Int}
+  #not_dirichlet_inds_g2l::Dict{Int,Int}
+
+  #x_Id::Array{Array{Float64,1},1}
+  #x_Γ::Array{Float64, 1}
+  #z_Γ::Array{Float64, 1}
+  #u::Array{Float64,1}
 end
 
 
@@ -1038,9 +1135,80 @@ end
 
 
 """
-     prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
-                                          ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                          node_Γ_cnt::Array{Int,1})
+     prepare_neumann_neumann_schur_precond(ndom::Int,
+                                           cells::Array{Int,2},
+                                           points::Array{Float64,2},
+                                           epart::Array{Int,1},
+                                           ind_Id_g2l::Array{Dict{Int,Int},1},
+                                           ind_Γd_g2l::Array{Dict{Int,Int}},
+                                           ind_Γ_g2l::Dict{Int,Int},
+                                           ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                           node_owner::Array{Int,1},
+                                           node_Γ_cnt::Array{Int,1},
+                                           a_vec::Array{Float64,1},
+                                           f::Function,
+                                           uexact::Function;
+                                           verbose=true,
+                                           load_partition=false)
+                                       
+Prepares and returns a `NeumannNeumannSchurPreconditioner`.
+Computes pseudo-inverses of (singular) local Schur complements.
+
+"""
+function prepare_neumann_neumann_schur_precond(ndom::Int,
+                                               cells::Array{Int,2},
+                                               points::Array{Float64,2},
+                                               epart::Array{Int,1},
+                                               ind_Id_g2l::Array{Dict{Int,Int},1},
+                                               ind_Γd_g2l::Array{Dict{Int,Int}},
+                                               ind_Γ_g2l::Dict{Int,Int},
+                                               ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                               node_owner::Array{Int,1},
+                                               node_Γ_cnt::Array{Int,1},
+                                               a_vec::Array{Float64,1},
+                                               f::Function,
+                                               uexact::Function;
+                                               verbose=true,                                               
+                                               load_partition=false)
+
+  n_Γ = ind_Γ_g2l.count
+
+  verbose ? print("prepare_local_schurs ... ") : nothing
+  time = @elapsed A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = prepare_local_schurs(cells,
+                                                                      points,
+                                                                      epart,
+                                                                      ind_Id_g2l,
+                                                                      ind_Γd_g2l,
+                                                                      ind_Γ_g2l,
+                                                                      node_owner,
+                                                                      a_vec,
+                                                                      f,
+                                                                      uexact)
+  verbose ? println("$time seconds") : nothing
+
+  verbose ? print("assemble amg preconditioners of A_IIdd ... ") : nothing
+  time = @elapsed Π_IId = [AMGPreconditioner{SmoothedAggregation}(A_IIdd[idom])
+                           for idom in 1:ndom];
+  verbose ? println("$time seconds") : nothing
+
+  return prepare_neumann_neumann_schur_precond(A_IIdd, A_IΓdd, A_ΓΓdd,
+                                              ind_Γd_Γ2l, node_Γ_cnt,
+                                              preconds=Π_IId), Π_IId
+end
+
+
+"""
+     prepare_neumann_neumann_schur_precond(tentative_nnode::Int,
+                                           ndom::Int,
+                                           cells::Array{Int,2},
+                                           points::Array{Float64,2},
+                                           cell_neighbors::Array{Int,2},
+                                           a_vec::Array{Float64,1},
+                                           dirichlet_inds_g2l::Dict{Int,Int},
+                                           f::Function,
+                                           uexact::Function;
+                                           verbose=true,
+                                           load_partition=false)
                                           
 Prepares and returns a `NeumannNeumannSchurPreconditioner`.
 Computes pseudo-inverses of (singular) local Schur complements.
@@ -1053,15 +1221,10 @@ function prepare_neumann_neumann_schur_precond(tentative_nnode::Int,
                                                cell_neighbors::Array{Int,2},
                                                a_vec::Array{Float64,1},
                                                dirichlet_inds_g2l::Dict{Int,Int},
-                                               not_dirichlet_inds_g2l::Dict{Int,Int},
                                                f::Function,
                                                uexact::Function;
                                                verbose=true,                                               
-                                               do_local_schur_assembly=true,
-                                               load_partition=false,
-                                               compute_A_ΓΓ_chol=true,
-                                               nvec=25, 
-                                               ε=.01)
+                                               load_partition=false)
 
   if load_partition
     epart, npart = load_partition(tentative_nnode, ndom)
@@ -1077,25 +1240,7 @@ function prepare_neumann_neumann_schur_precond(tentative_nnode::Int,
                                                                 npart,
                                                                 dirichlet_inds_g2l)
   n_Γ = ind_Γ_g2l.count
-
-  verbose ? print("prepare_global_schur ... ") : nothing
-  time = @elapsed A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = prepare_global_schur(cells,
-                                                                       points,
-                                                                       epart,
-                                                                       ind_Id_g2l,
-                                                                       ind_Γ_g2l,
-                                                                       node_owner,
-                                                                       a_vec,
-                                                                       f,
-                                                                       uexact)
-  verbose ? println("$time seconds") : nothing
-
-
-  verbose ? print("assemble amg preconditioners of A_IId ... ") : nothing
-  time = @elapsed Π_IId = [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
-                           for idom in 1:ndom];
-  verbose ? println("$time seconds") : nothing
-
+  
   verbose ? print("prepare_local_schurs ... ") : nothing
   time = @elapsed A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = prepare_local_schurs(cells,
                                                                       points,
@@ -1109,71 +1254,15 @@ function prepare_neumann_neumann_schur_precond(tentative_nnode::Int,
                                                                       uexact)
   verbose ? println("$time seconds") : nothing
 
-  if do_local_schur_assembly
-    verbose ? print("assemble_local_schurs ... ") : nothing
-    time = @elapsed Sd_local_mat = assemble_local_schurs(A_IIdd,
-                                                         A_IΓdd,
-                                                         A_ΓΓdd,
-                                                         preconds=Π_IId)
-    verbose ? println("$time seconds") : nothing
+  verbose ? print("assemble amg preconditioners of A_IIdd ... ") : nothing
+  time = @elapsed Π_IId = [AMGPreconditioner{SmoothedAggregation}(A_IIdd[idom])
+                           for idom in 1:ndom];
+  verbose ? println("$time seconds") : nothing
 
-
-    S = LinearMap(x -> apply_local_schurs(Sd_local_mat,
-                                          ind_Γd_Γ2l,
-                                          node_Γ_cnt,
-                                          x), nothing,
-                                          n_Γ, issymmetric=true)
-
-  else
-    S = LinearMap(x -> apply_local_schurs(A_IIdd,
-                                          A_IΓdd,
-                                          A_ΓΓdd,
-                                          ind_Γd_Γ2l,
-                                          node_Γ_cnt,
-                                          x,
-                                          preconds=Π_IId), 
-                                          nothing, n_Γ, issymmetric=true)
-  end
-
-  # ℓ-value suggested in Grigori et al.
-  ℓ = floor(Int, ndom + .1 * A_ΓΓ.n)
-
-  return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
-                                ind_Γ_g2l, not_dirichlet_inds_g2l, 
-                                compute_A_ΓΓ_chol=compute_A_ΓΓ_chol,
-                                nvec=nvec, low_rank_correction=low_rank_correction,
-                                ℓ=ℓ, ε=ε, verbose=verbose)
-
-
-
-
-
-
-
-
-
-
-
-
-return prepare_neumann_neumann_schur_precond(A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                             A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                             A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
-                                             ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                             node_Γ_cnt::Array{Int,1};
-                                             preconds=nothing)
-
-return prepare_neumann_neumann_schur_precond(Sd_local_mat::Array{SparseMatrixCSC{Float64,Int},1},
-                                             ind_Γd_Γ2l::Array{Dict{Int,Int},1},
-                                             node_Γ_cnt::Array{Int,1})
-
+  return prepare_neumann_neumann_schur_precond(A_IIdd, A_IΓdd, A_ΓΓdd,
+                                               ind_Γd_Γ2l, node_Γ_cnt,
+                                               preconds=Π_IId), Π_IId
 end
-
-
-
-
-
-
-
 
 
 """
@@ -1463,6 +1552,133 @@ function prepare_lorasc_precond(S::FunctionMap{Float64},
                               x_Γ,
                               z_Γ,
                               u)
+end
+
+
+"""
+     prepare_lorasc_precond(ndom::Int,
+                            cells::Array{Int,2},
+                            points::Array{Float64,2},
+                            epart::Array{Int,1},
+                            ind_Id_g2l::Array{Dict{Int,Int},1},
+                            ind_Γd_g2l::Array{Dict{Int,Int}},
+                            ind_Γ_g2l::Dict{Int,Int},
+                            ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                            node_owner::Array{Int,1},
+                            node_Γ_cnt::Array{Int,1},
+                            a_vec::Array{Float64,1},
+                            dirichlet_inds_g2l::Dict{Int,Int},
+                            not_dirichlet_inds_g2l::Dict{Int,Int},
+                            f::Function,
+                            uexact::Function;
+                            verbose=true,
+                            do_local_schur_assembly=true,
+                            load_partition=false,
+                            compute_A_ΓΓ_chol=true,
+                            nvec=25,
+                            low_rank_correction=:exact,
+                            ε=.01)
+
+Prepares and returns a `LorascPreconditioner`.
+See Grigori et al. (2014) for a reference on the LORASC preconditioner.
+
+Grigori L, Frédéric N, Soleiman Y.
+Robust algebraic Schur complement preconditioners based on low rank corrections.
+Inria research report. 2014;RR-8557:pp.18.
+
+Remark: There is no need to call both prepare_global_schur() and prepare_local_schurs().
+
+"""
+function prepare_lorasc_precond(ndom::Int,
+                                cells::Array{Int,2},
+                                points::Array{Float64,2},
+                                epart::Array{Int,1},
+                                ind_Id_g2l::Array{Dict{Int,Int},1},
+                                ind_Γd_g2l::Array{Dict{Int,Int}},
+                                ind_Γ_g2l::Dict{Int,Int},
+                                ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                node_owner::Array{Int,1},
+                                node_Γ_cnt::Array{Int,1},
+                                a_vec::Array{Float64,1},
+                                dirichlet_inds_g2l::Dict{Int,Int},
+                                not_dirichlet_inds_g2l::Dict{Int,Int},
+                                f::Function,
+                                uexact::Function;
+                                verbose=true,
+                                do_local_schur_assembly=true,
+                                load_partition=false,
+                                compute_A_ΓΓ_chol=true,
+                                nvec=25, 
+                                low_rank_correction=:exact,
+                                ε=.01)
+
+  n_Γ = ind_Γ_g2l.count
+
+  verbose ? print("prepare_global_schur ... ") : nothing
+  time = @elapsed A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = prepare_global_schur(cells,
+                                                                       points,
+                                                                       epart,
+                                                                       ind_Id_g2l,
+                                                                       ind_Γ_g2l,
+                                                                       node_owner,
+                                                                       a_vec,
+                                                                       f,
+                                                                       uexact)
+  verbose ? println("$time seconds") : nothing
+
+  verbose ? print("assemble amg preconditioners of A_IId ... ") : nothing
+  time = @elapsed Π_IId = [AMGPreconditioner{SmoothedAggregation}(A_IId[idom])
+                           for idom in 1:ndom];
+  verbose ? println("$time seconds") : nothing
+
+  verbose ? print("prepare_local_schurs ... ") : nothing
+  time = @elapsed A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = prepare_local_schurs(cells,
+                                                                      points,
+                                                                      epart,
+                                                                      ind_Id_g2l,
+                                                                      ind_Γd_g2l,
+                                                                      ind_Γ_g2l,
+                                                                      node_owner,
+                                                                      a_vec,
+                                                                      f,
+                                                                      uexact)
+  verbose ? println("$time seconds") : nothing
+
+  if do_local_schur_assembly
+    verbose ? print("assemble_local_schurs ... ") : nothing
+    time = @elapsed Sd_local_mat = assemble_local_schurs(A_IIdd,
+                                                         A_IΓdd,
+                                                         A_ΓΓdd,
+                                                         preconds=Π_IId)
+    verbose ? println("$time seconds") : nothing
+
+
+    S = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x), nothing,
+                                          n_Γ, issymmetric=true)
+
+  else
+    S = LinearMap(x -> apply_local_schurs(A_IIdd,
+                                          A_IΓdd,
+                                          A_ΓΓdd,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x,
+                                          preconds=Π_IId), 
+                                          nothing, n_Γ, issymmetric=true)
+  end
+
+  # ℓ-value suggested in Grigori et al.
+  ℓ = floor(Int, ndom + .1 * A_ΓΓ.n)
+
+  return prepare_lorasc_precond(S, A_IId, A_IΓd, A_ΓΓ, ind_Id_g2l,
+                                ind_Γ_g2l, not_dirichlet_inds_g2l, 
+                                compute_A_ΓΓ_chol=compute_A_ΓΓ_chol,
+                                nvec=nvec, low_rank_correction=low_rank_correction,
+                                ℓ=ℓ, ε=ε, verbose=verbose)
+
 end
 
 

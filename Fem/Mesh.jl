@@ -256,3 +256,38 @@ function load_partition(tentative_nnode::Int, ndom::Int)
   npart = Array(npzread("data/DoF$tentative_nnode-ndom$ndom.npart.npz")) .+ 1
   return epart, npart
 end
+
+
+"""
+     get_partition(tentative_nnode::Int,
+                   ndom::Int,
+                   cells::Array{Int,2},
+                   cell_neighbors::Array{Int,2},
+                   dirichlet_inds_g2l::Dict{Int,Int},
+                   load_partition=false)
+
+Fetches mesh partition.
+"""
+function get_partition(tentative_nnode::Int,
+                       ndom::Int,
+                       cells::Array{Int,2},
+                       cell_neighbors::Array{Int,2},
+                       dirichlet_inds_g2l::Dict{Int,Int},
+                       load_partition=false)
+
+  if load_existing_partition
+    epart, npart = load_partition(tentative_nnode, ndom)
+  else
+    epart, npart = mesh_partition(cells, ndom)
+    save_partition(epart, npart, tentative_nnode, ndom)
+  end
+  
+  ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
+  elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
+                                                                cell_neighbors,
+                                                                epart, 
+                                                                npart,
+                                                                dirichlet_inds_g2l)
+
+  return epart, ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner, node_Γ_cnt
+end

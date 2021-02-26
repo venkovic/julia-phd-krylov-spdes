@@ -57,11 +57,10 @@ export prepare_local_schurs,
        apply_local_schur,
        apply_local_schurs
 export assemble_A_ΓΓ_from_local_blocks
-
-# from EllipticPdeDomainDecomposition.jl,
 export get_schur_rhs,
        get_subdomain_solutions,
        merge_subdomain_solutions
+export do_condensed_isotropic_elliptic_assembly
 
 # from EllipticPdeDomainDecomposition.jl,
 export NeumannNeumannSchurPreconditioner,
