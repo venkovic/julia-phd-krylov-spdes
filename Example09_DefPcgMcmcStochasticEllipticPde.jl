@@ -27,16 +27,20 @@ using LinearAlgebra: isposdef, rank
 troubleshoot = true
 
 maxit = 5_000
-tentative_nnode = 320_000
+tentative_nnode = 20_000
 load_existing_mesh = false
 
-ndom = 32
+ndom = 8
 load_existing_partition = false
 
 nbj = ndom
 
 nvec = floor(Int, 1.25 * ndom)
 spdim = 3 * ndom
+
+const preconds_with_dd = ("lorasc$(ndom)_0", "lorasc$(ndom)_1", "neumann-neumann$(ndom)_0")
+
+preconds = ["neumann-neumann$(ndom)_0"] # ∈ ("amg_0", "bj$(nbj)_0") ⋃ preconds_with_dd 
 
 nchains = 50
 nsmp = 5
@@ -48,6 +52,17 @@ L = .1
 
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
+function f(x::Float64, y::Float64)
+  return -1.
+end
+  
+function uexact(xx::Float64, yy::Float64)
+  return .734
+end
+
+#
+# Load mesh
+#
 if load_existing_mesh
   cells, points, point_markers, cell_neighbors = load_mesh(tentative_nnode)
 else
@@ -65,18 +80,35 @@ get_dirichlet_inds(points, point_markers)
 n = not_dirichlet_inds_g2l.count
 nnode = mesh.n_point
 
-function f(x::Float64, y::Float64)
-  return -1.
-end
-  
-function uexact(xx::Float64, yy::Float64)
-  return .734
-end
-
-println()
 space_println("nnode = $(size(points)[2])")
 space_println("nel = $(size(cells)[2])")
 
+#
+# Load mesh parition
+#
+do_dd = false
+for precond in preconds
+  if precond in preconds_with_dd
+    global do_dd = true
+    break
+  end
+end
+
+if do_dd
+  if load_existing_partition
+    epart, npart = load_partition(tentative_nnode, ndom)
+  else
+    epart, npart = mesh_partition(cells, ndom)
+    save_partition(epart, npart, tentative_nnode, ndom)
+  end
+
+  ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
+  elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
+                                                                cell_neighbors,
+                                                                epart, 
+                                                                npart,
+                                                                dirichlet_inds_g2l)
+end
 
 #
 # Assembly of constant preconditioners
@@ -90,32 +122,27 @@ A_0, _ = @time do_isotropic_elliptic_assembly(cells, points,
                                               point_markers,
                                               exp.(g_0), f, uexact)
 
-printlnln("prepare amg_0 preconditioner for A_0 ...")
-Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
-flush(stdout)
+Π = []
+for precond in preconds
 
-printlnln("prepare_lorasc_precond for A_0 with ε = 0 ...")
-Π_lorasc_0 = @time prepare_lorasc_precond(tentative_nnode,
-                                          ndom,
-                                          cells,
+  if precond == "amg_0"
+    printlnln("prepare amg_0 preconditioner for A_0 ...")
+    Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
+    push!(Π, Π_amg_0)
+    flush(stdout)
+  
+  elseif precond == "lorasc$(ndom)_0"
+    printlnln("prepare_lorasc_precond for A_0 with ε = 0 ...")
+    Π_lorasc_0 = @time prepare_lorasc_precond(ndom,
+                                             cells,
                                           points,
-                                          cell_neighbors,
-                                          exp.(g_0),
-                                          dirichlet_inds_g2l,
-                                          not_dirichlet_inds_g2l,
-                                          f,
-                                          uexact,
-                                          do_local_schur_assembly=true,
-                                          low_rank_correction=:exact,
-                                          ε=0)
-flush(stdout)
-
-printlnln("prepare_lorasc_precond for A_0 with ε = 0.01 ...")
-Π_lorasc_1 = @time prepare_lorasc_precond(tentative_nnode,
-                                          ndom,
-                                          cells,
-                                          points,
-                                          cell_neighbors,
+                                          epart,
+                                          ind_Id_g2l,
+                                          ind_Γd_g2l,
+                                          ind_Γ_g2l,
+                                          ind_Γd_Γ2l,
+                                          node_owner,
+                                          node_Γ_cnt,
                                           exp.(g_0),
                                           dirichlet_inds_g2l,
                                           not_dirichlet_inds_g2l,
@@ -124,15 +151,64 @@ printlnln("prepare_lorasc_precond for A_0 with ε = 0.01 ...")
                                           do_local_schur_assembly=true,
                                           low_rank_correction=:exact,
                                           ε=.01)
-flush(stdout)
+    push!(Π, Π_lorasc_0)
+    flush(stdout)
 
-printlnln("prepare bj_0 preconditioner for A_0 ...")
-Π_bj_0 = @time BJPreconditioner(nbj, A_0);
-flush(stdout)
+  elseif precond == "lorasc$(ndom)_1"
+    printlnln("prepare_lorasc_precond for A_0 with ε = 0.01 ...")
+    Π_lorasc_1 = @time prepare_lorasc_precond(ndom,
+                                          cells,
+                                          points,
+                                          epart,
+                                          ind_Id_g2l,
+                                          ind_Γd_g2l,
+                                          ind_Γ_g2l,
+                                          ind_Γd_Γ2l,
+                                          node_owner,
+                                          node_Γ_cnt,
+                                          exp.(g_0),
+                                          dirichlet_inds_g2l,
+                                          not_dirichlet_inds_g2l,
+                                          f,
+                                          uexact,
+                                          do_local_schur_assembly=true,
+                                          low_rank_correction=:exact,
+                                          ε=0)
+    push!(Π, Π_lorasc_1)
+    flush(stdout)
 
-printlnln("prepare chol16_0 preconditioner for A_0 ...")
-Π_chol16_0 = @time get_cholesky16(A_0);
-flush(stdout)
+  elseif precond == "bj$(nbj)_0"
+    printlnln("prepare bj_0 preconditioner for A_0 ...")
+    Π_bj_0 = @time BJPreconditioner(nbj, A_0);
+    push!(Π, Π_bj_0)
+    flush(stdout)
+
+  elseif precond == "chol16"
+    printlnln("prepare chol16_0 preconditioner for A_0 ...")
+    Π_chol16_0 = @time get_cholesky16(A_0);
+    push!(Π, Π_chol16_0)
+    flush(stdout)
+
+  elseif precond == "neumann-neumann$(ndom)_0"
+    printlnln("prepare neumann-neummann preconditioner for A_0 ...")
+    ΠS_nn_0, Π_IId = prepare_neumann_neumann_schur_precond(ndom,
+                                                              cells,
+                                                              points,
+                                                              epart,
+                                                              ind_Id_g2l,
+                                                              ind_Γd_g2l,
+                                                              ind_Γ_g2l,
+                                                              ind_Γd_Γ2l,
+                                                              node_owner,
+                                                              node_Γ_cnt,
+                                                              exp.(g_0),
+                                                              f,
+                                                              uexact,
+                                                              load_partition=false)
+    push!(Π, ΠS_nn_0)
+    flush(stdout)
+  end
+end
 
 #
 # Load kl representation and prepare mcmc sampler
@@ -188,6 +264,32 @@ function test_solvers_on_single_chain(nsmp::Int,
                                                       exp.(sampler.g),
                                                       f, uexact)
   verbose ? println("$Δt seconds") : nothing
+
+  do_schur = false
+  for precond in preconds
+    occursin("neumann-neumann", precond) ? do_schur = true : nothing
+  end
+
+  if do_schur
+    S, b_schur = do_condensed_isotropic_elliptic_assembly(ndom,
+                                                          cells,
+                                                          points,
+                                                          epart,
+                                                          ind_Id_g2l,
+                                                          ind_Γd_g2l,
+                                                          ind_Γ_g2l,
+                                                          ind_Γd_Γ2l,
+                                                          node_owner,
+                                                          node_Γ_cnt,
+                                                          exp.(sampler.g),
+                                                          f,
+                                                          uexact,
+                                                          Π_IId)
+    n_Γ, = size(b_schur)
+    x_schur = zeros(Float64, n_Γ)
+    WtS = Array{Float64,2}(undef, nvec, n_Γ)
+  end
+
 
   methods = String[]
   W = Dict{String,Array{Float64,2}}()
@@ -248,17 +350,39 @@ function test_solvers_on_single_chain(nsmp::Int,
                                                         exp.(sampler.g),
                                                         f, uexact)
       verbose ? println("$Δt seconds") : nothing
+
+      if do_schur
+        S, b_schur = do_condensed_isotropic_elliptic_assembly(ndom,
+                                                              cells,
+                                                              points,
+                                                              epart,
+                                                              ind_Id_g2l,
+                                                              ind_Γd_g2l,
+                                                              ind_Γ_g2l,
+                                                              ind_Γd_Γ2l,
+                                                              node_owner,
+                                                              node_Γ_cnt,
+                                                              exp.(sampler.g),
+                                                              f,
+                                                              uexact,
+                                                              Π_IId)
+      end
     end
 
     for (p, precond) in enumerate(preconds)
 
       if do_pcg
         method = precond * "-pcg"
-        x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
         troubleshoot ? save_system(A, b) : nothing 
         try
-          Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p], maxit=maxit)
+          if occursin("neumann-neumann", precond)
+            x_schur .= 0
+            Δt = @elapsed _, it, _ = pcg(S, b_schur, x_schur, Π[p], maxit=maxit)
+          else
+            x .= 0
+            Δt = @elapsed _, it, _  = pcg(A, b, x, Π[p], maxit=maxit)
+          end
         catch err
           status = -1
           return iter, status
@@ -270,17 +394,32 @@ function test_solvers_on_single_chain(nsmp::Int,
 
       if do_eigpcg
         method = precond * "-eigpcg"
-        if s == 1
-          x .= 0
-        else
-          WtA .= W[method]'A
-          H = WtA * W[method]
-          x .= W[method] * (H \ (W[method]'b))
-        end
         verbose ? print("$method of A * u = b ... ") : nothing
         troubleshoot ? save_system(A, b) : nothing 
         try
-          Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+          if occursin("neumann-neumann", precond)
+            
+            if s == 1
+              x_schur .= 0
+            else
+              WtS .= W[method]'S
+              H = WtS * W[method]
+              x_schur .= W[method] * (H \ (W[method]'b_schur))
+            end
+            
+            Δt = @elapsed _, it, _, W[method] = eigpcg(S, b_schur, x_schur, Π[p], nvec, spdim, maxit=maxit)
+          else
+            
+            if s == 1
+              x .= 0
+            else
+              WtA .= W[method]'A
+              H = WtA * W[method]
+              x .= W[method] * (H \ (W[method]'b))
+            end
+            
+            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+          end
         catch err
           status = -1
           return iter, status
@@ -292,14 +431,22 @@ function test_solvers_on_single_chain(nsmp::Int,
 
       if do_eigdefpcg
         method = precond * "-eigdefpcg"
-        x .= 0
         verbose ? print("$method of A * u = b ... ") : nothing
         if s == 1
           troubleshoot ? save_system(A, b) : nothing
+
+          #Δt = @elapsed _, it, _, W[method] = eigpcg(S, b_schur, x, Π[p], nvec, spdim, maxit=maxit)
           try
-            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+            if occursin("neumann-neumann", precond)
+              x_schur .= 0
+              Δt = @elapsed _, it, _, W[method] = eigpcg(S, b_schur, x_schur, Π[p], nvec, spdim, maxit=maxit)
+            else
+              x .= 0
+              Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+            end
           catch err
             status = -1
+            println(err)
             return iter, status
           end
         else
@@ -309,7 +456,13 @@ function test_solvers_on_single_chain(nsmp::Int,
               status = -1
               return iter, status
             end
-            Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim, maxit=maxit)
+            if occursin("neumann-neumann", precond)
+              x_schur .= 0
+              Δt = @elapsed _, it, _, W[method] = eigdefpcg(S, b_schur, x_schur, Π[p], W[method], spdim, maxit=maxit)
+            else
+              x .= 0
+              Δt = @elapsed _, it, _, W[method] = eigdefpcg(A, b, x, Π[p], W[method], spdim, maxit=maxit)
+            end
           catch err
             status = -1
             return iter, status
@@ -328,7 +481,13 @@ function test_solvers_on_single_chain(nsmp::Int,
           # Some work remains to do here
           troubleshoot ? save_system(A, b) : nothing 
           try
-            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+            if occursin("neumann-neumann", precond)
+              x_schur .= 0
+              Δt = @elapsed _, it, _, W[method] = eigpcg(S, b_schur, x_schur, Π[p], nvec, spdim, maxit=maxit)
+            else
+              x .= 0
+              Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+            end
           catch err
             status = -1
             return iter, status
@@ -336,7 +495,13 @@ function test_solvers_on_single_chain(nsmp::Int,
         else
           troubleshoot ? save_deflated_system(A, b, W[method]) : nothing 
           try
-            Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p], maxit=maxit)
+            if occursin("neumann-neumann", precond)
+              x_schur .= 0
+              Δt = @elapsed _, it, _, W[method] = defpcg(S, b_schur, W[method], x_schur, Π[p], maxit=maxit)
+            else
+              x .= 0
+              Δt = @elapsed _, it, _, W[method] = defpcg(A, b, W[method], x, Π[p], maxit=maxit)
+            end            
           catch err
             status = -1
             return iter, status
@@ -438,23 +603,18 @@ function test_solvers_on_several_chains(nchains::Int,
   return iters
 end
 
-
-#
-# Is assemble_local_schurs necessary with ε = 0 
-#
-#Π = [Π_lorasc_0, Π_lorasc_1]
-#preconds = ["lorasc$(ndom)_0",
-#            "lorasc$(ndom)_1"]
-
-Π = [Π_bj_0]
-preconds = ["bj$(nbj)_0"]
-            
-
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
                                        preconds, nvec, spdim, maxit,
-                                       do_pcg=false,
+                                       do_pcg=true,
                                        do_eigpcg=false,
-                                       do_eigdefpcg=true,
+                                       do_eigdefpcg=false,
                                        do_defpcg=false,
-                                       save_results=true,
+                                       save_results=false,
                                        troubleshoot=troubleshoot)
+
+
+# get_constant_preconds()
+# get_constant_preconds_with_dd()
+# test_solvers_on_single_chain()
+# test_solvers_on_single_chain()
+# test_solvers_on_several_chains()
