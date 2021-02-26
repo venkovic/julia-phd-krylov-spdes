@@ -12,20 +12,29 @@
 
 \maketitle
 
-\section{Constant preconditioners}
+%\section{Constant preconditioners}
 
-\subsection{Block Jacobi (bJ)}
+%\subsection{Block Jacobi (bJ)}
 
-\subsection{Low rank (LORASC)}
+%\subsection{Low rank (LORASC)}
 
-\subsection{Neumann-Neumann (NN)}
+%\subsection{Neumann-Neumann (NN)}
 
-\subsection{Algebraic multigrid (AMG)}
+%\subsection{Algebraic multigrid (AMG)}
 
-\section{Deflation results}
+%\section{Deflation results}
 
-\subsection{Weak scaling}
-Results in Tab.~\ref{Tab:005} are *.
+%\subsection{Weak scaling}
+%Results in Tab.~\ref{Tab:005} are *.
+
+
+% 320,000_bj64@hector stuck at 1st attempt of chain 11/50, 
+%                           just after realization 3/5 (2,216 iter).
+% 320,000_bj128@lucien stuck at 4th attempt of chain 30/50,
+%                            just after realization 1/5 (3900 iter).
+% 320,000_lorasc128@lucien stuck at 1st attempt of chain 2/50, 
+%                                just after realization 4/5 (229 iter).
+
 
 
 \begin{table}[ht]
@@ -38,8 +47,8 @@ Results in Tab.~\ref{Tab:005} are *.
 		20,208  &   8 &   828.6 $\pm$ 166.5 &  10 &  24 &   488.6 $\pm$  93.4 & xxx.xx $\pm$ xx.xx \\
 		40,406  &  16 & 1,435.2 $\pm$ 357.2 &  20 &  48 &   715.3 $\pm$ 154.6 & xxx.xx $\pm$ xx.xx \\
 		80,598  &  32 & 2,241.5 $\pm$ 528.4 &  40 &  96 & 1,043.2 $\pm$ 294.2 & xxx.xx $\pm$ xx.xx \\
-		160,941 &  64 & 3,257.1 $\pm$ 519.7 &  80 & 192 & 1,272.9 $\pm$ 272.4   & xxx.xx $\pm$ xx.xx \\
-		321,386 & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		160,941 &  64 & 3,321.4 $\pm$ 559.3 &  80 & 192 & 1,340.8 $\pm$ 370.6   & xxx.xx $\pm$ xx.xx \\
+		321,386 & 128 & 5,698.0 $\pm$ 862.7 & 160 & 384 & 2,996.1 $\pm$ 728.3 & xxx.xx $\pm$ xx.xx \\
 		\hline
 	\end{tabular}
 	\label{Tab:005}
@@ -58,7 +67,7 @@ Results in Tab.~\ref{Tab:005} are *.
 	40,406  &  16 & 348.3 $\pm$  89.6 &  20 &  48 & 181.7 $\pm$ 43.0 & xxx.x $\pm$ xx.x \\
 	80,598  &  32 & 453.9 $\pm$ 115.9 &  40 &  96 & 201.6 $\pm$ 51.1 & xxx.x $\pm$ xx.x \\
 	160,941 &  64 & 603.2 $\pm$ 134.7 &  80 & 192 & 239.5 $\pm$ 47.0 & xxx.x $\pm$ xx.x \\
-	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	321,386 & 128 & 781.0 $\pm$ 000.0 & 160 & 384 & 280.0 $\pm$ 00.0 & xxx.x $\pm$ xx.x \\
 	\hline
 \end{tabular}
 \label{Tab:010}
@@ -75,41 +84,23 @@ Results in Tab.~\ref{Tab:005} are *.
 	40,406  &  16 & 324.5 $\pm$  84.0 &  20 &  48 & 182.3 $\pm$ 44.2 & xxx.x $\pm$ xx.x \\
 	80,598  &  32 & 388.7 $\pm$  98.3 &  40 &  96 & 202.5 $\pm$ 53.7 & xxx.x $\pm$ xx.x \\
 	160,941 &  64 & 498.3 $\pm$ 116.6 &  80 & 192 & 236.6 $\pm$ 45.4 & xxx.x $\pm$ xx.x \\
-	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	321,386 & 128 & 661.0 $\pm$ 000.0 & 160 & 384 & 283.0 $\pm$ 00.0 & xxx.x $\pm$ xx.x \\
 	\hline
 \end{tabular}
 	\label{Tab:015}
 \end{table}
 
-\begin{table}[ht]
-	\caption{Scaling results of the constant AMG preconditioner.}
-	\centering
-	\begin{tabular}{|c|c|}
-		%\hline
-		%\multicolumn{4}{|c|}{Country List} \\
-		\hline
-		n & pcg iter \\
-		\hline
-		20,208  &  10 $\pm$ 2 \\
-		40,406  & 10 $\pm$ 2  \\
-		80,598  & 10 $\pm$ 2  \\
-		160,941 & 10 $\pm$ 2  \\
-		321,386 & 10 $\pm$ 2  \\
-		\hline
-	\end{tabular}
-	\label{Tab:020}
-\end{table}
 
 
 \begin{table}[ht]
-	\caption{Weak scaling results of deflation for a constant NN preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
+	\caption{Weak scaling results of deflation for a constant Neumann-Neumann preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
 	\centering
 	\begin{tabular}{|c|c|c|c|c|c|c|}
 	\hline
 	$n_\Gamma$ & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 	\hline
 	20,208  &   8 & xxx.x $\pm$  xx.x &  10 &  24 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
-	40,406  &  16 & xxx.x $\pm$  xx.x &  20 &  48 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	1,422  &  16 & 106.1 $\pm$  24.0 &  20 &  48 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
 	80,598  &  32 & xxx.x $\pm$  xx.x &  40 &  96 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
 	160,941 &  64 & xxx.x $\pm$  xx.x &  80 & 192 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
 	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
@@ -118,7 +109,7 @@ Results in Tab.~\ref{Tab:005} are *.
 	\label{Tab:025}
 \end{table}
 
-\subsection{Strong scaling results}
+%\subsection{Strong scaling results}
 
 
 \begin{table}[ht]
@@ -128,11 +119,11 @@ Results in Tab.~\ref{Tab:005} are *.
 		\hline
 		n & nb & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 		\hline
-		321,386 &   8 & xxx.xx $\pm$ xx.xx &  10 &  24 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-        321,386 &  16 & xxx.xx $\pm$ xx.xx &  20 &  48 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-        321,386 &  32 & xxx.xx $\pm$ xx.xx &  40 &  96 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-        321,386 &  64 & xxx.xx $\pm$ xx.xx &  80 & 192 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
-        321,386 & 128 & xxx.xx $\pm$ xx.xx & 160 & 384 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+		321,386 &   8 & x,xxx.x $\pm$ xx.xx &  10 &  24 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 &  16 & x,xxx.x $\pm$ xx.xx &  20 &  48 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 &  32 & x,xxx.x $\pm$ xx.xx &  40 &  96 & xxx.xx $\pm$ xx.xx & xxx.xx $\pm$ xx.xx \\
+        321,386 &  64 & 4,256.9 $\pm$ 452.4 &  80 & 192 & 1,959.0 $\pm$ 550.7 & xxx.xx $\pm$ xx.xx \\
+		321,386 & 128 & 5,698.0 $\pm$ 862.7 & 160 & 384 & 2,996.1 $\pm$ 728.3 & xxx.xx $\pm$ xx.xx \\
 		\hline
 	\end{tabular}
 	\label{Tab:030}
@@ -140,7 +131,7 @@ Results in Tab.~\ref{Tab:005} are *.
 
 
 \begin{table}[ht]
-	\caption{Strong scaling results of deflation for a constant bJ preconditioner with $nvec=\lfloor1.25\times nb\rfloor$ and $spdim=3\times nb$.}
+	\caption{Strong scaling results of deflation for a constant LORASC preconditioner with $\varepsilon=0$, $nvec=\lfloor1.25\times nb\rfloor$ and $spdim=3\times nb$.}
 	\centering
 	\begin{tabular}{|c|c|c|c|c|c|c|}
 		\hline
@@ -158,7 +149,7 @@ Results in Tab.~\ref{Tab:005} are *.
 
 
 \begin{table}[ht]
-	\caption{Strong scaling results of deflation for a constant NN preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
+	\caption{Strong scaling results of deflation for a constant Neumann-Neumann preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
 	\centering
 	\begin{tabular}{|c|c|c|c|c|c|c|}
 		\hline
@@ -173,5 +164,28 @@ Results in Tab.~\ref{Tab:005} are *.
 	\end{tabular}
 	\label{Tab:040}
 \end{table}
+
+%\subsection{Scaling of AMG}
+
+\begin{table}[ht]
+	\caption{Scaling results of the constant AMG preconditioner.}
+	\centering
+	\begin{tabular}{|c|c|}
+		%\hline
+		%\multicolumn{4}{|c|}{Country List} \\
+		\hline
+		n & pcg iter \\
+		\hline
+		20,208  & 125.9 $\pm$ 35.0 \\
+		40,406  & 136.5 $\pm$ 39.2  \\
+		80,598  & 144.7 $\pm$ 51.7  \\
+		160,941 & 150.4 $\pm$ 48.3  \\
+		321,386 & xxx.x $\pm$ xx.x  \\
+		\hline
+	\end{tabular}
+	\label{Tab:020}
+\end{table}
+
+
 
 \end{document}
