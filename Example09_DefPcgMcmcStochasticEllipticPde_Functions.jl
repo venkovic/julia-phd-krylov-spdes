@@ -1,3 +1,6 @@
+using SparseArrays: SparseMatrixCSC
+using LinearMaps: FunctionMap
+
 """
      get_constant_preconds()
 
@@ -5,10 +8,9 @@ Returns queried constant preconditioners.
 
 """
 function get_constant_preconds(preconds::Array{String,1},
-                               A_0::SparseMatrixCSC{Float64,Int},
-                               dd::DomainDecomposition,)
+                               A_0::SparseMatrixCSC{Float64,Int})
 
-  Π = []
+  Π, Π_IId = [], []
 
   do_dd = false
   for precond in preconds
@@ -86,7 +88,7 @@ function get_constant_preconds(preconds::Array{String,1},
 
     elseif precond == "neumann-neumann$(ndom)_0"
       printlnln("prepare neumann-neummann preconditioner for A_0 ...")
-      ΠS_nn_0, Π_IId = prepare_neumann_neumann_schur_precond(ndom,
+      ΠS_nn_0, _Π_IId = prepare_neumann_neumann_schur_precond(ndom,
                                                              cells,
                                                              points,
                                                              epart,
@@ -101,13 +103,15 @@ function get_constant_preconds(preconds::Array{String,1},
                                                              uexact,
                                                              load_partition=false)
       push!(Π, ΠS_nn_0)
+      push!(Π_IId, _Π_IId)
       flush(stdout)
+
     end
 
   end # precond in preconds
 
   if do_dd
-    return Π, Π_IId
+    return Π, Π_IId[1]
   else
     return Π
   end
@@ -146,7 +150,8 @@ function test_solvers_on_single_chain(nsmp::Int,
                                       do_defpcg=true,
                                       verbose=true,
                                       save_results=false,
-                                      troubleshoot=false)
+                                      troubleshoot=false,
+                                      Π_IId=nothing)
 
   status = 0 
 
@@ -296,7 +301,13 @@ function test_solvers_on_single_chain(nsmp::Int,
             if s == 1
               x_schur .= 0
             else
-              WtS .= W[method]'S
+              if isa(S, FunctionMap)
+                for j in 1:nvec
+                  WtS[j, :] .= S * W[method][:, j] 
+                end
+              else
+                WtS .= W[method]'S
+              end
               H = WtS * W[method]
               x_schur .= W[method] * (H \ (W[method]'b_schur))
             end
@@ -312,6 +323,7 @@ function test_solvers_on_single_chain(nsmp::Int,
             Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
           end
         catch err
+          throw(err)
           status = -1
           return iter, status
         end
@@ -449,7 +461,8 @@ function test_solvers_on_several_chains(nchains::Int,
                                         do_defpcg=true,
                                         verbose=true,
                                         save_results=true,
-                                        troubleshoot=false)
+                                        troubleshoot=false,
+                                        Π_IId=nothing)
 
   iters = Dict{String,Array{Int,2}}()
 
@@ -464,7 +477,8 @@ function test_solvers_on_several_chains(nchains::Int,
                                                 do_eigdefpcg=do_eigdefpcg,
                                                 do_defpcg=do_defpcg,
                                                 verbose=verbose,
-                                                troubleshoot=troubleshoot)
+                                                troubleshoot=troubleshoot,
+                                                Π_IId=Π_IId)
 
     if status == 0
       for (method, _iter) in iter

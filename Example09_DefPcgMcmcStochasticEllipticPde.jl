@@ -24,6 +24,9 @@ import JLD
 
 using LinearAlgebra: isposdef, rank
 
+include("Example09_DefPcgMcmcStochasticEllipticPde_Functions.jl")
+
+
 troubleshoot = true
 
 maxit = 5_000
@@ -38,9 +41,15 @@ nbj = ndom
 nvec = floor(Int, 1.25 * ndom)
 spdim = 3 * ndom
 
-const preconds_with_dd = ("lorasc$(ndom)_0", "lorasc$(ndom)_1", "neumann-neumann$(ndom)_0")
+preconds = ["neumann-neumann$(ndom)_0"] # ∈ ("amg_0", 
+                                        #    "bj$(nbj)_0",
+                                        #    "lorasc$(ndom)_0",
+                                        #    "lorasc$(ndom)_1",
+                                        #    "neumann-neumann$(ndom)_0")
 
-preconds = ["neumann-neumann$(ndom)_0"] # ∈ ("amg_0", "bj$(nbj)_0") ⋃ preconds_with_dd 
+const preconds_with_dd = ("lorasc$(ndom)_0",
+                          "lorasc$(ndom)_1",
+                          "neumann-neumann$(ndom)_0")
 
 nchains = 50
 nsmp = 5
@@ -56,7 +65,7 @@ function f(x::Float64, y::Float64)
   return -1.
 end
   
-function uexact(xx::Float64, yy::Float64)
+function uexact(x::Float64, y::Float64)
   return .734
 end
 
@@ -86,29 +95,19 @@ space_println("nel = $(size(cells)[2])")
 #
 # Load mesh parition
 #
-do_dd = false
-for precond in preconds
-  if precond in preconds_with_dd
-    global do_dd = true
-    break
-  end
+if load_existing_partition
+  epart, npart = load_partition(tentative_nnode, ndom)
+else
+  epart, npart = mesh_partition(cells, ndom)
+  save_partition(epart, npart, tentative_nnode, ndom)
 end
 
-if do_dd
-  if load_existing_partition
-    epart, npart = load_partition(tentative_nnode, ndom)
-  else
-    epart, npart = mesh_partition(cells, ndom)
-    save_partition(epart, npart, tentative_nnode, ndom)
-  end
-
-  ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
-  elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
-                                                                cell_neighbors,
-                                                                epart, 
-                                                                npart,
-                                                                dirichlet_inds_g2l)
-end
+ind_Id_g2l, ind_Γd_g2l, ind_Γ_g2l, ind_Γd_Γ2l, node_owner,
+elemd, node_Γ, node_Γ_cnt, node_Id, nnode_Id = set_subdomains(cells,
+                                                              cell_neighbors,
+                                                              epart,
+                                                              npart,
+                                                              dirichlet_inds_g2l)
 
 #
 # Assembly of constant preconditioners
@@ -122,20 +121,27 @@ A_0, _ = @time do_isotropic_elliptic_assembly(cells, points,
                                               point_markers,
                                               exp.(g_0), f, uexact)
 
-
 #
-# Load kl representation and prepare mcmc sampler
+# Load kl representation
 # 
 M = get_mass_matrix(cells, points)
 Λ = npzread("data/$root_fname.kl-eigvals.npz")
 Ψ = npzread("data/$root_fname.kl-eigvecs.npz")
 
+#
+# Prepare constant preconditioners
+#
+Π, Π_IId = get_constant_preconds(preconds, A_0)
 
-iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π,
+#
+# Run test
+#
+iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π, 
                                        preconds, nvec, spdim, maxit,
-                                       do_pcg=true,
-                                       do_eigpcg=false,
+                                       do_pcg=false,
+                                       do_eigpcg=true,
                                        do_eigdefpcg=false,
                                        do_defpcg=false,
                                        save_results=false,
-                                       troubleshoot=troubleshoot)
+                                       troubleshoot=troubleshoot,
+                                       Π_IId=Π_IId)
