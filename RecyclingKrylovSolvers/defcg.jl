@@ -322,13 +322,23 @@ function eigdefpcg(A::Union{SparseMatrixCSC{T},
   p = Array{T,1}(undef, n)
   z = Array{T,1}(undef, n)
   mu = Array{T,1}(undef, nvec)
-  
-  WtA = W'A
-  WtAW = WtA * W
-  WtW = W'W
+  WtA = Array{T,2}(undef, nvec, n)
+  WtAW = Array{T,2}(undef, nvec, nvec)
+  WtW = Array{T,2}(undef, nvec, nvec)
+
+  if isa(A, FunctionMap)
+    for ivec in 1:nvec
+      WtA[ivec, :] .= A * W[:, ivec]
+    end
+  else
+    mul!(WtA, W', A)
+  end
+
+  WtAW .= WtA * W
+  WtW .= W'W
 
   r .= b .- A * x
-  
+
   mu .= W' * r
   mu .= WtAW \ mu
   x .+= W * mu
