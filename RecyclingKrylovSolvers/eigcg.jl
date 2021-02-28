@@ -157,6 +157,7 @@ function eigpcg(A::Union{SparseMatrixCSC{T},
   res_norm = Array{T,1}(undef, n)
 
   V = Array{T,2}(undef, n, spdim)
+  AV = Array{T,2}(undef, n, spdim)
   VtAV = zeros(T, spdim, spdim)
   Y = zeros(T, spdim, 2 * nvec)
   tvec = Array{T,1}(undef, n)
@@ -208,7 +209,14 @@ function eigpcg(A::Union{SparseMatrixCSC{T},
     end
 
     if ivec == spdim
-      VtAV = V' * (A * V)
+      if isa(A, FunctionMap)
+        for jvec in 1:spdim
+          AV[:, jvec] .= A * V[:, jvec]
+        end
+      else
+        mul!(AV, A, V)
+      end
+      VtAV .= V'AV
       Tm = Symmetric(VtAV) # spdim-by-spdim
       Y[:, 1:nvec] = eigvecs(Tm)[:, 1:nvec] # spdim-by-nvec
       Y[1:spdim-1, nvec+1:end] = eigvecs(Tm[1:spdim-1, 1:spdim-1])[:, 1:nvec] # (spdim-1)-by-nvec
