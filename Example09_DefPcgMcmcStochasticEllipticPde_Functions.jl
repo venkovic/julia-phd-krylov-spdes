@@ -113,7 +113,7 @@ function get_constant_preconds(preconds::Array{String,1},
   if do_dd
     return Π, Π_IId[1]
   else
-    return Π
+    return Π, nothing
   end
 
 end # function get_constant_preconds

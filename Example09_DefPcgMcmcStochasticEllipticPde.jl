@@ -30,10 +30,10 @@ include("Example09_DefPcgMcmcStochasticEllipticPde_Functions.jl")
 troubleshoot = true
 
 maxit = 5_000
-tentative_nnode = 20_000
+tentative_nnode = 40_000
 load_existing_mesh = false
 
-ndom = 8
+ndom = 16
 load_existing_partition = false
 
 nbj = ndom
@@ -139,9 +139,9 @@ M = get_mass_matrix(cells, points)
 iters = test_solvers_on_several_chains(nchains, nsmp, Λ, Ψ, Π, 
                                        preconds, nvec, spdim, maxit,
                                        do_pcg=false,
-                                       do_eigpcg=true,
-                                       do_eigdefpcg=false,
+                                       do_eigpcg=false,
+                                       do_eigdefpcg=true,
                                        do_defpcg=false,
-                                       save_results=false,
+                                       save_results=true,
                                        troubleshoot=troubleshoot,
                                        Π_IId=Π_IId)
