@@ -74,11 +74,11 @@ Example05_KarhunenLoevePllDomainDecomposition:
 and "global" Karhunen-Loeve expansions of a Gaussian process.
 
 Example06_PcgStochasticEllipticPde:
--assembles (and quickly re-assembles) linear systems of fem discretization 
+-assembles (and quickly updates) linear systems of fem discretization 
 for the heat equation with a heterogeneous isotropic lognormal coefficient field. 
 -shows how to assemble constant preconditionners for given realizations. 
 -shows effect of deflation on "median" LorascPreconditioner for A * u = b.
--Shows lack of effect of deflation on "median" AMGPreconditioner for A * u = b. 
+-shows lack of effect of deflation on "median" AMGPreconditioner for A * u = b. 
 
 Example07_PcgSchurStochasticEllipticPde:
 -prepares (and quickly updates) Schur complement operators for the heat equation 
@@ -96,3 +96,28 @@ Example09_DefPcgMcmcStochasticEllipticPde:
 
 Example10_EllipticPdePllPcg:
 -work in progress.
+
+Example11_EigInitPcgMultipleRhs:
+-random sampling of right hand sides with constant left hand side.
+-deflates initial guess with online eigenvector approximation.
+
+
+Snacks:
+
+fudge:
+-in Example09, when W is not full rank for large nvec, solves are 
+ attempted, potential errors are foregone, and the realization ignored.
+-fix deflated solvers. 
+
+fondue:
+-cache averse much? what about transposing points and cells?
+
+ginger:
+-add some punch with a domain decomposition-friendly assembly.
+-try to get rid of some of the dictionaries?
+
+lime:
+-trim verbose function calls with a struct for domain decomposition.
+
+
+
