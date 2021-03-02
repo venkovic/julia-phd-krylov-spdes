@@ -3,6 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{makecell}
+\usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
 \title{Deflation results with MCMC}
 %\author{Gubert Farnsworth}
@@ -18,6 +19,14 @@
 
 %\subsection{Low rank (LORASC)}
 
+%\begin{align}
+%\mathbf{S}\mathbf{u}=\lambda\mathbf{A}_{\Gamma\Gamma}\mathbf{u}
+%\end{align}
+
+%\begin{align}
+%\tilde{\mathbf{S}}^{-1}=\mathbf{A}_{\Gamma\Gamma}^{-1}+\mathbf{E}\boldsymbol{\Sigma}\mathbf{E}^T
+%\end{align}
+%where $\mathbf{E}=[\mathbf{v}_1,\dots,\mathbf{v}_i]$
 %\subsection{Neumann-Neumann (NN)}
 
 %\subsection{Algebraic multigrid (AMG)}
@@ -95,15 +104,15 @@
 \begin{table}[ht]
 	\caption{Weak scaling results of deflation for a constant Neumann-Neumann preconditioner with $nvec=\lfloor1.25\times ndom\rfloor$ and $spdim=3\times ndom$.}
 	\centering
-	\begin{tabular}{|c|c|c|c|c|c|c|}
+	\begin{tabular}{|c|c|c|c|c|c|c|c|}
 	\hline
-	$n_\Gamma$ & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
+	$n$ & $n_\Gamma$ & ndom & \makecell{pcg\\ iter} & nvec & spdim & \makecell{eigdefpcg\\ iter} & \makecell{defpcg\\ iter}\\
 	\hline
-	20,208  &   8 & xxx.x $\pm$  xx.x &  10 &  24 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
-	1,422  &  16 & 106.1 $\pm$  24.0 &  20 &  48 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
-	80,598  &  32 & xxx.x $\pm$  xx.x &  40 &  96 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
-	160,941 &  64 & xxx.x $\pm$  xx.x &  80 & 192 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
-	321,386 & 128 & xxx.x $\pm$  xx.x & 160 & 384 & xxx.x $\pm$ xx.x & xxx.x $\pm$ xx.x \\
+	20,208  & 641    &   8 &  77.6 $\pm$  19.9 &  10 &  24  & 71.3 $\pm$ 17.8 & xxx.x $\pm$ xx.x \\
+	40,406  & 1,422  &  16 & 107.3 $\pm$  28.3 &  20 &  48  & 89.7 $\pm$ 27.3 & xxx.x $\pm$ xx.x \\
+	80,598  & 2,800  &  32 & 156.9 $\pm$  22.6 &  40 &  96 &  91.9 $\pm$ 18.0 & xxx.x $\pm$ xx.x \\
+	160,941 & 5,600  &  64 & 517.9 $\pm$  88.6 &  80 & 192 & 270.4 $\pm$ 79.7 & xxx.x $\pm$ xx.x \\
+	321,386 & 11,200 & 128 & 794.0 $\pm$ 129.3 & 160 & 384 & 313.5 $\pm$ 83.0 & xxx.x $\pm$ xx.x \\
 	\hline
     \end{tabular}
 	\label{Tab:025}
