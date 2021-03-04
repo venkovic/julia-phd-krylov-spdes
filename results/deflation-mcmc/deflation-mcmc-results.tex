@@ -13,28 +13,80 @@
 
 \maketitle
 
-%\section{Constant preconditioners}
+\section{A handful of constant preconditioners}
+Constant preconditioners are considered for the realization $\xi=\mathbf{1}$, denoted by $\mathbf{A}_0$.
+\subsection{Block Jacobi (bJ)}
+We first consider non-overlapping diagonal bJ preconditioners of the form
+\begin{align}
+\mathbf{M}^{-1}=\sum_{j=1}^{n_b}\boldsymbol{\mathcal{R}}_j\mathbf{M}_j^{-1}\boldsymbol{\mathcal{R}}_j^T
+\end{align}
+with canonical restrictions $\boldsymbol{\mathcal{R}}_j$ from a global vector to each block $j\in[1,n_b]$.
+For each $j$, $\mathbf{M}_j^{-1}$ is applied with a Cholesky factorization $\mathbf{M}_j=\mathbf{L}_j\mathbf{L}_j^T=\boldsymbol{\mathcal{R}}_j^T\mathbf{A}\boldsymbol{\mathcal{R}}_j$.
 
-%\subsection{Block Jacobi (bJ)}
+\subsection{Geometric domain decomposition}
+Let us consider a $n_d$-partition of $\Omega$ into subdomains $\{\Omega_d\}_{d=1}^{n_d}$ where each $\Omega_d$ is a contiguous union of elements, with a (non-Dirichlet) boundary denoted by $\partial\Omega_d$.
+The canonical restriction $\boldsymbol{\mathcal{R}}_d$ maps global (non-Dirichlet) degrees of freedom (DoFs) to mesh nodes contained in $\Omega_d$.
+We assume local orderings such that $\boldsymbol{\mathcal{R}}_d=[\boldsymbol{\mathcal{R}}_{\mathrm{I},d},\boldsymbol{\mathcal{R}}_{\Gamma,d}]$,
+where $\boldsymbol{\mathcal{R}}_{\mathrm{I},d}$ and $\boldsymbol{\mathcal{R}}_{\Gamma,d}$ map nodes from $\Omega_d\setminus\partial\Omega_d$ and $\partial\Omega_d$, respectively.
+Then, we write
+\begin{align}
+\boldsymbol{\mathcal{R}}_d^T\mathbf{A}\boldsymbol{\mathcal{R}}_d=
+\begin{bmatrix}\boldsymbol{\mathcal{R}}_{\mathrm{I},d}^T\\\boldsymbol{\mathcal{R}}_{\Gamma,d}^T\end{bmatrix}
+\mathbf{A}
+\begin{bmatrix}\boldsymbol{\mathcal{R}}_{\mathrm{I},d}&\boldsymbol{\mathcal{R}}_{\Gamma,d}\end{bmatrix}=:
+\begin{bmatrix}
+\mathbf{A}_{\mathrm{II},d}&\mathbf{A}_{\mathrm{I}\Gamma,d}\\
+\mathbf{A}_{\Gamma \mathrm{I},d}&\mathbf{A}_{\Gamma\Gamma,d}
+\end{bmatrix}
+\end{align}
+and
+\begin{align}
+\boldsymbol{\mathcal{R}}_d^T\mathbf{b}=
+\begin{bmatrix}\boldsymbol{\mathcal{R}}_{\mathrm{I},d}^T\\\boldsymbol{\mathcal{R}}_{\Gamma,d}^T\end{bmatrix}\mathbf{b}=:
+\begin{bmatrix}\mathbf{b}_{\mathrm{I},d}\\\mathbf{b}_{\Gamma,d}\end{bmatrix}.
+\end{align}
+After elimination of $\mathbf{u}_{\mathrm{I}}$ from $\mathbf{A}\mathbf{u}=\mathbf{b}$, we have
+\begin{align}
+\mathbf{S}\mathbf{u}_{\Gamma}=\mathbf{b}_S
+\end{align}
+where $\mathbf{b}_S=$ and the Schur complement, $\mathbf{S}$, is applied 
+\begin{align}
+\mathbf{S}\mathbf{u}_\Gamma=\sum_{d=1}^{n_d}\mathbf{S}_d\mathbf{u}_{\Gamma,d}
+\end{align}
+with
+\begin{align}
+\mathbf{S}_d\mathbf{u}_{\Gamma,d}=
+\mathbf{A}_{\Gamma\Gamma,d}\mathbf{u}_{\Gamma,d}-
+\mathbf{A}_{\Gamma\mathrm{I},d}\mathbf{A}_{\mathrm{II},d}^{-1}\mathbf{A}_{\mathrm{I}\Gamma,d}\mathbf{u}_{\Gamma,d}.
+\end{align}
+For non-overlapping partitions, $\mathbf{A}_{\mathrm{II},d}$ is SPD but $\mathbf{S}_{d}$ is semi-definite.
 
-%\subsection{Low rank (LORASC)}
+\subsubsection{Neumann-Neumann (NN)}
+The NN preconditioner $\mathbf{M}_{NN}^{-1}$, see~\cite{}, is defined as follows for Eq.~\eqref{},
+\begin{align}
+\mathbf{M}_{NN}^{-1}\mathbf{u}_\Gamma=\sum_{d=1}^{n_d}\boldsymbol{\mathcal{R}}_{\Gamma,d}
+\end{align}
+where $\mathbf{S}_d^\dagger$ denotes the pseudo-inverse of $\mathbf{S}_d$.
 
-%\begin{align}
-%\mathbf{S}\mathbf{u}=\lambda\mathbf{A}_{\Gamma\Gamma}\mathbf{u}
-%\end{align}
+\subsubsection{Balanced domain decomposition (BDD)}
 
-%\begin{align}
-%\tilde{\mathbf{S}}^{-1}=\mathbf{A}_{\Gamma\Gamma}^{-1}+\mathbf{E}\boldsymbol{\Sigma}\mathbf{E}^T
-%\end{align}
-%where $\mathbf{E}=[\mathbf{v}_1,\dots,\mathbf{v}_i]$
-%\subsection{Neumann-Neumann (NN)}
+\subsubsection{Low rank Schur (LORASC)}
 
-%\subsection{Algebraic multigrid (AMG)}
+\begin{align}
+\mathbf{S}\mathbf{u}=\lambda\mathbf{A}_{\Gamma\Gamma}\mathbf{u}
+\end{align}
 
-%\section{Deflation results}
+\begin{align}
+\tilde{\mathbf{S}}^{-1}=\mathbf{A}_{\Gamma\Gamma}^{-1}+\mathbf{E}\boldsymbol{\Sigma}\mathbf{E}^T
+\end{align}
+where $\mathbf{E}=[\mathbf{v}_1,\dots,\mathbf{v}_i]$
 
-%\subsection{Weak scaling}
-%Results in Tab.~\ref{Tab:005} are *.
+\subsection{Algebraic multigrid (AMG)}
+
+\section{Deflation results}
+
+\subsection{Weak scaling}
+Results in Tab.~\ref{Tab:005} are *.
 
 
 % 320,000_bj64@hector stuck at 1st attempt of chain 11/50, 
@@ -56,13 +108,12 @@
 		20,208  &   8 &   828.6 $\pm$ 166.5 &  10 &  24 &   488.6 $\pm$  93.4 & xxx.xx $\pm$ xx.xx \\
 		40,406  &  16 & 1,435.2 $\pm$ 357.2 &  20 &  48 &   715.3 $\pm$ 154.6 & xxx.xx $\pm$ xx.xx \\
 		80,598  &  32 & 2,241.5 $\pm$ 528.4 &  40 &  96 & 1,043.2 $\pm$ 294.2 & xxx.xx $\pm$ xx.xx \\
-		160,941 &  64 & 3,321.4 $\pm$ 559.3 &  80 & 192 & 1,340.8 $\pm$ 370.6   & xxx.xx $\pm$ xx.xx \\
+		160,941 &  64 & 3,321.4 $\pm$ 559.3 &  80 & 192 & 1,340.8 $\pm$ 370.6 & xxx.xx $\pm$ xx.xx \\
 		321,386 & 128 & 5,698.0 $\pm$ 862.7 & 160 & 384 & 2,996.1 $\pm$ 728.3 & xxx.xx $\pm$ xx.xx \\
 		\hline
 	\end{tabular}
 	\label{Tab:005}
 \end{table}
-
 
 
 \begin{table}[ht]
@@ -110,15 +161,15 @@
 	\hline
 	20,208  & 641    &   8 &  77.6 $\pm$  19.9 &  10 &  24  & 71.3 $\pm$ 17.8 & xxx.x $\pm$ xx.x \\
 	40,406  & 1,422  &  16 & 107.3 $\pm$  28.3 &  20 &  48  & 89.7 $\pm$ 27.3 & xxx.x $\pm$ xx.x \\
-	80,598  & 2,800  &  32 & 156.9 $\pm$  22.6 &  40 &  96 &  91.9 $\pm$ 18.0 & xxx.x $\pm$ xx.x \\
-	160,941 & 5,600  &  64 & 517.9 $\pm$  88.6 &  80 & 192 & 270.4 $\pm$ 79.7 & xxx.x $\pm$ xx.x \\
+	80,598  & 2,800  &  32 & 157.2 $\pm$  29.8 &  40 &  96 &  94.9 $\pm$ 27.2 & xxx.x $\pm$ xx.x \\
+	160,941 & 5,600  &  64 & 533.9 $\pm$  88.0 &  80 & 192 & 273.1 $\pm$ 84.8 & xxx.x $\pm$ xx.x \\
 	321,386 & 11,200 & 128 & 794.0 $\pm$ 129.3 & 160 & 384 & 313.5 $\pm$ 83.0 & xxx.x $\pm$ xx.x \\
 	\hline
     \end{tabular}
 	\label{Tab:025}
 \end{table}
 
-%\subsection{Strong scaling results}
+\subsection{Strong scaling results}
 
 
 \begin{table}[ht]
@@ -174,14 +225,12 @@
 	\label{Tab:040}
 \end{table}
 
-%\subsection{Scaling of AMG}
+\subsection{Scaling of AMG}
 
 \begin{table}[ht]
 	\caption{Scaling results of the constant AMG preconditioner.}
 	\centering
 	\begin{tabular}{|c|c|}
-		%\hline
-		%\multicolumn{4}{|c|}{Country List} \\
 		\hline
 		n & pcg iter \\
 		\hline
