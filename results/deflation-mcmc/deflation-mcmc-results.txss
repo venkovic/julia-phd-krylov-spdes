@@ -4,7 +4,7 @@ File=
 
 [Session]
 Bookmarks=@Invalid()
-CurrentFile=references.bib
+CurrentFile=../../../tex-thesis-ubx-cerfacs/template_ub/my-operators.tex
 File0\Col=0
 File0\FileName=deflation-mcmc-results.tex
 File0\FirstLine=0
@@ -15,5 +15,10 @@ File1\FileName=references.bib
 File1\FirstLine=0
 File1\FoldedLines=
 File1\Line=0
+File2\Col=48
+File2\FileName=../../../tex-thesis-ubx-cerfacs/template_ub/my-operators.tex
+File2\FirstLine=0
+File2\FoldedLines=
+File2\Line=12
 FileVersion=1
 MasterFile=
