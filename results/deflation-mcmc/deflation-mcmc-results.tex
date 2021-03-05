@@ -5,119 +5,144 @@
 \usepackage{makecell}
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
+% Include my math operators
+\input{my-operators.tex}
+
 \title{Deflation results with MCMC}
-%\author{Gubert Farnsworth}
-%\date{\today}
+\author{N. Venkovic \and P. Mycek \and L. Giraud \and O.P. Le Ma\^{i}tre}
+\date{\today}
 
 \begin{document}
 
 \maketitle
+
 
 \section{A handful of constant preconditioners}
 Constant preconditioners are considered for the realization $\xi=\mathbf{1}$, denoted by $\mathbf{A}_0$.
 \subsection{Block Jacobi (bJ)}
 We first consider non-overlapping diagonal bJ preconditioners of the form
 \begin{align}
-\mathbf{M}^{-1}=\sum_{j=1}^{n_b}\boldsymbol{\mathcal{R}}_j\mathbf{M}_j^{-1}\boldsymbol{\mathcal{R}}_j^T
+\mathbf{M}^{-1}=\sum_{j=1}^{n_b}\Rloc{j}\mathbf{M}_j^{-1}\Rloc{j}^T
 \end{align}
-with canonical restrictions $\boldsymbol{\mathcal{R}}_j$ from a global vector to each block $j\in[1,n_b]$.
-For each $j$, $\mathbf{M}_j^{-1}$ is applied with a Cholesky factorization $\mathbf{M}_j=\mathbf{L}_j\mathbf{L}_j^T=\boldsymbol{\mathcal{R}}_j^T\mathbf{A}\boldsymbol{\mathcal{R}}_j$.
+with canonical restrictions $\Rloc{j}$ from a global vector to each block $j\in[1,n_b]$.
+For each $j$, $\mathbf{M}_j^{-1}$ is applied with a Cholesky factorization $\mathbf{M}_j=\mathbf{L}_j\mathbf{L}_j^T=\Rloc{j}^T\mathbf{A}\Rloc{j}$.
 
-\subsection{Geometric domain decomposition}
+\subsection{Non-overlapping geometric domain decomposition}
 Let us consider a $n_d$-partition of $\Omega$ into subdomains $\{\Omega_d\}_{d=1}^{n_d}$ where each $\Omega_d$ is a contiguous union of elements, with a (non-Dirichlet) boundary denoted by $\partial\Omega_d$.
-The canonical restriction $\boldsymbol{\mathcal{R}}_d$ maps global (non-Dirichlet) degrees of freedom (DoFs) to mesh nodes contained in $\Omega_d$.
-We assume local orderings such that $\boldsymbol{\mathcal{R}}_d=[\boldsymbol{\mathcal{R}}_{\mathrm{I},d},\boldsymbol{\mathcal{R}}_{\Gamma,d}]$,
-where $\boldsymbol{\mathcal{R}}_{\mathrm{I},d}$ and $\boldsymbol{\mathcal{R}}_{\Gamma,d}$ map nodes from $\Omega_d\setminus\partial\Omega_d$ and $\partial\Omega_d$, respectively.
+The canonical restriction $\Rloc{d}$ maps global (non-Dirichlet) degrees of freedom (DoFs) to mesh nodes contained in $\Omega_d$.
+We assume local orderings such that $\Rloc{d}=[\RIloc{d},\RGloc{d}]$,
+where $\RIloc{d}$ and $\RGloc{d}$ map nodes from $\Omega_d\setminus\partial\Omega_d$ and $\partial\Omega_d$, respectively.
 Then, we write
 \begin{align}
-\boldsymbol{\mathcal{R}}_d^T\mathbf{A}\boldsymbol{\mathcal{R}}_d=
-\begin{bmatrix}\boldsymbol{\mathcal{R}}_{\mathrm{I},d}^T\\\boldsymbol{\mathcal{R}}_{\Gamma,d}^T\end{bmatrix}
-\mathbf{A}
-\begin{bmatrix}\boldsymbol{\mathcal{R}}_{\mathrm{I},d}&\boldsymbol{\mathcal{R}}_{\Gamma,d}\end{bmatrix}=:
+\Rloc{d}^T\mathbf{A}\Rloc{d}=
 \begin{bmatrix}
-\mathbf{A}_{\mathrm{II},d}&\mathbf{A}_{\mathrm{I}\Gamma,d}\\
-\mathbf{A}_{\Gamma \mathrm{I},d}&\mathbf{A}_{\Gamma\Gamma,d}
+\RIloc{d}^T\\
+\RGloc{d}^T
+\end{bmatrix}
+\mathbf{A}
+\begin{bmatrix}
+\RIloc{d}&\RGloc{d}
+\end{bmatrix}=:
+\begin{bmatrix}
+\AIIloc{d}&\AIGloc{d}\\
+\AGIloc{d}&\AGGloc{d}
 \end{bmatrix}
 \end{align}
 and
 \begin{align}
-\boldsymbol{\mathcal{R}}_d^T\mathbf{b}=
-\begin{bmatrix}\boldsymbol{\mathcal{R}}_{\mathrm{I},d}^T\\\boldsymbol{\mathcal{R}}_{\Gamma,d}^T\end{bmatrix}\mathbf{b}=:
-\begin{bmatrix}\mathbf{b}_{\mathrm{I},d}\\\mathbf{b}_{\Gamma,d}\end{bmatrix}.
+{\boldsymbol{\mathcal{R}}^{\!(d)}}^T\mathbf{b}=
+\begin{bmatrix}
+\RIloc{d}\\
+\RGloc{d}
+\end{bmatrix}
+\mathbf{b}=:
+\begin{bmatrix}
+\bIloc{d}\\
+\bGloc{d}
+\end{bmatrix}.
 \end{align}
 The original system can be re-ordered as follows,
 \begin{align}
 \begin{bmatrix}
-\mathbf{A}_{\mathrm{II},1}&&&\mathbf{A}_{\mathrm{I\Gamma},1}\\
-&\ddots&& \vdots\\
-&&\mathbf{A}_{\mathrm{II},n_d}&\mathbf{A}_{\mathrm{I\Gamma},n_d}\\
-\mathbf{A}_{\mathrm{I\Gamma},1}&\cdots&\mathbf{A}_{\mathrm{I\Gamma},n_d}& \mathbf{A}_{\Gamma\Gamma} 
+\AIIlocnum{1}&      &            &\AIGlocnum{1}\\
+             &\ddots&            &\vdots       \\
+             &      &\AIIloc{n_d}&\AIGloc{n_d} \\
+\AGIlocnum{1}&\cdots&\AGIloc{n_d}&\AGG
 \end{bmatrix}
 \begin{bmatrix}
-\mathbf{b}_{\mathrm{I},1}\\
-\vdots\\
-\mathbf{b}_{\mathrm{I},n_d}\\
-\mathbf{b}_{\Gamma}
+\uIlocnum{1}\\
+\vdots      \\
+\uIloc{n_d} \\
+\uG
 \end{bmatrix}
 =
 \begin{bmatrix}
-\mathbf{u}_{\mathrm{I},1}\\
-\vdots\\
-\mathbf{u}_{\mathrm{I},n_d}\\
-\mathbf{u}_{\Gamma}
-\end{bmatrix}
+\bIlocnum{1}\\
+\vdots      \\
+\bIloc{n_d} \\
+\bG
+\end{bmatrix},
 \end{align}
-where $\mathbf{A}_{\mathrm{II}}\mathbf{u}_{\mathrm{I},d}=\mathbf{b}_{\mathrm{I},d}-\mathbf{A}_{\mathrm{I}\Gamma,d}\mathbf{u}_{\Gamma}$.
+where $\AIIloc{d}\uIloc{d}=\bIloc{d}-\AIGloc{d}\uG$.
 After elimination of $\mathbf{u}_{\mathrm{I}}$ from Eq.~\eqref{}, a condensed problem
 \begin{align}
-\mathbf{S}\mathbf{u}_{\Gamma}=\mathbf{b}_S
+\mathbf{S}\uG=\bS
 \end{align}
-is obtained for $\mathbf{u}_\Gamma$ 
-where $\mathbf{b}_S=\mathbf{b}_\Gamma-\mathbf{A}_{}$.
-The global Schur complement $\mathbf{S}$ combines contributions from each local Schur complement
+is obtained for $\uG$ where $\bS=\bG-\mathbf{A}_{}$.
+The global Schur complement $\mathbf{S}$ combines contributions from each local Schur complement,
 \begin{align}
-\mathbf{S}_d=
-\mathbf{A}_{\Gamma\Gamma,d}-
-\mathbf{A}_{\Gamma\mathrm{I},d}\mathbf{A}_{\mathrm{II},d}^{-1}\mathbf{A}_{\mathrm{I}\Gamma,d}
-\;,\;\;
-d=1,\dots,n_d,
+\mathbf{S}^{(d)}=
+\AGGloc{d}-
+\AGIloc{d}\AIIloc{d}^{-1}\AIGloc{d},
 \end{align}
-all of which are combined to form $\mathbf{S}=\sum_{d=1}^{n_d}\boldsymbol{\mathcal{R}}_d\mathbf{S}_d\boldsymbol{\mathcal{R}}_d^T$.
-Note that, for non-overlapping partitions, $\mathbf{A}_{\mathrm{II},d}$ is SPD, but $\mathbf{S}_{d}$ is symmetric positive semi-definite.
+for $d=1,\dots,n_d$, i.e., $\mathbf{S}=\sum_{d=1}^{n_d}\Rloc{d}\mathbf{S}^{(d)}\Rloc{d}^T$.
+Assuming that $\Omega_1,\dots,\Omega_{n_d}$ form a non-overlapping partition of $\Omega$, we have that $\AIIloc{d}$ is SPD, and $\mathbf{S}^{(d)}$ is symmetric positive semi-definite.
 
 \subsubsection{Neumann-Neumann (NN)}
-The NN preconditioner $\mathbf{M}_{NN}^{-1}$, see~\cite{}, is defined as follows for Eq.~\eqref{},
+The NN preconditioner, see~\cite{}, is a procedure *** for Eq.~\eqref{}.
+Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$ of $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$, a matrix representation of the NN preconditioner is given by
 \begin{align}
-\mathbf{M}_{NN}^{-1}=\sum_{d=1}^{n_d}
-\boldsymbol{\mathcal{R}}_{\Gamma,d}
-\mathbf{D}
-\mathbf{S}_d^\dagger
-\mathbf{D}
-\boldsymbol{\mathcal{R}}_{\Gamma,d}^T,
+\invMNN=\sum_{d=1}^{n_d}
+\RGloc{d}
+\mathbf{D}_d
+{\mathbf{S}^{(d)}}^\dagger
+\mathbf{D}_d
+\RGloc{d}^T,
 \end{align}
-where $\mathbf{S}_d^\dagger$ denotes the pseudo-inverse of $\mathbf{S}_d$,
-and $\mathbf{D}_d$ is a weight matrix which, altogether with the weight matrices of the other subdomains, 
-forms a decomposition of unity for the nodes on the interface $\partial\Omega=\cup_{d=1}^{n_d}\partial\Omega_d$, i.e.,
+where $\mathbf{D}_d$ is a weight matrix which forms a decomposition of unity along with the weight matrices of all the other subdomains.
+That is,
 \begin{align}
 \sum_{d=1}^{n_d}
-\boldsymbol{\mathcal{R}}_{\Gamma,d}
+\RGloc{d}
 \mathbf{D}_d
-\boldsymbol{\mathcal{R}}_{\Gamma,d}^T
+\RGloc{d}^T
 =\mathbf{I}.
 \end{align}
 It is customary to let $\mathbf{D}_d$ be diagonal with ***.
+Not that NN does not scale.
+For large numbers of subdomains, it becomes useful to define and use coarse spaces.
 
 \subsubsection{Balanced domain decomposition (BDD)}
-NN does not scale.
+Balancing is introduced by * in order to introduce a coarse space such that
+\begin{align}
+\invMBDD=\sum_{d=1}^{n_d}
+\RGloc{d}
+\mathbf{D}_d
+{\mathbf{S}^{(d)}}^\dagger
+\mathbf{D}_d
+\RGloc{d}^T,
+\end{align}
+
+
 
 \subsubsection{Low rank Schur (LORASC)}
 
 \begin{align}
-\mathbf{S}\mathbf{u}=\lambda\mathbf{A}_{\Gamma\Gamma}\mathbf{u}
+\mathbf{S}\mathbf{u}=\lambda\AGG\mathbf{u}
 \end{align}
 
 \begin{align}
-\tilde{\mathbf{S}}^{-1}=\mathbf{A}_{\Gamma\Gamma}^{-1}+\mathbf{E}\boldsymbol{\Sigma}\mathbf{E}^T
+\tilde{\mathbf{S}}^{-1}=\invAGG+\mathbf{E}\boldsymbol{\Sigma}\mathbf{E}^T
 \end{align}
 where $\mathbf{E}=[\mathbf{v}_1,\dots,\mathbf{v}_i]$
 
