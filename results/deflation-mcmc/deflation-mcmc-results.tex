@@ -6,7 +6,7 @@
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
 % Include my math operators
-\input{my-operators.tex}
+\input{/home/venkovic/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
 
 \title{Deflation results with MCMC}
 \author{N. Venkovic \and P. Mycek \and L. Giraud \and O.P. Le Ma\^{i}tre}
@@ -118,21 +118,29 @@ That is,
 \RGloc{d}^T
 =\mathbf{I}.
 \end{align}
-It is customary to let $\mathbf{D}_d$ be diagonal with ***.
+It is customary to let $\mathbf{D}_d$ be diagonal with components *.
 Not that NN does not scale.
 For large numbers of subdomains, it becomes useful to define and use coarse spaces.
 
 \subsubsection{Balanced domain decomposition (BDD)}
 Balancing is introduced by * in order to introduce a coarse space such that
+
 \begin{align}
-\invMBDD=\sum_{d=1}^{n_d}
-\RGloc{d}
-\mathbf{D}_d
-{\mathbf{S}^{(d)}}^\dagger
-\mathbf{D}_d
-\RGloc{d}^T,
+\mathbf{Q}^{(0)}:=&\RGlocnum{0}\left(\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\right)^{-1}\RGlocnum{0}^T\\
+\mathbf{Q}^{(d)}:=&\RGloc{d}\mathbf{D}_d{\mathbf{S}^{(d)}}^\dagger\mathbf{D}_d\RGloc{d}^T
 \end{align}
 
+
+\begin{align}
+\invMBDD=
+{\mathbf{Q}^{(0)}}
++
+\left(\mathbf{I}-\mathbf{S}\mathbf{Q}^{(0)}\right)^T
+\sum_{d=1}^{n_d}
+\mathbf{Q}^{(d)}
+\left(\mathbf{I}-\mathbf{S}\mathbf{Q}^{(0)}\right),
+\end{align}
+where $\mathbf{S}^{(0)}=\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}$.
 
 
 \subsubsection{Low rank Schur (LORASC)}
