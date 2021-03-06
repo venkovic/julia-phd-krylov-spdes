@@ -6,7 +6,7 @@
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
 % Include my math operators
-\input{/home/venkovic/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
+\input{/home/nicolas/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
 
 \title{Deflation results with MCMC}
 \author{N. Venkovic \and P. Mycek \and L. Giraud \and O.P. Le Ma\^{i}tre}
@@ -16,24 +16,29 @@
 
 \maketitle
 
+We want to solve
+\begin{align}\label{eq:000}
+\mathbf{A}\mathbf{u}=\mathbf{b}
+\end{align}
+where $\mathbf{A}$ is SPD.
 
 \section{A handful of constant preconditioners}
 Constant preconditioners are considered for the realization $\xi=\mathbf{1}$, denoted by $\mathbf{A}_0$.
 \subsection{Block Jacobi (bJ)}
 We first consider non-overlapping diagonal bJ preconditioners of the form
-\begin{align}
+\begin{align}\label{eq:005}
 \mathbf{M}^{-1}=\sum_{j=1}^{n_b}\Rloc{j}\mathbf{M}_j^{-1}\Rloc{j}^T
 \end{align}
 with canonical restrictions $\Rloc{j}$ from a global vector to each block $j\in[1,n_b]$.
 For each $j$, $\mathbf{M}_j^{-1}$ is applied with a Cholesky factorization $\mathbf{M}_j=\mathbf{L}_j\mathbf{L}_j^T=\Rloc{j}^T\mathbf{A}\Rloc{j}$.
 
 \subsection{Non-overlapping geometric domain decomposition}
-Let us consider a $n_d$-partition of $\Omega$ into subdomains $\{\Omega_d\}_{d=1}^{n_d}$ where each $\Omega_d$ is a contiguous union of elements, with a (non-Dirichlet) boundary denoted by $\partial\Omega_d$.
+Let us consider a $n_d$-partition of $\Omega$ into subdomains $\{\Omega_d\}_{d=1}^{n_d}$ where each $\Omega_d$ is a contiguous union of elements of the mesh, with a (non-Dirichlet) boundary denoted by $\partial\Omega_d$.
 The canonical restriction $\Rloc{d}$ maps global (non-Dirichlet) degrees of freedom (DoFs) to mesh nodes contained in $\Omega_d$.
 We assume local orderings such that $\Rloc{d}=[\RIloc{d},\RGloc{d}]$,
 where $\RIloc{d}$ and $\RGloc{d}$ map nodes from $\Omega_d\setminus\partial\Omega_d$ and $\partial\Omega_d$, respectively.
 Then, we write
-\begin{align}
+\begin{align}\label{eq:010}
 \Rloc{d}^T\mathbf{A}\Rloc{d}=
 \begin{bmatrix}
 \RIloc{d}^T\\
@@ -49,7 +54,7 @@ Then, we write
 \end{bmatrix}
 \end{align}
 and
-\begin{align}
+\begin{align}\label{eq:015}
 {\boldsymbol{\mathcal{R}}^{\!(d)}}^T\mathbf{b}=
 \begin{bmatrix}
 \RIloc{d}\\
@@ -61,8 +66,8 @@ and
 \bGloc{d}
 \end{bmatrix}.
 \end{align}
-The original system can be re-ordered as follows,
-\begin{align}
+The original system can then be re-ordered as follows,
+\begin{align}\label{eq:020}
 \begin{bmatrix}
 \AIIlocnum{1}&      &            &\AIGlocnum{1}\\
              &\ddots&            &\vdots       \\
@@ -83,34 +88,38 @@ The original system can be re-ordered as follows,
 \bG
 \end{bmatrix},
 \end{align}
-where $\AIIloc{d}\uIloc{d}=\bIloc{d}-\AIGloc{d}\uG$.
-After elimination of $\mathbf{u}_{\mathrm{I}}$ from Eq.~\eqref{}, a condensed problem
-\begin{align}
-\mathbf{S}\uG=\bS
+where 
+\begin{align}\label{eq:025}
+\AIIloc{d}\uIloc{d}=\bIloc{d}-\AIGloc{d}\uG
+\;,\;\;
+d=1,\dots,n_d.
 \end{align}
-is obtained for $\uG$ where $\bS=\bG-\mathbf{A}_{}$.
-The global Schur complement $\mathbf{S}$ combines contributions from each local Schur complement,
+Making use of Eq.~\eqref{eq:025} to eliminate $\uIlocnum{1},\dots,\uIloc{n_d}$ from Eq.~\eqref{eq:020} yields a condensed linear system of the form
+\begin{align}\label{eq:030}
+\mathbf{S}\uG=\bS
+\;,\;\;
+\bS=\bG-\sum_{1}^{n_d}\AGIloc{d}\AIIloc{d}^{-1}\bIloc{d},
+\end{align}
+in which $\AIIloc{d}$ is SPD and $\mathbf{S}$, i.e., the global Schur complement operator, admits a decomposition of the form
+\begin{align}
+\mathbf{S}=\sum_{d=1}^{n_d}\Rloc{d}\mathbf{S}^{(d)}\Rloc{d}^T
+\end{align}
+with local Schur complements given by
 \begin{align}
 \mathbf{S}^{(d)}=
 \AGGloc{d}-
-\AGIloc{d}\AIIloc{d}^{-1}\AIGloc{d},
+\AGIloc{d}\AIIloc{d}^{-1}\AIGloc{d}
+\;,\;\;
+d=1,\dots,n_d.
 \end{align}
-for $d=1,\dots,n_d$, i.e., $\mathbf{S}=\sum_{d=1}^{n_d}\Rloc{d}\mathbf{S}^{(d)}\Rloc{d}^T$.
-Assuming that $\Omega_1,\dots,\Omega_{n_d}$ form a non-overlapping partition of $\Omega$, we have that $\AIIloc{d}$ is SPD, and $\mathbf{S}^{(d)}$ is symmetric positive semi-definite.
+Note that there exist one-, two- and, more generally, multi-level preconditioners for Eqs.~\eqref{eq:000} and \eqref{eq:030}, which are designed to leverage the locality inherent to domain decomposition in distributed implementations.
+An extensive review of multi-level preconditioners based on domain decomposition and their relation to deflation can be found in Tang et al.~\cite{Tang2009}.
+Here, we simply present a handful of well known one- and two-level variants.
 
 \subsubsection{Neumann-Neumann (NN)}
-The NN preconditioner, see~\cite{}, is a procedure *** for Eq.~\eqref{}.
-Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$ of $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$, a matrix representation of the NN preconditioner is given by
-\begin{align}
-\invMNN=\sum_{d=1}^{n_d}
-\RGloc{d}
-\mathbf{D}_d
-{\mathbf{S}^{(d)}}^\dagger
-\mathbf{D}_d
-\RGloc{d}^T,
-\end{align}
-where $\mathbf{D}_d$ is a weight matrix which forms a decomposition of unity along with the weight matrices of all the other subdomains.
-That is,
+Perhaps the most widely known one-level preconditioner for Eq.~\eqref{eq:030} was proposed by De~Roeck and Le~Tallec~\cite{DeRoeck1991}.
+This method is referred to as Neumann-Neumann (NN) preconditioning due to the nature of the boundary conditions on the interface of the subdomains when considering the local problems solved through the application of the preconditioner.
+To define an NN preconditioner, it is necessary to specify weight matrices $\mathbf{D}_1,\dots,\mathbf{D}_{n_d}$ so as to form a partition of unity, i.e.,
 \begin{align}
 \sum_{d=1}^{n_d}
 \RGloc{d}
@@ -118,12 +127,27 @@ That is,
 \RGloc{d}^T
 =\mathbf{I}.
 \end{align}
-It is customary to let $\mathbf{D}_d$ be diagonal with components *.
+A simple choice consists of letting $\mathbf{D}_d$ be diagonal with each non-zero component set to one divided by the number of subdomains to which the DoF is associated.
+See \cite{Toselli} for other choices of weight matrices.
+
+We recall that $\Omega_1,\dots,\Omega_{n_d}$ are contiguous subsets which form a non-overlapping partition of $\Omega$.
+Despite such conditions, the local Schur complements $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$ are symmetric positive semi-definite.
+Then ****.
+Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$ of $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$, a matrix representation of the NN preconditioner is given by
+\begin{align}
+\invMNN=\sum_{d=1}^{n_d}
+\RGloc{d}
+\mathbf{D}_d
+{\mathbf{S}^{(d)}}^\dagger
+\mathbf{D}_d
+\RGloc{d}^T.
+\end{align}
 Not that NN does not scale.
 For large numbers of subdomains, it becomes useful to define and use coarse spaces.
 
 \subsubsection{Balanced domain decomposition (BDD)}
-Balancing is introduced by * in order to introduce a coarse space such that
+Balancing is introduced by Mandel~\cite{Mandel1993} in order to introduce a coarse space such that ****.
+Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
 
 \begin{align}
 \mathbf{Q}^{(0)}:=&\RGlocnum{0}\left(\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\right)^{-1}\RGlocnum{0}^T\\
@@ -318,5 +342,6 @@ Results in Tab.~\ref{Tab:005} are *.
 \end{table}
 
 
-
+\bibliographystyle{siamplain}
+\bibliography{references}
 \end{document}
