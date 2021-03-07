@@ -7,22 +7,17 @@
 % Maths
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
+% My math operators
+\input{/home/nicolas/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
+
 % Algos
 \usepackage{algorithm}
 \usepackage{algorithmic}
 \renewcommand{\algorithmicrequire}{\textbf{Input:}}
 \renewcommand{\algorithmicensure}{\textbf{Output:}}
-%\usepackage{xparse}
-%\makeatletter
-%\NewDocumentCommand{\LeftComment}{s m}{%
-%	\Statex \IfBooleanF{#1}{\hspace*{\ALG@thistlm}}\(\triangleright\) #2}
-%\makeatother
 \usepackage{tikz}
-\renewcommand{\algorithmiccomment}[1]{{\color{gray}$\triangleright$ #1}}
+\renewcommand{\algorithmiccomment}[1]{{\hfill\color{gray}$\triangleright$ #1}}
 
-
-% My math operators
-\input{/home/venkovic/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
 
 \title{Deflation results with MCMC}
 \author{N. Venkovic \and P. Mycek \and L. Giraud \and O.P. Le Ma\^{i}tre}
@@ -146,31 +141,23 @@ To define an NN preconditioner, it is necessary to specify weight matrices $\mat
 A simple choice consists of letting $\mathbf{D}_d$ be diagonal with each non-zero component set to one divided by the number of subdomains to which the DoF is associated.
 See \cite{} for other choices of weight matrices.
 
-
 \begin{algorithm}[ht]
-	\caption{Neumann-Neumann preconditioner application~\cite{Mandel1993}}
+	\caption{Application of the Neumann-Neumann preconditioner}
 	\label{alg:NN}
 	\begin{algorithmic}[1]
 		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
-		\ENSURE{$\invMNN\mathbf{r}$}
-		\FOR{$d=1,\dots,n_d$}
-		\STATE{$\mathbf{r}^{(d)}:=\mathbf{D}_d^T\RGloc{d}^T\mathbf{r}$}
-		\STATE{Solve for any $\mathbf{z}^{(d)}$ s.t. $\mathbf{S}^{(d)}\mathbf{z}^{(d)}=\mathbf{r}^{(d)}$}
+		\ENSURE{$\mathbf{z}=\invMNN\mathbf{r}$}
+		\FOR[for each subdomain]{$d=1,\dots,n_d$}
+		\STATE{$\mathbf{r}^{(d)}:=\mathbf{D}_d^T\RGloc{d}^T\mathbf{r}$}\COMMENT{get local residual}
+		\STATE{Find any $\mathbf{z}^{(d)}$ s.t. $\mathbf{S}^{(d)}\mathbf{z}^{(d)}=\mathbf{r}^{(d)}$}\COMMENT{solve local problem}
 		\ENDFOR
-        \STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d\mathbf{r}^{(d)}$}
-		\RETURN{$\mathbf{z}$}
+        \STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d\mathbf{r}^{(d)}$}\COMMENT{average contributions of all subdomains}
 	\end{algorithmic}
 \end{algorithm}
 
-
-
-
-
-
-We recall that $\Omega_1,\dots,\Omega_{n_d}$ are contiguous subsets which form a non-overlapping partition of $\Omega$.
-Despite such conditions, the local Schur complements $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$ are symmetric positive semi-definite.
-Then ****.
-Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$ of $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$, a matrix representation of the NN preconditioner is given by
+The local Schur complements $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$ are typically singular.
+Thus ***.
+Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$, the following matrix representation is obtained:
 \begin{align}
 \invMNN=\sum_{d=1}^{n_d}
 \RGloc{d}
@@ -179,12 +166,27 @@ Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\da
 \mathbf{D}_d
 \RGloc{d}^T.
 \end{align}
-Not that NN does not scale.
-For large numbers of subdomains, it becomes useful to define and use coarse spaces.
+For large numbers of subdomains, ***.
+The NN preconditioner does not scale.
 
 \subsubsection{Balanced domain decomposition (BDD)}
 Balancing is introduced by Mandel~\cite{Mandel1993} in order to introduce a coarse space such that ****.
 Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
+
+\begin{algorithm}[ht]
+	\caption{Application of the balanced domain decomposition preconditioner}
+	\label{alg:BDD}
+	\begin{algorithmic}[1]
+		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
+		\ENSURE{$\mathbf{z}=\invMBDD\mathbf{r}$}
+		\FOR[for each subdomain:]{$d=1,\dots,n_d$}
+		\STATE{Find $\lambda_d$ s.t. $\mathbf{Z}^{(d)}{\mathbf{D}^{(d)}}^T\RGloc{d}^T\left(\mathbf{r}-\mathbf{D}_d^T\RGloc{d}^T\mathbf{r}\right)=0$}\COMMENT{solve local auxiliary problem.}
+		\ENDFOR
+		\STATE{$\mathbf{s}:=\mathbf{r}-\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d\mathbf{r}^{(d)}$}\COMMENT{balance residual}
+		\STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d(\mathbf{u}^{(d)}+\mathbf{Z}\boldsymbol{\mu})$}\COMMENT{average contributions of all subdomains}
+	\end{algorithmic}
+\end{algorithm}
+
 
 \begin{align}
 \mathbf{Q}^{(0)}:=&\RGlocnum{0}\left(\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\right)^{-1}\RGlocnum{0}^T\\
