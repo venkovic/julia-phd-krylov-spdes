@@ -3,10 +3,26 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{makecell}
+
+% Maths
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
-% Include my math operators
-\input{/home/nicolas/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
+% Algos
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+%\usepackage{xparse}
+%\makeatletter
+%\NewDocumentCommand{\LeftComment}{s m}{%
+%	\Statex \IfBooleanF{#1}{\hspace*{\ALG@thistlm}}\(\triangleright\) #2}
+%\makeatother
+\usepackage{tikz}
+\renewcommand{\algorithmiccomment}[1]{{\color{gray}$\triangleright$ #1}}
+
+
+% My math operators
+\input{/home/venkovic/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
 
 \title{Deflation results with MCMC}
 \author{N. Venkovic \and P. Mycek \and L. Giraud \and O.P. Le Ma\^{i}tre}
@@ -128,7 +144,28 @@ To define an NN preconditioner, it is necessary to specify weight matrices $\mat
 =\mathbf{I}.
 \end{align}
 A simple choice consists of letting $\mathbf{D}_d$ be diagonal with each non-zero component set to one divided by the number of subdomains to which the DoF is associated.
-See \cite{Toselli} for other choices of weight matrices.
+See \cite{} for other choices of weight matrices.
+
+
+\begin{algorithm}[ht]
+	\caption{Neumann-Neumann preconditioner application~\cite{Mandel1993}}
+	\label{alg:NN}
+	\begin{algorithmic}[1]
+		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
+		\ENSURE{$\invMNN\mathbf{r}$}
+		\FOR{$d=1,\dots,n_d$}
+		\STATE{$\mathbf{r}^{(d)}:=\mathbf{D}_d^T\RGloc{d}^T\mathbf{r}$}
+		\STATE{Solve for any $\mathbf{z}^{(d)}$ s.t. $\mathbf{S}^{(d)}\mathbf{z}^{(d)}=\mathbf{r}^{(d)}$}
+		\ENDFOR
+        \STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d\mathbf{r}^{(d)}$}
+		\RETURN{$\mathbf{z}$}
+	\end{algorithmic}
+\end{algorithm}
+
+
+
+
+
 
 We recall that $\Omega_1,\dots,\Omega_{n_d}$ are contiguous subsets which form a non-overlapping partition of $\Omega$.
 Despite such conditions, the local Schur complements $\mathbf{S}^{(1)},\dots,\mathbf{S}^{(n_d)}$ are symmetric positive semi-definite.
