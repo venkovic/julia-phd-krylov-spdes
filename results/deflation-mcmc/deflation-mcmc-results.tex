@@ -8,7 +8,7 @@
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
 % My math operators
-\input{/home/venkovic/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
+\input{/home/nicolas/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
 
 % Algos
 \usepackage{algorithm}
@@ -172,6 +172,14 @@ The NN preconditioner does not scale.
 \subsubsection{Balanced domain decomposition (BDD)}
 Balancing is introduced by Mandel~\cite{Mandel1993} in order to introduce a coarse space such that ****.
 Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
+
+\begin{align}
+\Rlocnum{0}:=
+\begin{bmatrix}
+\RGlocnum{1}^T\mathbf{D}_1\mathbf{Z}_1&\dots&\RGloc{n_d}^T\mathbf{D}_{n_d}\mathbf{Z}_{n_d}
+\end{bmatrix}
+\end{align}
+
 
 \begin{algorithm}[ht]
 	\caption{Balancing domain decomposition preconditioner}
