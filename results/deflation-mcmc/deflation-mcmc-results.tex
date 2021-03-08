@@ -8,7 +8,7 @@
 \usepackage{amsmath,amssymb,amsfonts,amsopn,dsfont}
 
 % My math operators
-\input{/home/nicolas/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
+\input{/home/venkovic/Dropbox/Git/tex-thesis-ubx-cerfacs/template_ub/my-operators.tex}
 
 % Algos
 \usepackage{algorithm}
@@ -142,7 +142,7 @@ A simple choice consists of letting $\mathbf{D}_d$ be diagonal with each non-zer
 See \cite{} for other choices of weight matrices.
 
 \begin{algorithm}[ht]
-	\caption{Application of the Neumann-Neumann preconditioner}
+	\caption{Neumann-Neumann preconditioner}
 	\label{alg:NN}
 	\begin{algorithmic}[1]
 		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
@@ -174,7 +174,7 @@ Balancing is introduced by Mandel~\cite{Mandel1993} in order to introduce a coar
 Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
 
 \begin{algorithm}[ht]
-	\caption{Application of the balanced domain decomposition preconditioner}
+	\caption{Balancing domain decomposition preconditioner}
 	\label{alg:BDD}
 	\begin{algorithmic}[1]
 		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
@@ -186,24 +186,21 @@ Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
 		\STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d(\mathbf{u}^{(d)}+\mathbf{Z}\boldsymbol{\mu})$}\COMMENT{average contributions of all subdomains}
 	\end{algorithmic}
 \end{algorithm}
-
-
-\begin{align}
-\mathbf{Q}^{(0)}:=&\RGlocnum{0}\left(\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\right)^{-1}\RGlocnum{0}^T\\
-\mathbf{Q}^{(d)}:=&\RGloc{d}\mathbf{D}_d{\mathbf{S}^{(d)}}^\dagger\mathbf{D}_d\RGloc{d}^T
-\end{align}
-
-
+Using the sqme pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$, the following matrix form is obtained,
 \begin{align}
 \invMBDD=
-{\mathbf{Q}^{(0)}}
+(\mathbf{I}-\mathbf{S}\mathbf{Q}^{(0)})^T
+\invMNN
+(\mathbf{I}-\mathbf{S}\mathbf{Q}^{(0)})
 +
-\left(\mathbf{I}-\mathbf{S}\mathbf{Q}^{(0)}\right)^T
-\sum_{d=1}^{n_d}
-\mathbf{Q}^{(d)}
-\left(\mathbf{I}-\mathbf{S}\mathbf{Q}^{(0)}\right),
+{\mathbf{Q}^{(0)}},
 \end{align}
-where $\mathbf{S}^{(0)}=\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}$.
+where
+\begin{align}
+\mathbf{Q}^{(0)}:=&\RGlocnum{0}\left(\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\right)^{-1}\RGlocnum{0}^T.%\\
+%\mathbf{Q}^{(d)}:=&\RGloc{d}\mathbf{D}_d{\mathbf{S}^{(d)}}^\dagger\mathbf{D}_d\RGloc{d}^T
+\end{align}
+For elliptic PDEs, ****.
 
 
 \subsubsection{Low rank Schur (LORASC)}
