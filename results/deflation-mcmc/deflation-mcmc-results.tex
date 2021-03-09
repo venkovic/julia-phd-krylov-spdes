@@ -33,7 +33,7 @@ We want to solve
 \end{align}
 where $\mathbf{A}$ is SPD.
 
-\section{A handful of constant preconditioners}
+\section{Overview of constant preconditioners}
 Constant preconditioners are considered for the realization $\xi=\mathbf{1}$, denoted by $\mathbf{A}_0$.
 \subsection{Block Jacobi (bJ)}
 We first consider non-overlapping diagonal bJ preconditioners of the form
@@ -43,7 +43,11 @@ We first consider non-overlapping diagonal bJ preconditioners of the form
 with canonical restrictions $\Rloc{j}$ from a global vector to each block $j\in[1,n_b]$.
 For each $j$, $\mathbf{M}_j^{-1}$ is applied with a Cholesky factorization $\mathbf{M}_j=\mathbf{L}_j\mathbf{L}_j^T=\Rloc{j}^T\mathbf{A}\Rloc{j}$.
 
-\subsection{Non-overlapping geometric domain decomposition}
+\subsection{Non-overlapping domain decomposition}
+One-, two- and multi-level domain decomposition~\cite{Giraud2006a}.
+Unifying view of precoditioners based on algebraic domain decomposition~\cite{Poirel2018}.
+Reference for domain decomposition~\cite{Toselli2006}.
+
 Let us consider a $n_d$-partition of $\Omega$ into subdomains $\{\Omega_d\}_{d=1}^{n_d}$ where each $\Omega_d$ is a contiguous union of elements of the mesh, with a (non-Dirichlet) boundary denoted by $\partial\Omega_d$.
 The canonical restriction $\Rloc{d}$ maps global (non-Dirichlet) degrees of freedom (DoFs) to mesh nodes contained in $\Omega_d$.
 We assume local orderings such that $\Rloc{d}=[\RIloc{d},\RGloc{d}]$,
@@ -128,7 +132,7 @@ An extensive review of multi-level preconditioners based on domain decomposition
 Here, we simply present a handful of well known one- and two-level variants.
 
 \subsubsection{Neumann-Neumann (NN)}
-Perhaps the most widely known one-level preconditioner for Eq.~\eqref{eq:030} was proposed by De~Roeck and Le~Tallec~\cite{DeRoeck1991}.
+A widely known preconditioner for Eq.~\eqref{eq:030} was proposed by De~Roeck and Le~Tallec~\cite{DeRoeck1991}.
 This method is referred to as Neumann-Neumann (NN) preconditioning due to the nature of the boundary conditions on the interface of the subdomains when considering the local problems solved through the application of the preconditioner.
 To define an NN preconditioner, it is necessary to specify weight matrices $\mathbf{D}_1,\dots,\mathbf{D}_{n_d}$ so as to form a partition of unity, i.e.,
 \begin{align}
@@ -169,6 +173,10 @@ Using pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\da
 For large numbers of subdomains, ***.
 The NN preconditioner does not scale.
 
+
+
+\subsection{Multilevel approaches}
+
 \subsubsection{Balanced domain decomposition (BDD)}
 Balancing is introduced by Mandel~\cite{Mandel1993} in order to introduce a coarse space such that ****.
 Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
@@ -181,19 +189,36 @@ Consider the coarse space $V_0\subset V_\Gamma$ and $\Rlocnum{0}$.
 \end{align}
 
 
+
+
 \begin{algorithm}[ht]
 	\caption{Balancing domain decomposition preconditioner}
 	\label{alg:BDD}
 	\begin{algorithmic}[1]
 		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
 		\ENSURE{$\mathbf{z}=\invMBDD\mathbf{r}$}
-		\FOR[for each subdomain:]{$d=1,\dots,n_d$}
-		\STATE{Find $\lambda_d$ s.t. $\mathbf{Z}^{(d)}{\mathbf{D}^{(d)}}^T\RGloc{d}^T\left(\mathbf{r}-\mathbf{D}_d^T\RGloc{d}^T\mathbf{r}\right)=0$}\COMMENT{solve local auxiliary problem.}
-		\ENDFOR
-		\STATE{$\mathbf{s}:=\mathbf{r}-\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d\mathbf{r}^{(d)}$}\COMMENT{balance residual}
-		\STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d(\mathbf{u}^{(d)}+\mathbf{Z}\boldsymbol{\mu})$}\COMMENT{average contributions of all subdomains}
+		\STATE{Find $\boldsymbol{\lambda}$ s.t. $\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\boldsymbol{\lambda}=\RGlocnum{0}^T\mathbf{r}$}\COMMENT{solve coarse problem}
+		\STATE{$\mathbf{s}:=\mathbf{r}-\mathbf{S}\RGlocnum{0}\boldsymbol{\lambda}$}\COMMENT{(pre-)balance residual}
+		\STATE{$\mathbf{z}_{\mathrm{NN}}:=\invMNN\mathbf{s}$}\COMMENT{apply Neumann-Neumann}
+		\STATE{Find $\boldsymbol{\mu}$ s.t. $\RGlocnum{0}^T\mathbf{S}\RGlocnum{0}\boldsymbol{\mu}=\RGlocnum{0}^T(\mathbf{s}-\mathbf{S}\mathbf{z}_{\mathrm{NN}})$}\COMMENT{solve coarse problem}
+		\STATE{$\mathbf{s}:=\mathbf{r}+\RGlocnum{0}\boldsymbol{\mu}$}\COMMENT{(post-)balance preconditioned residual}
 	\end{algorithmic}
 \end{algorithm}
+
+
+%\begin{algorithm}[ht]
+%	\caption{Balancing domain decomposition preconditioner}
+%	\label{alg:BDD}
+%	\begin{algorithmic}[1]
+%		\REQUIRE{$\mathbf{r}\in V_\Gamma$}
+%		\ENSURE{$\mathbf{z}=\invMBDD\mathbf{r}$}
+%		\FOR[for each subdomain:]{$d=1,\dots,n_d$}
+%		\STATE{Find $\lambda_d$ s.t. $\mathbf{Z}^{(d)}{\mathbf{D}^{(d)}}^T\RGloc{d}^T\left(\mathbf{r}-\mathbf{D}_d^T\RGloc{d}^T\mathbf{r}\right)=0$}\COMMENT{solve local auxiliary problem.}
+%		\ENDFOR
+%		\STATE{$\mathbf{s}:=\mathbf{r}-\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d\mathbf{r}^{(d)}$}\COMMENT{balance residual}
+%		\STATE{$\mathbf{z}:=\sum_{d=1}^{n_d}\RGloc{d}\mathbf{D}_d(\mathbf{u}^{(d)}+\mathbf{Z}\boldsymbol{\mu})$}\COMMENT{average contributions of all subdomains}
+%	\end{algorithmic}
+%\end{algorithm}
 Using the sqme pseudo-inverses ${\mathbf{S}^{(1)}}^\dagger,\dots,{\mathbf{S}^{(n_d)}}^\dagger$, the following matrix form is obtained,
 \begin{align}
 \invMBDD=
@@ -212,7 +237,7 @@ For elliptic PDEs, ****.
 
 
 \subsubsection{Low rank Schur (LORASC)}
-
+LORASC is from~\cite{Grigori2014}.
 \begin{align}
 \mathbf{S}\mathbf{u}=\lambda\AGG\mathbf{u}
 \end{align}
@@ -222,7 +247,7 @@ For elliptic PDEs, ****.
 \end{align}
 where $\mathbf{E}=[\mathbf{v}_1,\dots,\mathbf{v}_i]$
 
-\subsection{Algebraic multigrid (AMG)}
+\subsubsection{Algebraic multigrid (AMG)}
 
 \section{Deflation results}
 
