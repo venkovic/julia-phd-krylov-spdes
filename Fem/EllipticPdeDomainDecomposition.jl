@@ -547,6 +547,42 @@ end
 
 
 """
+     domain_decompose_rhs!(b::Array{Float64,1},
+                           b_Id::Array{Array{Float64,1},1},
+                           b_Γ::Array{Float64,1})
+
+Does algebraic domain decomposition of rhs based on given
+ind_Id_g2l, ind_Γ_g2l and node_owner.
+
+"""
+function domain_decompose_rhs!(b::Array{Float64,1},
+                               b_Id::Array{Array{Float64,1},1},
+                               b_Γ::Array{Float64,1},
+                               ind_Id_g2l::Array{Dict{Int,Int},1},
+                               ind_Γ_g2l::Dict{Int,Int},
+                               node_owner::Array{Int,1})
+
+  nnode, = size(b)
+
+  for inode in 1:nnode
+
+    i_owner = node_owner[inode]
+    i_is_dirichlet = i_owner == 0
+
+    # inode ∈ Γ
+    if (i_owner == -1)
+      b_Γ[ind_Γ_g2l[inode]] = b[inode]
+    
+    # inode ∉ Γ & inode is not dirichlet
+    elseif !i_is_dirichlet
+      b_Id[i_owner][ind_Id_g2l[i_owner][inode]] = b[inode]
+
+    end
+  end
+end
+
+
+"""
      apply_global_schur(A_IId::Array{SparseMatrixCSC{Float64,Int},1},
                         A_IΓd::Array{SparseMatrixCSC{Float64,Int},1},
                         A_ΓΓ::SparseMatrixCSC{Float64,Int},
@@ -895,10 +931,60 @@ function do_condensed_isotropic_elliptic_assembly(ndom::Int,
                                                   node_Γ_cnt,
                                                   x),
                                                   n_Γ, issymmetric=true)
-
+  
   return S_local_mat, b_schur
 end
 
+
+"""
+     do_condensed_isotropic_elliptic_assembly(ndom::Int,
+                                              A_IIdd,
+                                              A_IΓdd,
+                                              A_ΓΓdd,
+                                              b_Idd,
+                                              b_Γ,
+                                              ind_Γ_g2l::Dict{Int,Int},
+                                              ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                              node_Γ_cnt::Array{Int,1},
+                                              Π_IId;
+                                              verbose=true)
+
+Does assembly of Schur condensed system.
+
+"""
+function do_condensed_isotropic_elliptic_assembly(ndom::Int,
+                                                  A_IIdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                  A_IΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                  A_ΓΓdd::Array{SparseMatrixCSC{Float64,Int},1},
+                                                  b_Idd::Array{Array{Float64,1},1},
+                                                  b_Γ::Array{Float64,1},
+                                                  ind_Γ_g2l::Dict{Int,Int},
+                                                  ind_Γd_Γ2l::Array{Dict{Int,Int}},
+                                                  node_Γ_cnt::Array{Int,1},
+                                                  Π_IId;
+                                                  verbose=true)
+
+  n_Γ = ind_Γ_g2l.count
+
+  verbose ? printlnln("get_schur_rhs ...") : nothing
+  b_schur = @time get_schur_rhs(b_Idd, A_IIdd, A_IΓdd, b_Γ, ind_Γd_Γ2l, preconds=Π_IId)
+  verbose ? println("$Δt seconds") : nothing
+  
+  verbose ? printlnln("assemble_local_schurs ...") : nothing
+  Δt = @elapsed Sd_local_mat = assemble_local_schurs(A_IIdd,
+                                                     A_IΓdd,
+                                                     A_ΓΓdd,
+                                                     preconds=Π_IId)
+  verbose ? println("$Δt seconds") : nothing
+
+  S_local_mat = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                                  ind_Γd_Γ2l,
+                                                  node_Γ_cnt,
+                                                  x),
+                                                  n_Γ, issymmetric=true)
+  
+  return S_local_mat, b_schur
+end
 
 
 
@@ -1832,12 +1918,14 @@ function apply_lorasc(Πlorasc::LorascPreconditioner,
   #z_Γ = Array{Float64, 1}(undef, n_Γ)
   #u = Array{Float64,1}(undef, n)
 
+  # Get nodal values in the interior of each sub-domain
   for idom in 1:ndom
     for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
       Πlorasc.x_Id[idom][node_in_I] = x[Πlorasc.not_dirichlet_inds_g2l[node]]
     end
   end
 
+  # Get nodal values on the global interface
   for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
     val = x[Πlorasc.not_dirichlet_inds_g2l[node]]
     Πlorasc.x_Γ[node_in_Γ] = val
@@ -1845,10 +1933,15 @@ function apply_lorasc(Πlorasc::LorascPreconditioner,
   end
 
   for idom in 1:ndom
+
+    # Solve local interior problem of sub-domain
     Πlorasc.x_Id[idom] .= Πlorasc.chol_A_IId[idom] \ Πlorasc.x_Id[idom]
+    
+    # Add sub-domain's contribution to rhs of global interfacial problem
     Πlorasc.z_Γ .-= Πlorasc.A_IΓd[idom]' * Πlorasc.x_Id[idom]
   end
 
+  # Apply first level of approximate Schur inverse 
   if isnothing(Πlorasc.chol_A_ΓΓ)
     Πlorasc.x_Γ .= IterativeSolvers.cg(Πlorasc.A_ΓΓ, 
                                        Πlorasc.z_Γ,
@@ -1857,6 +1950,7 @@ function apply_lorasc(Πlorasc::LorascPreconditioner,
     Πlorasc.x_Γ .= Πlorasc.chol_A_ΓΓ \ Πlorasc.z_Γ
   end
 
+  # Add rank-one corrections 
   for (k, σ) in enumerate(Πlorasc.Σ)
     val = Πlorasc.E[k]'Πlorasc.z_Γ
     Πlorasc.x_Γ .+= val * Πlorasc.E[k]
@@ -1865,13 +1959,15 @@ function apply_lorasc(Πlorasc::LorascPreconditioner,
   for idom in 1:ndom
     Πlorasc.x_Id[idom] .-= Πlorasc.chol_A_IId[idom] \ (Πlorasc.A_IΓd[idom] * Πlorasc.x_Γ)
   end
-
+  
+  # Add nodal values from the interior of each sub-domain to the returned vector
   for idom in 1:ndom
     for (node, node_in_I) in Πlorasc.ind_Id_g2l[idom]
       Πlorasc.u[Πlorasc.not_dirichlet_inds_g2l[node]] = Πlorasc.x_Id[idom][node_in_I]
     end
   end
 
+  # Add nodal values from the global interface to the returned vector
   for (node, node_in_Γ) in Πlorasc.ind_Γ_g2l
     Πlorasc.u[Πlorasc.not_dirichlet_inds_g2l[node]] = Πlorasc.x_Γ[node_in_Γ]
   end

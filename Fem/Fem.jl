@@ -52,6 +52,7 @@ export set_subdomains
 # from EllipticPdeDomainDecomposition.jl,
 export prepare_global_schur,
        apply_global_schur
+export domain_decompose_rhs!
 export prepare_local_schurs,
        assemble_local_schurs,
        apply_local_schur,
