@@ -105,6 +105,7 @@ function test_solvers_on_multiple_rhs(nsmp::Int,
         method = precond * "-initpcg"
         push!(methods, method)
         iter[method] = Array{Int,1}(undef, nsmp)
+        W[method] = Array{Float64,2}(undef, A.n, nvec)
     end
 
     if do_eigpcg 
@@ -178,8 +179,65 @@ function test_solvers_on_multiple_rhs(nsmp::Int,
       end
 
 
+
+
+
+
+
+
+
+
       if do_initpcg
-      end
+        method = precond * "-initpcg"
+        verbose ? print("$method of A * u = b ... ") : nothing
+        troubleshoot ? save_system(A, b) : nothing 
+        try
+          if occursin("neumann-neumann", precond)
+            if s == 1
+              x_schur .= 0
+            else
+              if isa(S, FunctionMap)
+                for j in 1:nvec
+                  WtS[j, :] .= S * W[method][:, j] 
+                end
+              else
+                WtS .= W[method]'S
+              end
+              H = WtS * W[method]
+              x_schur .= W[method] * (H \ (W[method]'b_schur))
+            end
+            Δt = @elapsed _, it, _, W[method] = eigpcg(S, b_schur, x_schur, Π[p], nvec, spdim, maxit=maxit)
+          else
+            if s == 1
+              x .= 0
+            else
+              WtA .= W[method]'A
+              H = WtA * W[method]
+              x .= W[method] * (H \ (W[method]'b))
+            end
+            Δt = @elapsed _, it, _, W[method] = eigpcg(A, b, x, Π[p], nvec, spdim, maxit=maxit)
+          end
+        catch err
+          throw(err)
+          status = -1
+          return iter, status
+        end
+        verbose ? println("$Δt seconds, iter = $it") : nothing
+        iter[method][s] = it
+        flush(stdout)
+      end # if do_initpcg
+
+
+
+
+
+
+
+
+
+
+
+
 
       if do_eigpcg
         method = precond * "-eigpcg"
