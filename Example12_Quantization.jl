@@ -27,7 +27,7 @@ using LinearAlgebra: isposdef, rank
 include("Example12_Quantization_Functions.jl")
 
 maxit = 5_000
-tentative_nnode = 4_000
+tentative_nnode = 20_000
 load_existing_mesh = false
 
 nsmp = 10_000
@@ -96,8 +96,8 @@ M = get_mass_matrix(cells, points)
 # Get Voronoi quantizer
 #
 nsmp_preconds = 10_000
-P = 5 # 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
-distance = "cdf-full"
+P = 90 # 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+distance = "L2-full"
 X, centroids, assignments, costs = get_quantizer(nsmp_preconds, P, Λ, distance=distance)
 
 #
