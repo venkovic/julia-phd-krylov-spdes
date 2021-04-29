@@ -101,6 +101,9 @@ Example11_EigInitPcgMultipleRhs:
 -random sampling of right hand sides with constant left hand side.
 -deflates initial guess with online eigenvector approximation.
 
+Example12_QuantizationAndLocalInterpolation:
+-random sampling of right hand sides with constant left hand side.
+-deflates initial guess with online eigenvector approximation.
 
 Snacks:
 
