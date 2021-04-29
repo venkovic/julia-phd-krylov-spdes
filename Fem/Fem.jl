@@ -99,7 +99,8 @@ export project_on_mesh,
        trim_and_order,
        get_kl_coordinates
 export draw,
-       draw!
+       draw!,
+       set!
 
 # from KarhunenLoevePllDomainDecomposition.jl, 
 export pll_do_global_mass_covariance_reduced_assembly

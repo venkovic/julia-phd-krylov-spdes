@@ -68,6 +68,28 @@ function draw!(smp::McSampler)
 end
 
 
+"""
+     function set!(smp::McSampler, ξ)
+
+Forcess a realization of McSampler in place of smp.g for a given ξ.
+
+Input:
+
+ `smp::McSampler`
+
+"""
+function set!(smp::McSampler, ξ::Array{Float64,1})
+  smp.ξ .= ξ
+  smp.g .= sqrt(smp.Λ[1]) * smp.ξ[1] * smp.Ψ[:, 1]
+  for k in 2:smp.m
+    smp.g .+= sqrt(smp.Λ[k]) * smp.ξ[k] * smp.Ψ[:, k]
+  end
+end
+
+
+
+
+
 struct McmcSampler
   n::Int # number of DoFs
   m::Int # number of modes in Karhunen Loeve (KL) expansion
