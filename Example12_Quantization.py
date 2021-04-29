@@ -5,7 +5,7 @@ distance = ('L2-full', 'cdf-full',)
 Ps = (5, 10, 20, 30, 40, 50, 60, 70 ,80, 90, 100,)
 nsmp_preconds = 10_000
 nsmp = 1_000
-root_fname = 'SExp_sig21.0_L0.1_DoF4000'
+root_fname = 'SExp_sig21.0_L0.1_DoF20000'
 
 iters, assignments, dists, dists_to_0 = {}, {}, {}, {}
 
@@ -27,15 +27,23 @@ for dist in distance:
   std_iters[dist] = np.std(iters[dist], axis=0)
 
 import pylab as pl
-fig, axes = pl.subplots(1, 2, sharey=True, figsize=(12, 6.5))
-axes[0].set_title(distance[0])
-axes[0].errorbar(Ps, mean_iters[distance[0]], yerr=std_iters[distance[0]], fmt='o')
-axes[1].set_title(distance[1])
-axes[1].errorbar(Ps, mean_iters[distance[1]], yerr=std_iters[distance[1]], fmt='o')
-axes[0].set_ylim(50, 150)
-axes[0].set_ylabel('mean iters +/- std')
-for ax in axes: 
+fig, axes = pl.subplots(2, 2, figsize=(8, 6.5), sharey='row')
+axes[0, 0].set_title(distance[0])
+axes[0, 0].plot(Ps, mean_iters[distance[0]])
+axes[1, 0].plot(Ps, std_iters[distance[0]])
+
+axes[0, 1].set_title(distance[1])
+axes[0, 1].plot(Ps, mean_iters[distance[1]])
+axes[1, 1].plot(Ps, std_iters[distance[1]])
+
+axes[0, 0].set_ylabel('mean of PCG iterations')
+axes[1, 0].set_ylabel('std of PCG iterations')
+
+for ax in axes[1, :]:
+  ax.set_xlabel('# of preconditioners')
+
+for ax in axes.flatten(): 
   ax.grid(ls='-.')
-  ax.set_xlabel('# of preconds')
+   
 
 pl.savefig("Example12.pdf")
