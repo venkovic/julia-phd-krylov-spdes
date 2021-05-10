@@ -224,8 +224,8 @@ SIAM Journal on Scientific Computing, SIAM, 1999, 21, 1909-1926.
 function defpcg(A::Union{SparseMatrixCSC{T},
                          FunctionMap},
                 b::Array{T,1},
-                W::Array{T,2},
                 x::Array{T,1},
+                W::Array{T,2},
                 M;
                 maxit=0)
 
