@@ -57,7 +57,7 @@ printlnln("assemble amg preconditioner ...")
 
 printlnln("amg-pcg solve ...")
 #u_no_dirichlet, it, _  = @time cg(A, b, Pl=Π)
-u_no_dirichlet, it, _  = @time pcg(A, b, M=Π)
+u_no_dirichlet, it, _  = @time pcg(A, b, zeros(length(b)), Π)
 space_println("n = $(A.n), iter = $it")
 
 printlnln("append dirchlet nodes to solution ...")
