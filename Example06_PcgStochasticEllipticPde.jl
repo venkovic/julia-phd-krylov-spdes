@@ -221,29 +221,29 @@ print("apply lorasc_0 ...")
 # Pcg solves
 #
 printlnln("amg_t-pcg of A * u = b ...")
-u, it, _ = @time pcg(A, b, M=Π_amg_t)
+u, it, _ = @time pcg(A, b, zeros(A.n), Π_amg_t)
 space_println("n = $(A.n), iter = $it")
 
 printlnln("amg_0-pcg of A * u = b ...")
-u, it, _ = @time pcg(A, b, M=Π_amg_0)
+u, it, _ = @time pcg(A, b, zeros(A.n), Π_amg_0)
 space_println("n = $(A.n), iter = $it")
 
 printlnln("cg solve of A * u = b ...")
-u, it, _ = @time cg(A, b)
+u, it, _ = @time cg(A, b, zeros(A.n))
 space_println("n = $(A.n), iter = $it")
 
 printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, ϕ_ld, M=Π_amg_0);
+u, it, _ = @time defpcg(A, b, zeros(A.n), ϕ_ld, Π_amg_0);
 space_println("n = $(A.n), nev = $nev (ld), iter = $it")
 
 printlnln("md-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, ϕ_md, M=Π_amg_0);
+u, it, _ = @time defpcg(A, b, zeros(A.n), ϕ_md, Π_amg_0);
 space_println("n = $(A.n), nev = $nev (md), iter = $it")
 
 printlnln("lorasc_0-pcg solve of A * u = b ...")
-u, it, _ = @time pcg(A, b, M=Π_lorasc_0)
+u, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_0)
 space_println("n = $(A.n), iter = $it")
                                          
 printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, ϕ_ld, M=Π_lorasc_0);
+u, it, _ = @time defpcg(A, b, zeros(A.n), ϕ_ld, Π_lorasc_0);
 space_println("n = $(A.n), nev = $nev (ld), iter = $it")
