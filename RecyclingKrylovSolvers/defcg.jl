@@ -34,8 +34,17 @@ function defcg(A::Union{SparseMatrixCSC{T},
   Ap = Array{T,1}(undef, n)
   res_norm = Array{T,1}(undef, n)
   mu = Array{T,1}(undef, nvec)
+  WtA = Array{T,2}(undef, nvec, n)
+  WtAW = Array{T,2}(undef, nvec, nvec)
+  WtW = Array{T,2}(undef, nvec, nvec)
 
-  WtA = W' * A
+  if isa(A, FunctionMap)
+    for ivec in 1:nvec
+      WtA[ivec, :] .= A * W[:, ivec]
+    end
+  else
+    mul!(WtA, W', A)
+  end
   WtAW = WtA * W
 
   r .= b .- A * x
@@ -113,8 +122,17 @@ function eigdefcg(A::Union{SparseMatrixCSC{T},
   res_norm = Array{T,1}(undef, n)
   p = Array{T,1}(undef, n)
   mu = Array{T,1}(undef, nvec)
+  WtA = Array{T,2}(undef, nvec, n)
+  WtAW = Array{T,2}(undef, nvec, nvec)
+  WtW = Array{T,2}(undef, nvec, nvec)
 
-  WtA = W' * A
+  if isa(A, FunctionMap)
+    for ivec in 1:nvec
+      WtA[ivec, :] .= A * W[:, ivec]
+    end
+  else
+    mul!(WtA, W', A)
+  end
   WtAW = WtA * W
 
   r .= b .- A * x
@@ -236,13 +254,23 @@ function defpcg(A::Union{SparseMatrixCSC{T},
   p = Array{T,1}(undef, n)
   z = Array{T,1}(undef, n)
   mu = Array{T,1}(undef, nvec)
+  WtA = Array{T,2}(undef, nvec, n)
+  WtAW = Array{T,2}(undef, nvec, nvec)
+  WtW = Array{T,2}(undef, nvec, nvec)
 
-  WtA = W' * A
+  if isa(A, FunctionMap)
+    for ivec in 1:nvec
+      WtA[ivec, :] .= A * W[:, ivec]
+    end
+  else
+    mul!(WtA, W', A)
+  end
   WtAW = WtA * W
 
   r .= b .- A * x
 
   mu .= W' * r
+  
   mu .= WtAW \ mu
   x .+= W * mu
 
