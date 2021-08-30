@@ -44,6 +44,8 @@ function dynamic_map!(func::Function,
 
   running_jobs_id = Dict{Int,Int}(worker => 0 for worker in workers())
   running_jobs = Dict{Int,Task}()
+  cnt_failures = Dict{Int,Int}(worker => 0 for worker in workers())
+  nfails_allowed = 3
 
   while length(done_jobs_id) < njobs
 
