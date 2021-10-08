@@ -105,21 +105,17 @@ Example12_QuantizationAndLocalInterpolation:
 -random sampling of right hand sides with constant left hand side.
 -deflates initial guess with online eigenvector approximation.
 
-Snacks:
+To do:
 
-fudge:
 -in Example09, when W is not full rank for large nvec, solves are 
  attempted, potential errors are foregone, and the realization ignored.
 -fix deflated solvers. 
 
-fondue:
 -cache averse much? what about transposing points and cells?
 
-ginger:
 -add some punch with a domain decomposition-friendly assembly.
 -try to get rid of some of the dictionaries?
 
-lime:
 -trim verbose function calls with a struct for domain decomposition.
 
 
