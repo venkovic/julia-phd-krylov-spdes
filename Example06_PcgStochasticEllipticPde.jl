@@ -12,13 +12,17 @@ using Preconditioners: AMGPreconditioner, SmoothedAggregation
 using NPZ: npzread
 using Random: seed!; seed!(123_456);
 using LinearMaps: LinearMap
+using SparseArrays: SparseMatrixCSC
 import Arpack
 
-tentative_nnode = 100_000
+tentative_nnode = 4_000
 load_existing_mesh = false
+save_spectra = true
 
-ndom = 40
+ndom = 200
 load_existing_partition = false
+
+nreals = 3
 
 model = "SExp"
 sig2 = 1.
@@ -148,26 +152,44 @@ S_0 = LinearMap(x -> apply_local_schurs(A_IIdd_0,
 # Operator assemblies for a random ξ_t
 #
 printlnln("in-place draw of ξ ...")
-@time draw!(Λ, Ψ, ξ, g)
+gs = [copy(g) for _ in 1:nreals]
+for ireal in 1:nreals
+  @time draw!(Λ, Ψ, ξ, g)
+  gs[ireal] .= g
+end
 
 printlnln("do_isotropic_elliptic_assembly for ξ ...")
-A, b = @time do_isotropic_elliptic_assembly(cells, points,
-                                            dirichlet_inds_g2l,
-                                            not_dirichlet_inds_g2l,
-                                            point_markers,
-                                            exp.(g), f, uexact)
-
+As, bs = [], []
+for ireal in 1:nreals
+  A, b = @time do_isotropic_elliptic_assembly(cells, points,
+                                              dirichlet_inds_g2l,
+                                              not_dirichlet_inds_g2l,
+                                              point_markers,
+                                              exp.(gs[ireal]), f, uexact)
+  push!(As, A)
+  push!(bs, b)  
+end
                                             
 #
 # Solve for some eigenpairs
 #
-nev = ndom + 10
-printlnln("solve for $nev least dominant eigvecs of A ...")
-λ_ld, ϕ_ld = @time Arpack.eigs(A, nev=nev, which=:SM)
-                                            
-printlnln("solve for $nev most dominant eigvecs of A ...")
-λ_md, ϕ_md = @time Arpack.eigs(A, nev=nev, which=:LM)
-
+if save_spectra
+  nev = ndom + 10
+  λ_lds, Φ_lds = [], []
+  for ireal in 1:nreals
+    printlnln("solve for least dominant eigvecs of A_$ireal ...")
+    λ_ld, Φ_ld = @time Arpack.eigs(As[ireal], nev=100, which=:SM)
+    push!(λ_lds, λ_ld)
+    push!(Φ_lds, Φ_ld)
+  end        
+  λ_mds, Φ_mds = [], []                                    
+  for ireal in 1:nreals
+    printlnln("solve for most dominant eigvecs of A_$ireal ...")
+    λ_md, Φ_md = @time Arpack.eigs(As[ireal], nev=As[ireal].n-100, which=:LM)
+    push!(λ_mds, λ_md)
+    push!(Φ_mds, Φ_md)
+  end
+end
 
 #
 # Preconditioner assemblies
@@ -175,8 +197,12 @@ printlnln("solve for $nev most dominant eigvecs of A ...")
 printlnln("assemble amg_0 preconditioner for A_0 ...")
 Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
 
-printlnln("assemble amg_t preconditioner for A ...")
-Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(A);
+Π_amg_ts = []
+for ireal in 1:nreals
+  printlnln("assemble amg_t preconditioner for A ...")
+  Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(A);
+  push!(Π_amg_ts, Π_amg_t)
+end
 
 printlnln("prepare_lorasc_precond ...")
 Π_lorasc_0 = @time prepare_lorasc_precond(S_0,
@@ -232,18 +258,22 @@ printlnln("cg solve of A * u = b ...")
 u, it, _ = @time cg(A, b, zeros(A.n))
 space_println("n = $(A.n), iter = $it")
 
-printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, zeros(A.n), ϕ_ld, Π_amg_0);
+"""
+#printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
+u, it, _ = @time defpcg(A, b, zeros(A.n), Φ_ld, Π_amg_0);
 space_println("n = $(A.n), nev = $nev (ld), iter = $it")
 
 printlnln("md-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, zeros(A.n), ϕ_md, Π_amg_0);
+u, it, _ = @time defpcg(A, b, zeros(A.n), Φ_md, Π_amg_0);
 space_println("n = $(A.n), nev = $nev (md), iter = $it")
+"""
 
 printlnln("lorasc_0-pcg solve of A * u = b ...")
 u, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_0)
 space_println("n = $(A.n), iter = $it")
-                                         
+
+"""
 printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, zeros(A.n), ϕ_ld, Π_lorasc_0);
+u, it, _ = @time defpcg(A, b, zeros(A.n), Φ_ld, Π_lorasc_0);
 space_println("n = $(A.n), nev = $nev (ld), iter = $it")
+"""

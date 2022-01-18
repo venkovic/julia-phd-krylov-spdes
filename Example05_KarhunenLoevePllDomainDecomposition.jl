@@ -8,8 +8,8 @@ using Utils: space_println, printlnln,
              add_my_procs,
              dynamic_mapreduce!
 
-machines = ["",]
-add_my_procs(machines, Sys.CPU_THREADS)
+machines = ["hector", "lucien",] # "marcel",]
+add_my_procs(machines, Sys.CPU_THREADS - 2)
 
 @everywhere begin
   import Pkg
@@ -28,9 +28,9 @@ end
 
 using NPZ: npzwrite
 
-ndom = 40
-nev = 40
-tentative_nnode = 20_000
+ndom = 80
+nev = 20
+tentative_nnode = 320_000
 forget = 1e-6
 
 model = "SExp"

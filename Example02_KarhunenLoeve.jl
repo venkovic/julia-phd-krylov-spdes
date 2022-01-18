@@ -8,7 +8,7 @@ using Utils: space_println, printlnln
 
 using NPZ: npzwrite
 
-tentative_nnode = 10_000
+tentative_nnode = 4_000 # 40_000
 load_existing_mesh = false
 
 if load_existing_mesh
@@ -37,8 +37,10 @@ space_println("nnode = $(size(points)[2])")
 space_println("nel = $(size(cells)[2])")
 
 println("solve_kl ...")
-λ, Φ = @time solve_kl(cells, points, cov, nev, verbose=true)
+Λ, Φ = @time solve_kl(cells, points, cov, nev, verbose=true)
+npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
+npzwrite("data/$root_fname.kl-eigvecs.npz", Φ)
 
 printlnln("sample ...")
-ξ, g = @time draw(λ, Φ)
+ξ, g = @time draw(Λ, Φ)
 npzwrite("data/$root_fname.greal.npz", g)

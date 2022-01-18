@@ -96,8 +96,8 @@ M = get_mass_matrix(cells, points)
 # Get Voronoi quantizer
 #
 nsmp_preconds = 10_000
-P = 90 # 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
-distance = "L2-full"
+P = 100 # 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
+distance = "cdf-full"
 X, centroids, assignments, costs = get_quantizer(nsmp_preconds, P, Λ, distance=distance)
 
 #
@@ -109,7 +109,7 @@ X, centroids, assignments, costs = get_quantizer(nsmp_preconds, P, Λ, distance=
 #
 # Test solver with quantized preconditioner
 #
-nsmp = 1_000
+nsmp = 5_000
 assignments, iters, dists, dists_to_0 = test_solver_with_centroidal_preconds(nsmp, Π, centroids, Λ, Ψ)
 
 #

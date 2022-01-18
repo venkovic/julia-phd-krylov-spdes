@@ -8,13 +8,13 @@ using Utils: space_println, printlnln
 
 using NPZ: npzwrite
 
-tentative_nnode = 20_000
+tentative_nnode = 100_000 # 320_000
 load_existing_mesh = false
 
-ndom = 80
+ndom = 30
 load_existing_partition = false
 
-nev = 35
+nev = 70 # 25
 forget = 1e-6
 
 if load_existing_mesh
@@ -42,8 +42,9 @@ else
 end
 
 model = "SExp"
+L = .1 # .05, .1, .5, 1., 5., 10.
 sig2 = 1.
-L = .1
+save_eigvals = true
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 function cov(x1::Float64, y1::Float64, x2::Float64, y2::Float64)
@@ -57,7 +58,7 @@ relative_local, relative_global = suggest_parameters(nnode)
 inds_g2ld = [Dict{Int,Int}() for _ in 1:ndom]
 inds_l2gd = Array{Int,1}[]
 elemsd = Array{Int,1}[]
-ϕd = Array{Float64,2}[]
+Φd = Array{Float64,2}[]
 centerd = Array{Float64,1}[]
 energy_expected = 0.
 
@@ -66,11 +67,13 @@ space_println("nel = $(size(cells)[2])")
 
 printlnln("solve_local_kl ...")
 @time for idom in 1:ndom
-  subdom = solve_local_kl(cells, points, epart, cov, nev, idom, relative=relative_local)
+  subdom = solve_local_kl(cells, points, epart, cov, nev, idom, relative=relative_local,
+                           save_eigvals=save_eigvals, model=model, sig2=sig2, L=L, 
+                           tentative_nnode=tentative_nnode)
   inds_g2ld[idom] = subdom.inds_g2l
   push!(inds_l2gd, subdom.inds_l2g)
   push!(elemsd, subdom.elems)
-  push!(ϕd, subdom.ϕ)
+  push!(Φd, subdom.Φ)
   push!(centerd, subdom.center)
   global energy_expected += subdom.energy
 end
@@ -78,13 +81,13 @@ println("... done with solve_local_kl.")
 
 printlnln("do_global_mass_covariance_reduced_assembly ...")
 K = @time do_global_mass_covariance_reduced_assembly(cells, points, elemsd,
-                                                     inds_g2ld, inds_l2gd, ϕd,
+                                                     inds_g2ld, inds_l2gd, Φd,
                                                      centerd, cov, forget=forget)
 println("... done with do_global_mass_covariance_reduced_assembly.")
 
 printlnln("solve_global_reduced_kl ...")
 Λ, Ψ = @time solve_global_reduced_kl(nnode, K, energy_expected,
-                                     elemsd, inds_l2gd, ϕd,
+                                     elemsd, inds_l2gd, Φd,
                                      relative=relative_global)
 npzwrite("data/$root_fname.kl-eigvals.npz", Λ)
 npzwrite("data/$root_fname.kl-eigvecs.npz", Ψ)
@@ -95,3 +98,5 @@ printlnln("sample ...")
 printlnln("sample in place ...")
 @time draw!(Λ, Ψ, ξ, g)
 npzwrite("data/$root_fname.greal.npz", g)
+
+

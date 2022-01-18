@@ -41,6 +41,13 @@ function get_quantizer(n::Int,
     X ./= sqrt.(Λ)
     res.centers ./= sqrt.(Λ)
 
+  elseif distance == "L2-10%"
+    nKL_reduced = findfirst(x -> x >= 0.1, cumsum(Λ))
+    X[1:nKL_reduced, :] .*= sqrt.(Λ[1:nKL_reduced])
+    res = kmeans(X[1:nKL_reduced, :], P)
+    X[1:nKL_reduced, :] ./= sqrt.(Λ[1:nKL_reduced])
+    res.centers ./= sqrt.(Λ[1:nKL_reduced])
+
   elseif distance == "cdf-full"
     X .= cdf.(Normal(), X) 
     res = kmeans(X, P)
