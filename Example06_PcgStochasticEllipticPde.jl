@@ -1,15 +1,17 @@
 push!(LOAD_PATH, "./Fem/")
 push!(LOAD_PATH, "./RecyclingKrylovSolvers/")
 push!(LOAD_PATH, "./Utils/")
+push!(LOAD_PATH, "./MyPreconditioners/")
 import Pkg
 Pkg.activate(".")
-
 using Fem
 using RecyclingKrylovSolvers: cg, pcg, defpcg
+
 using Utils: space_println, printlnln
 
+using MyPreconditioners: BJPreconditioner
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
-using NPZ: npzread
+using NPZ: npzread, npzwrite
 using Random: seed!; seed!(123_456);
 using LinearMaps: LinearMap
 using SparseArrays: SparseMatrixCSC
@@ -19,14 +21,14 @@ tentative_nnode = 4_000
 load_existing_mesh = false
 save_spectra = true
 
-ndom = 200
+ndom = 20 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
 nreals = 3
 
 model = "SExp"
 sig2 = 1.
-L = .1
+L = 1. # .1, 1.
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 if load_existing_mesh
@@ -171,27 +173,6 @@ for ireal in 1:nreals
 end
                                             
 #
-# Solve for some eigenpairs
-#
-if save_spectra
-  nev = ndom + 10
-  λ_lds, Φ_lds = [], []
-  for ireal in 1:nreals
-    printlnln("solve for least dominant eigvecs of A_$ireal ...")
-    λ_ld, Φ_ld = @time Arpack.eigs(As[ireal], nev=100, which=:SM)
-    push!(λ_lds, λ_ld)
-    push!(Φ_lds, Φ_ld)
-  end        
-  λ_mds, Φ_mds = [], []                                    
-  for ireal in 1:nreals
-    printlnln("solve for most dominant eigvecs of A_$ireal ...")
-    λ_md, Φ_md = @time Arpack.eigs(As[ireal], nev=As[ireal].n-100, which=:LM)
-    push!(λ_mds, λ_md)
-    push!(Φ_mds, Φ_md)
-  end
-end
-
-#
 # Preconditioner assemblies
 #
 printlnln("assemble amg_0 preconditioner for A_0 ...")
@@ -199,8 +180,8 @@ printlnln("assemble amg_0 preconditioner for A_0 ...")
 
 Π_amg_ts = []
 for ireal in 1:nreals
-  printlnln("assemble amg_t preconditioner for A ...")
-  Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(A);
+  printlnln("assemble amg_t preconditioner for A_$ireal ...")
+  Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(As[ireal]);
   push!(Π_amg_ts, Π_amg_t)
 end
 
@@ -213,67 +194,186 @@ printlnln("prepare_lorasc_precond ...")
                                           ind_Γ_g2l,
                                           not_dirichlet_inds_g2l)
 
-printlnln("prepare_lorasc_precond ...")
-Π_lorasc_1 = @time prepare_lorasc_precond(tentative_nnode,
-                                          ndom,
-                                          cells,
-                                          points,
-                                          cell_neighbors,
-                                          exp.(g_0),
-                                          dirichlet_inds_g2l,
-                                          not_dirichlet_inds_g2l,
-                                          f,
-                                          uexact)
+printlnln("prepare_lorasc_precond with ε = 0.01 ...")
+Π_lorasc_ε01_0 = @time prepare_lorasc_precond(tentative_nnode,
+                                              ndom,
+                                              cells,
+                                              points,
+                                              cell_neighbors,
+                                              exp.(g_0),
+                                              dirichlet_inds_g2l,
+                                              not_dirichlet_inds_g2l,
+                                              f,
+                                              uexact,
+                                              ε=.01)
+
+
+printlnln("prepare_lorasc_precond with ε = 0 ...")
+Π_lorasc_ε00_0 = @time prepare_lorasc_precond(tentative_nnode,
+                                              ndom,
+                                              cells,
+                                              points,
+                                              cell_neighbors,
+                                              exp.(g_0),
+                                              dirichlet_inds_g2l,
+                                              not_dirichlet_inds_g2l,
+                                              f,
+                                              uexact,
+                                              ε=0)
+
+Π_lorasc_ε01_ts, Π_lorasc_ε00_ts = [], []
+for ireal in 1:nreals
+  printlnln("assemble lorasc preconditioner with ε = 0.01 for A_$ireal ...")
+  Π_lorasc_ε01_t = @time prepare_lorasc_precond(tentative_nnode,
+                                                ndom,
+                                                cells,
+                                                points,
+                                                cell_neighbors,
+                                                exp.(gs[ireal]),
+                                                dirichlet_inds_g2l,
+                                                not_dirichlet_inds_g2l,
+                                                f,
+                                                uexact,
+                                                ε=.01)
+  push!(Π_lorasc_ε01_ts, Π_lorasc_ε01_t)
+end
+for ireal in 1:nreals
+  printlnln("assemble lorasc preconditioner with ε = 0 for A_$ireal ...")
+  Π_lorasc_ε00_t = @time prepare_lorasc_precond(tentative_nnode,
+                                                ndom,
+                                                cells,
+                                                points,
+                                                cell_neighbors,
+                                                exp.(gs[ireal]),
+                                                dirichlet_inds_g2l,
+                                                not_dirichlet_inds_g2l,
+                                                f,
+                                                uexact,
+                                                ε=0)
+  push!(Π_lorasc_ε00_ts, Π_lorasc_ε00_t)
+end
+
+Π_bJ_0 = BJPreconditioner(ndom, A_0)
+
+Π_bJ_ts = []
+for ireal in 1:nreals
+  Π_bJ_t = BJPreconditioner(ndom, As[ireal])
+  push!(Π_bJ_ts, Π_bJ_t)
+end
+
+
+#
+# Solve for some eigenpairs
+#
+function apply_preconditioner_get_eigenpairs(Π, tag)
+  λ_lds, Φ_lds = [], []
+  for ireal in 1:nreals
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, As[ireal].n, As[ireal].n)
+    @time for j in 1:As[ireal].n
+      if size(Π) == (1,)
+        Π_inv_At[:, j] .= Π[1] \ Array(As[ireal][:, j])
+      else
+        Π_inv_At[:, j] .= Π[ireal] \ Array(As[ireal][:, j])
+      end
+    end
+    λ_ld, Φ_ld = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    push!(Φ_lds, Φ_ld)
+  end        
+  λ_mds, Φ_mds = [], []                                    
+  for ireal in 1:nreals
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, As[ireal].n, As[ireal].n)
+    @time for j in 1:As[ireal].n
+      if size(Π) == (1,)
+        Π_inv_At[:, j] .= Π[1] \ Array(As[ireal][:, j])
+      else
+        Π_inv_At[:, j] .= Π[ireal] \ Array(As[ireal][:, j])
+      end
+    end
+    λ_md, Φ_md = @time Arpack.eigs(Π_inv_At, nev=As[ireal].n-100, which=:LM)
+    push!(λ_mds, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+    push!(Φ_mds, Φ_md)
+  end
+end
+
+if save_spectra
+  #apply_preconditioner_get_eigenpairs([Π_amg_0], "amg_0")
+  #apply_preconditioner_get_eigenpairs(Π_amg_ts, "amg_t")
+  apply_preconditioner_get_eigenpairs([Π_lorasc_ε00_0], "lorasc_ndom$ndom"*"_eps00_0")
+  apply_preconditioner_get_eigenpairs(Π_lorasc_ε00_ts, "lorasc_ndom$ndom"*"_eps00_t")
+  apply_preconditioner_get_eigenpairs([Π_lorasc_ε01_0], "lorasc_ndom$ndom"*"_eps01_0")
+  apply_preconditioner_get_eigenpairs(Π_lorasc_ε01_ts, "lorasc_ndom$ndom"*"_eps01_t")
+  apply_preconditioner_get_eigenpairs([Π_bJ_0], "bJ_nb$ndom"*"_0")
+  apply_preconditioner_get_eigenpairs(Π_bJ_ts, "bJ_nb$ndom"*"_t")
+
+  #conds_Πinv_A
+end
+
+if save_spectra
+
+else
+end
+
+
+
+
+
+
 
 #
 # Preconditioner applications
 #
 println()
 
-Π_amg_0 \ rand(A.n);
 print("apply amg_0 ...")
-@time Π_amg_0 \ rand(A.n);
+@time Π_amg_0 \ rand(As[1].n);
 
-Π_amg_t \ rand(A.n);
-print("apply amg_t ...")
-@time Π_amg_t \ rand(A.n);
+for ireal in 1:nreals
+  print("apply amg_t_$ireal ...")
+  @time Π_amg_ts[ireal] \ rand(As[ireal].n);
+end
 
-Π_lorasc_0 \ rand(A.n)
 print("apply lorasc_0 ...")
-@time Π_lorasc_0 \ rand(A.n)
+@time Π_lorasc_0 \ rand(As[1].n)
 
 
 #
 # Pcg solves
 #
-printlnln("amg_t-pcg of A * u = b ...")
-u, it, _ = @time pcg(A, b, zeros(A.n), Π_amg_t)
-space_println("n = $(A.n), iter = $it")
+for ireal in 1:nreals
+  printlnln("amg_t-pcg of A * u = b ...")
+  u, it, _ = @time pcg(As[ireal], bs[ireal], zeros(As[ireal].n), Π_amg_ts[ireal])
+  space_println("n = $(As[ireal].n), iter = $it")
 
-printlnln("amg_0-pcg of A * u = b ...")
-u, it, _ = @time pcg(A, b, zeros(A.n), Π_amg_0)
-space_println("n = $(A.n), iter = $it")
+  printlnln("amg_0-pcg of A * u = b ...")
+  u, it, _ = @time pcg(As[ireal], bs[ireal], zeros(As[ireal].n), Π_amg_0)
+  space_println("n = $(As[ireal].n), iter = $it")
 
-printlnln("cg solve of A * u = b ...")
-u, it, _ = @time cg(A, b, zeros(A.n))
-space_println("n = $(A.n), iter = $it")
+  printlnln("cg solve of A * u = b ...")
+  u, it, _ = @time cg(As[ireal], bs[ireal], zeros(As[ireal].n))
+  space_println("n = $(As[ireal].n), iter = $it")
 
-"""
-#printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, zeros(A.n), Φ_ld, Π_amg_0);
-space_println("n = $(A.n), nev = $nev (ld), iter = $it")
+  """
+  #printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
+  u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_ld, Π_amg_0);
+  space_println("n = $(As[ireal].n), nev = $nev (ld), iter = $it")
 
-printlnln("md-def-amg_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, zeros(A.n), Φ_md, Π_amg_0);
-space_println("n = $(A.n), nev = $nev (md), iter = $it")
-"""
+  printlnln("md-def-amg_0-pcg solve of A * u = b ...")
+  u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_md, Π_amg_0);
+  space_println("n = $(As[ireal].n), nev = $nev (md), iter = $it")
+  """
 
-printlnln("lorasc_0-pcg solve of A * u = b ...")
-u, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_0)
-space_println("n = $(A.n), iter = $it")
+  printlnln("lorasc_0-pcg solve of A * u = b ...")
+  u, it, _ = @time pcg(As[ireal], bs[ireal], zeros(As[ireal].n), Π_lorasc_0)
+  space_println("n = $(As[ireal].n), iter = $it")
 
-"""
-printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
-u, it, _ = @time defpcg(A, b, zeros(A.n), Φ_ld, Π_lorasc_0);
-space_println("n = $(A.n), nev = $nev (ld), iter = $it")
-"""
+  """
+  printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
+  u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_ld, Π_lorasc_0);
+  space_println("n = $(As[ireal].n), nev = $nev (ld), iter = $it")
+  """
+end
