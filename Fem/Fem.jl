@@ -33,6 +33,7 @@ export get_total_area
 export mesh_partition,
        save_partition,
        load_partition
+export get_border_nodes
 
 # from BoundaryConditions.jl
 export get_dirichlet_inds,

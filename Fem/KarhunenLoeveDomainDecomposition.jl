@@ -114,7 +114,7 @@ Input:
 Output:
 
  `C::Array{Float64,2}`, `size(C) = (inds_g2l.count, inds_g2l.count)`,
-  array of local Galerkin formulation s.t. `C[i, j] = ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ`.
+  array of local Galerkin formulation s.t. `C[i, j] = ∫_Ω Φ_i(P) ∫_{Ω'} cov(P, P') Φ_j(P') dΩ' dΩ`.
 
 """
 function do_local_mass_covariance_assembly(cells::Array{Int,2},
@@ -126,8 +126,8 @@ function do_local_mass_covariance_assembly(cells::Array{Int,2},
 
   nel = length(elems) # Number of elements in subdomain
   nnode = inds_g2l.count # Number of nodes of subdomain
-  R = zeros(nnode, nnode) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
-  C = zeros(nnode, nnode) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
+  R = zeros(nnode, nnode) # R[i, j] ≈ ∑_e ∫_{Ω'_e} Φ_i(P') cov(P', P_j) dΩ'
+  C = zeros(nnode, nnode) # C[i, j] ≈ ∫_Ω Φ_i(P) ∫_{Ω'} cov(P, P') Φ_j(P') dΩ' dΩ.
   x, y = zeros(3), zeros(3) # (x, y) coordinates of element vertices
   Δx, Δy = zeros(3), zeros(3), zeros(3) # Used to store terms of shoelace formula
   Area = zeros(nel) # Used to store element areas
@@ -230,7 +230,7 @@ Input:
 Output:
 
  `M::SparseMatrixCSC{Float64}`, `size(M) = (inds_g2l.count, inds_g2l.count)`,
-  local mass matrix of subdomain s.t. `M[i, j] = ∫_Ω ϕ_i(P) ϕ_j(P) dΩ`.
+  local mass matrix of subdomain s.t. `M[i, j] = ∫_Ω Φ_i(P) Φ_j(P) dΩ`.
 
 """
 function do_local_mass_assembly(cells::Array{Int,2},
@@ -380,16 +380,16 @@ function do_global_mass_reduced_assembly(cells::Array{Int,2},
         value = 0.
         for i in 1:3
           inode = inds_g2ld[idom][cells[i, iel]]
-          ϕ_d_α_i = Φd[idom][inode, α]
+          Φ_d_α_i = Φd[idom][inode, α]
 
           # Loop over vertices of element
           for j in 1:3
             jnode = inds_g2ld[idom][cells[j, iel]]
-            ϕ_d_β_j = Φd[idom][jnode, β]
+            Φ_d_β_j = Φd[idom][jnode, β]
             if i == j
-              value += ϕ_d_α_i * ϕ_d_β_j * Area / 6
+              value += Φ_d_α_i * Φ_d_β_j * Area / 6
             else
-              value += ϕ_d_α_i * ϕ_d_β_j * Area / 12
+              value += Φ_d_α_i * Φ_d_β_j * Area / 12
             end
           end
         end
@@ -502,8 +502,8 @@ function do_global_mass_covariance_reduced_assembly(cells::Array{Int,2},
         
         nnode_jdom = inds_g2ld[jdom].count
 
-        R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} ϕ_i(P') cov(P', P_j) dΩ'
-        C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω ϕ_i(P) ∫_{Ω'} cov(P, P') ϕ_j(P') dΩ' dΩ.
+        R = zeros(nnode_idom, nnode_jdom) # R[i, j] ≈ ∑_e ∫_{Ω'_e} Φ_i(P') cov(P', P_j) dΩ'
+        C = zeros(nnode_idom, nnode_jdom) # C[i, j] ≈ ∫_Ω Φ_i(P) ∫_{Ω'} cov(P, P') Φ_j(P') dΩ' dΩ.
 
         # Loop over mesh nodes of the jdom-th subdomain 
         for (j, jnode) in enumerate(inds_l2gd[jdom])
@@ -660,7 +660,12 @@ function solve_local_kl(cells::Array{Int,2},
                         cov::Function,
                         nev::Int,
                         idom::Int;
-                        relative=.99)
+                        relative=.99,
+                        save_eigvals=false,
+                        model="SExp",
+                        sig2=1.,
+                        L=.1,
+                        tentative_nnode=20_000)
 
   ndom = maximum(epart) # Number of subdomains
   inds_l2g, inds_g2l, elems, center = set_subdomain(cells, points, epart, idom)
@@ -671,7 +676,12 @@ function solve_local_kl(cells::Array{Int,2},
   M = do_local_mass_assembly(cells, points, inds_g2l, elems)
   
   # Solve local generalized eigenvalue problem
-  λ, ϕ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
+  λ, Φ = map(x -> real(x), Arpack.eigs(C, M, nev=nev))
+  if save_eigvals
+    root_fname = get_root_filename(model, sig2, L, tentative_nnode)
+    ndom = maximum(epart)
+    npzwrite("data/$root_fname.kl-local-eigvals-idom$idom-ndom$ndom.npz", λ)
+  end
 
   # Integrate variance over subdomain
   x, y = zeros(3), zeros(3)
@@ -708,7 +718,7 @@ function solve_local_kl(cells::Array{Int,2},
 
   # Arpack 0.5.1 does not normalize the vectors properly
   for k in 1:nvec
-    ϕ[:, k] ./= sqrt(ϕ[:, k]'M * ϕ[:, k])
+    Φ[:, k] ./= sqrt(Φ[:, k]'M * Φ[:, k])
   end
   
   # Details about truncation
@@ -719,7 +729,7 @@ function solve_local_kl(cells::Array{Int,2},
   return SubDomain(inds_g2l,
                    inds_l2g,
                    elems,
-                   ϕ[:, 1:nvec],
+                   Φ[:, 1:nvec],
                    center,
                    energy_expected / relative)
 end
@@ -731,7 +741,7 @@ end
                              energy_expected::Float64,
                              elemsd::Array{Array{Int,1},1},
                              inds_l2gd::Array{Array{Int,1},1},
-                             ϕd::Array{Array{Float64,2},1};
+                             Φd::Array{Array{Float64,2},1};
                              relative=.99)
 
 Solves eigenvalue problem previously assembled with local Karhunen Loeve (KL)
@@ -742,7 +752,7 @@ Input:
  `nnode::Int`,
   number of mesh nodes.
 
- `K::Array{Float64,2}`, `size(K) = (sum([size(ϕ)[2] for ϕ in ϕd]), sum([size(ϕ)[2] for ϕ in ϕd]))`,
+ `K::Array{Float64,2}`, `size(K) = (sum([size(Φ)[2] for Φ in Φd]), sum([size(Φ)[2] for Φ in Φd]))`,
   mass covariance matrix of reduced global problem.
 
  `energy_expected::Float64`,
@@ -775,7 +785,7 @@ function solve_global_reduced_kl(nnode::Int,
                                  energy_expected::Float64,
                                  elemsd::Array{Array{Int,1},1},
                                  inds_l2gd::Array{Array{Int,1},1},
-                                 ϕd::Array{Array{Float64,2},1};
+                                 Φd::Array{Array{Float64,2},1};
                                  relative=.99)
 
   Ksym = LinearAlgebra.Symmetric(K)
@@ -789,7 +799,7 @@ function solve_global_reduced_kl(nnode::Int,
     nvec += 1 
     energy_achieved >= energy_expected ? break : nothing
   end
-  Ψ = project_on_mesh(nnode, Φ[:, 1:nvec], elemsd, inds_l2gd, ϕd)
+  Ψ = project_on_mesh(nnode, Φ[:, 1:nvec], elemsd, inds_l2gd, Φd)
 
   # Details about truncation
   str = "$nvec/$(length(Λ)) vectors kept for "
@@ -804,7 +814,7 @@ end
      draw(mesh::TriangleMesh.TriMesh,
           Λ::Array{Float64,1},
           Φ::Array{Float64,2},
-          ϕd::Array{Array{Float64,2},1},
+          Φd::Array{Array{Float64,2},1},
           inds_l2gd::Array{Array{Int,1},1})
 
 Draws Gaussian process (GP) realization using eigenfunctions of local 
@@ -840,12 +850,12 @@ Output:
 function draw(mesh::TriangleMesh.TriMesh,
               Λ::Array{Float64,1},
               Φ::Array{Float64,2},
-              ϕd::Array{Array{Float64,2},1},
+              Φd::Array{Array{Float64,2},1},
               inds_l2gd::Array{Array{Int,1},1})
 
   nnode = mesh.n_point # Number of mesh nodes
   nmode = length(Λ) # Number of global modes
-  ndom = length(ϕd) # Number of subdomains
+  ndom = length(Φd) # Number of subdomains
   md = Int[] # Number of local modes for each subdomain
   
   ξ = rand(Distributions.Normal(), nmode)
@@ -854,7 +864,7 @@ function draw(mesh::TriangleMesh.TriMesh,
   
   # Get the number of local modes retained for each subdomain
   for idom in 1:ndom
-    push!(md, size(ϕd[idom])[2])
+    push!(md, size(Φd[idom])[2])
   end
   
   for idom in 1:ndom
@@ -863,7 +873,7 @@ function draw(mesh::TriangleMesh.TriMesh,
       for α in 1:md[idom]
         idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
         for γ in 1:nmode
-          g[inode] += sqrt(Λ[γ]) * ξ[γ] * Φ[ind_α_idom, γ] * ϕd[idom][i, α]
+          g[inode] += sqrt(Λ[γ]) * ξ[γ] * Φ[ind_α_idom, γ] * Φd[idom][i, α]
         end
       end # for α
     end # for γ
@@ -878,7 +888,7 @@ end
                      Φ::Array{Float64,2},
                      elemsd::Array{Array{Int,1},1},
                      inds_l2gd::Array{Array{Int,1},1},
-                     ϕd::Array{Array{Float64,2},1})
+                     Φd::Array{Array{Float64,2},1})
 
 Projects discontinuous product of local and reduced global eigenfunctions
 using P1 elements.
@@ -911,7 +921,7 @@ function project_on_mesh(nnodes::Int,
                          Φ::Array{Float64,2},
                          elemsd::Array{Array{Int,1},1},
                          inds_l2gd::Array{Array{Int,1},1},
-                         ϕd::Array{Array{Float64,2},1})
+                         Φd::Array{Array{Float64,2},1})
 
   ndom = length(elemsd) # Number of subdomains
   _, nmodes = size(Φ) # Number of reduced modes
@@ -921,7 +931,7 @@ function project_on_mesh(nnodes::Int,
 
   # Get the number of local modes retained for each subdomain
   for idom in 1:ndom
-    push!(md, size(ϕd[idom])[2])
+    push!(md, size(Φd[idom])[2])
   end
 
   # Loop over reduced modes
@@ -938,7 +948,7 @@ function project_on_mesh(nnodes::Int,
         # Loop over local modes and add contributions
         for α in 1:md[idom]
           idom == 1 ? ind_α_idom = α : ind_α_idom = sum(md[1:idom-1]) + α
-          Ψ[inode, imode] += Φ[ind_α_idom, imode] * ϕd[idom][i, α]
+          Ψ[inode, imode] += Φ[ind_α_idom, imode] * Φd[idom][i, α]
         end 
       end # for inode
     end # for idom
