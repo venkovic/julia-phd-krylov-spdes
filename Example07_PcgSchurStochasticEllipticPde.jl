@@ -16,10 +16,16 @@ model = "SExp"
 sig2 = 1.
 L = .1
 
-tentative_nnode = 400_000
-load_existing_mesh = true
+nreals = 1_000
 
-ndom = 50
+tentative_nnode = 4_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000
+load_existing_mesh = true
+save_spectra = false
+save_conditioning = false
+do_amg = true
+do_assembly_of_local_schurs = true # true for ndom = 200, false for ndom = 5
+
+ndom = 200 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
@@ -130,13 +136,13 @@ printlnln("prepare_neumann_neumann_schur_precond using S_local_mat ...")
                                                              node_Γ_cnt)
 
 printlnln("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
-u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], M=Π)
+u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], zeros(A.n), Π)
 space_println("n = $(A.n), iter = $it")
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, points, uexact)
 
 printlnln("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
-u_Γ, it, _ = @time pcg(S_local_mat, b_schur, M=ΠSnn_local_mat);
+u_Γ, it, _ = @time pcg(S_local_mat, b_schur, zeros(S_local_mat.N), ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), iter = $it")
 
 printlnln("get_subdomain_solutions ...")
@@ -149,6 +155,8 @@ u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
 
 space_println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
 
+
+"""
 # There's gotta be a betta way!
 using SparseArrays
 printlnln("assemble global schur ...")
@@ -162,3 +170,4 @@ printlnln("solve for least dominant eigvecs of schur complement ...")
 printlnln("ld-def-neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
 u_Γ, it, _ = @time defpcg(S_local_mat, b_schur, ϕ, M=ΠSnn_local_mat);
 space_println("n = $(S_local_mat.N), ndom = $ndom, nev = $nev (ld), iter = $it")
+"""
