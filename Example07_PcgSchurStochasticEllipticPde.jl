@@ -135,18 +135,38 @@ printlnln("prepare_neumann_neumann_schur_precond using S_local_mat ...")
                                                              ind_Γd_Γ2l,
                                                              node_Γ_cnt)
 
+printlnln("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+u_Γ, it, _ = @time pcg(S_local_mat, b_schur, zeros(S_local_mat.N), ΠSnn_local_mat);
+space_println("n = $(S_local_mat.N), iter = $it")
+
+printlnln("A_ΓΓ-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
+u_Γ, it, _ = @time pcg(S_local_mat, b_schur, zeros(S_local_mat.N), A_ΓΓdd);
+space_println("n = $(S_local_mat.N), iter = $it")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""                                                             
 printlnln("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
 u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], zeros(A.n), Π)
 space_println("n = $(A.n), iter = $it")
 u_no_dd = append_bc(dirichlet_inds_l2g, not_dirichlet_inds_l2g,
                     u_no_dd_no_dirichlet, points, uexact)
 
-printlnln("neumann-neumann-pcg solve of u_Γ s.t. S_global * u_Γ = b_schur ...")
-u_Γ, it, _ = @time pcg(S_local_mat, b_schur, zeros(S_local_mat.N), ΠSnn_local_mat);
-space_println("n = $(S_local_mat.N), iter = $it")
-
 printlnln("get_subdomain_solutions ...")
-u_Id = @time get_subdomain_solutions(u_Γ, A_IIdd, A_IΓdd, b_Idd);
+#u_Id = @time get_subdomain_solutions(u_Γ, A_IIdd, A_IΓdd, b_Idd);
                                                 
 printlnln("merge_subdomain_solutions ...")
 u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
@@ -156,7 +176,7 @@ u_with_dd = @time merge_subdomain_solutions(u_Γ, u_Id, node_Γ, node_Id,
 space_println("extrema(u_with_dd - u_no_dd) = $(extrema(u_with_dd - u_no_dd))")
 
 
-"""
+
 # There's gotta be a betta way!
 using SparseArrays
 printlnln("assemble global schur ...")
