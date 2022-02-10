@@ -81,16 +81,6 @@ space_println("nel = $(size(cells)[2])")
 printlnln("in-place draw ...")
 @time draw!(Λ, Ψ, ξ, g)
 
-printlnln("do_isotropic_elliptic_assembly ...")
-A, b = @time do_isotropic_elliptic_assembly(cells, points,
-                                            dirichlet_inds_g2l,
-                                            not_dirichlet_inds_g2l,
-                                            point_markers,
-                                            exp.(g), f, uexact)
-
-printlnln("assemble amg preconditioner of A ...")
-Π = @time AMGPreconditioner{SmoothedAggregation}(A)
-
 #printlnln("prepare_global_schur ...")
 #A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
 #                                                           points,
@@ -155,10 +145,18 @@ space_println("n = $(S_local_mat.N), iter = $it")
 
 
 
+""" 
 
+printlnln("do_isotropic_elliptic_assembly ...")
+A, b = @time do_isotropic_elliptic_assembly(cells, points,
+                                            dirichlet_inds_g2l,
+                                            not_dirichlet_inds_g2l,
+                                            point_markers,
+                                            exp.(g), f, uexact)
 
-
-"""                                                             
+printlnln("assemble amg preconditioner of A ...")
+Π = @time AMGPreconditioner{SmoothedAggregation}(A)
+                                                            
 printlnln("amg-pcg solve of u_no_dd_no_dirichlet s.t. A * u_no_dd_no_dirichlet = b ...")
 u_no_dd_no_dirichlet, it, _ = @time pcg(A, b[:, 1], zeros(A.n), Π)
 space_println("n = $(A.n), iter = $it")
