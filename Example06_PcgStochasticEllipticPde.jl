@@ -6,6 +6,7 @@ import Pkg
 Pkg.activate(".")
 using Fem
 using RecyclingKrylovSolvers: cg, pcg, defpcg
+using ArnoldiMethod
 
 using Utils: space_println, printlnln
 
@@ -17,18 +18,21 @@ using LinearMaps: LinearMap
 using SparseArrays: SparseMatrixCSC
 import Arpack
 
-tentative_nnode = 4_000
+tentative_nnode = 8_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000
 load_existing_mesh = false
-save_spectra = true
+save_spectra = false
+save_conditioning = false
+do_amg = true
+do_assembly_of_local_schurs = true # true for ndom = 200, false for ndom = 5
 
-ndom = 20 # 5, 10, 20, 30, 80, 200
+ndom = 200 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
-nreals = 3
+nreals = 1_000
 
 model = "SExp"
 sig2 = 1.
-L = 1. # .1, 1.
+L = .1 # .1, 1.
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)
 
 if load_existing_mesh
@@ -86,7 +90,7 @@ printlnln("extrema(ξ - χ) = $(extrema(ξ - χ))")
 
 
 #
-# Operator assemblies for ξ = 0
+# Operator assembly for ξ = 0
 #
 g_0 = copy(g); g_0 .= 0.
 
@@ -124,34 +128,30 @@ A_IIdd_0, A_IΓdd_0, A_ΓΓdd_0, _, _ = @time prepare_local_schurs(cells,
                                                                 f,
                                                                 uexact)
 
-# 
-# (Slow-ish) assembly of local Schur complements
-#
-
-printlnln("assemble_local_schurs ...")
-Sd_local_mat_0 = @time assemble_local_schurs(A_IIdd_0, A_IΓdd_0, A_ΓΓdd_0, preconds=Π_IId_0)
-                                            
-printlnln("build LinearMap using assembled local schurs ...")
-S_0 = LinearMap(x -> apply_local_schurs(Sd_local_mat_0,
-                                        ind_Γd_Γ2l,
-                                        node_Γ_cnt,
-                                        x), nothing,
-                                        n_Γ, issymmetric=true)
-
-"""
-printlnln("build LinearMap using (p)cg solves ...")
-S_0 = LinearMap(x -> apply_local_schurs(A_IIdd_0,
-                                        A_IΓdd_0,
-                                        A_ΓΓdd_0,
-                                        ind_Γd_Γ2l,
-                                        node_Γ_cnt,
-                                        x,
-                                        preconds=Π_IId_0), 
-                                        nothing, n_Γ, issymmetric=true)
-"""
+if do_assembly_of_local_schurs
+  printlnln("assemble_local_schurs ...")
+  Sd_local_mat_0 = @time assemble_local_schurs(A_IIdd_0, A_IΓdd_0, A_ΓΓdd_0, preconds=Π_IId_0)
+                                              
+  printlnln("build LinearMap using assembled local schurs ...")
+  S_0 = LinearMap(x -> apply_local_schurs(Sd_local_mat_0,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x), nothing,
+                                          n_Γ, issymmetric=true)
+else
+  printlnln("build LinearMap using (p)cg solves ...")
+  S_0 = LinearMap(x -> apply_local_schurs(A_IIdd_0,
+                                          A_IΓdd_0,
+                                          A_ΓΓdd_0,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x,
+                                          preconds=Π_IId_0), 
+                                          nothing, n_Γ, issymmetric=true)
+end
 
 #
-# Operator assemblies for a random ξ_t
+# Realization assemblies for a random ξ_t
 #
 printlnln("in-place draw of ξ ...")
 gs = [copy(g) for _ in 1:nreals]
@@ -159,42 +159,106 @@ for ireal in 1:nreals
   @time draw!(Λ, Ψ, ξ, g)
   gs[ireal] .= g
 end
+     
 
-printlnln("do_isotropic_elliptic_assembly for ξ ...")
-As, bs = [], []
-for ireal in 1:nreals
-  A, b = @time do_isotropic_elliptic_assembly(cells, points,
-                                              dirichlet_inds_g2l,
-                                              not_dirichlet_inds_g2l,
-                                              point_markers,
-                                              exp.(gs[ireal]), f, uexact)
-  push!(As, A)
-  push!(bs, b)  
+if do_amg
+  printlnln("assemble amg_0 preconditioner for A_0 ...")
+  Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
+
+  conds_0, conds_t = Float64[], Float64[]
+  iters_0, iters_t = Int[], Int[]
+  λ_lds_0, λ_lds_t = [], []
+  λ_mds_0, λ_mds_t = [], []
+  for ireal in 1:nreals
+    printlnln("do_isotropic_elliptic_assembly for ξ_$ireal ...")
+    A, b = @time do_isotropic_elliptic_assembly(cells, points,
+                                                dirichlet_inds_g2l,
+                                                not_dirichlet_inds_g2l,
+                                                point_markers,
+                                                exp.(gs[ireal]), f, uexact)
+
+    printlnln("assemble amg_t preconditioner for A_$ireal ...")
+    Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(A);
+
+    if save_conditioning
+      apply_Π_inv_A = LinearMap(x -> Π_amg_0 \ (A * x), nothing, A.n)
+      printlnln("Solve for least dominant eigenvalue of Π_amg_0^{-1} * A_$ireal ...")
+      vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+      printlnln("Solve for most dominant eigenvalue of Π_amg_0^{-1} * A_$ireal ...")
+      vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+      try
+        λ_ld = vals_ld.eigenvalues[1].re
+        λ_md = vals_md.eigenvalues[1].re
+        push!(conds_0, λ_md / λ_ld)
+      catch e
+        push!(conds_0, -1)
+      end
+
+      apply_Π_inv_A = LinearMap(x -> Π_amg_t \ (A * x), nothing, A.n)
+      printlnln("Solve for least dominant eigenvalue of Π_amg_t^{-1} * A_$ireal ...")
+      vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+      printlnln("Solve for most dominant eigenvalue of Π_amg_t^{-1} * A_$ireal ...")
+      vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+      try
+        λ_ld = vals_ld.eigenvalues[1].re
+        λ_md = vals_md.eigenvalues[1].re
+        push!(conds_t, λ_md / λ_ld)
+      catch e
+        push!(conds_t, -1)
+      end
+    end
+
+    if save_spectra
+      tag = "amg_0"
+      printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+      Π_inv_At = Array{Float64}(undef, A.n, A.n)
+      @time for j in 1:A.n
+        Π_inv_At[:, j] .= Π_amg_0 \ Array(A[:, j])
+      end
+      printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+      λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+      push!(λ_lds_0, λ_ld)
+      npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+      printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+      λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+      push!(λ_mds_0, λ_md)
+      npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+
+      tag = "amg_t"
+      printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+      Π_inv_At = Array{Float64}(undef, A.n, A.n)
+      @time for j in 1:A.n
+        Π_inv_At[:, j] .= Π_amg_t \ Array(A[:, j])
+      end
+      printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+      λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+      push!(λ_lds_t, λ_ld)
+      npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+      printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+      λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+      push!(λ_mds_t, λ_md)
+      npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+    end
+
+    printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_amg_0 ...")
+    _, it, _ = @time pcg(A, b, zeros(A.n), Π_amg_0)
+    push!(iters_0, it)
+
+    printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_amg_t ...")
+    _, it, _ = @time pcg(A, b, zeros(A.n), Π_amg_t)
+    push!(iters_t, it)
+  end
+  if save_conditioning
+    npzwrite("data/$root_fname.amg_0.conds.nreals$nreals.npz", conds_0)
+    npzwrite("data/$root_fname.amg_t.conds.nreals$nreals.npz", conds_t)
+  end
+  npzwrite("data/$root_fname.amg_0.pcg-iters.nreals$nreals.npz", iters_0)
+  npzwrite("data/$root_fname.amg_t.pcg-iters.nreals$nreals.npz", iters_t)
 end
-                                            
-#
-# Preconditioner assemblies
-#
-printlnln("assemble amg_0 preconditioner for A_0 ...")
-Π_amg_0 = @time AMGPreconditioner{SmoothedAggregation}(A_0);
 
-Π_amg_ts = []
-for ireal in 1:nreals
-  printlnln("assemble amg_t preconditioner for A_$ireal ...")
-  Π_amg_t = @time AMGPreconditioner{SmoothedAggregation}(As[ireal]);
-  push!(Π_amg_ts, Π_amg_t)
-end
 
-printlnln("prepare_lorasc_precond ...")
-Π_lorasc_0 = @time prepare_lorasc_precond(S_0,
-                                          A_IId_0,
-                                          A_IΓd_0,
-                                          A_ΓΓ_0,
-                                          ind_Id_g2l,
-                                          ind_Γ_g2l,
-                                          not_dirichlet_inds_g2l)
 
-printlnln("prepare_lorasc_precond with ε = 0.01 ...")
+printlnln("prepare_lorasc_precond with ε = 0 ...")
 Π_lorasc_ε01_0 = @time prepare_lorasc_precond(tentative_nnode,
                                               ndom,
                                               cells,
@@ -207,8 +271,157 @@ printlnln("prepare_lorasc_precond with ε = 0.01 ...")
                                               uexact,
                                               ε=.01)
 
+conds_0, conds_t = Float64[], Float64[]
+iters_0, iters_t = Int[], Int[]  
+λ_lds_0, λ_lds_t = [], []
+λ_mds_0, λ_mds_t = [], []
+for ireal in 1:nreals
+  printlnln("do_isotropic_elliptic_assembly for ξ_$ireal ...")
+  A, b = @time do_isotropic_elliptic_assembly(cells, points,
+                                              dirichlet_inds_g2l,
+                                              not_dirichlet_inds_g2l,
+                                              point_markers,
+                                              exp.(gs[ireal]), f, uexact)
 
-printlnln("prepare_lorasc_precond with ε = 0 ...")
+  printlnln("assemble lorasc preconditioner with ε = 0.01 for A_$ireal ...")
+ 
+  printlnln("prepare_global_schur ...")
+  A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
+                                                             points,
+                                                             epart,
+                                                             ind_Id_g2l,
+                                                             ind_Γ_g2l,
+                                                             node_owner,
+                                                             exp.(gs[ireal]),
+                                                             f,
+                                                             uexact)  
+                                                                                                                  
+  printlnln("assemble amg preconditioners of A_IId_0 ...")
+  Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom]) for idom in 1:ndom];
+                                                                                                                    
+  printlnln("prepare_local_schurs ...")
+  A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
+                                                            points,
+                                                            epart,
+                                                            ind_Id_g2l,
+                                                            ind_Γd_g2l,
+                                                            ind_Γ_g2l,
+                                                            node_owner,
+                                                            exp.(gs[ireal]),
+                                                            f,
+                                                            uexact)
+  
+  if do_assembly_of_local_schurs
+    printlnln("assemble_local_schurs ...")
+    Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
+                                                                                                                   
+    printlnln("build LinearMap using assembled local schurs ...")
+    S = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x), nothing,
+                                          n_Γ, issymmetric=true)
+  else
+    printlnln("build LinearMap using (p)cg solves ...")
+    S = LinearMap(x -> apply_local_schurs(A_IIdd,
+                                          A_IΓdd,
+                                          A_ΓΓdd,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x,
+                                          preconds=Π_IId), 
+                                          nothing, n_Γ, issymmetric=true)
+  end
+
+  Π_lorasc_ε01_t =   @time prepare_lorasc_precond(S,
+                                                  A_IId,
+                                                  A_IΓd,
+                                                  A_ΓΓ,
+                                                  ind_Id_g2l,
+                                                  ind_Γ_g2l,
+                                                  not_dirichlet_inds_g2l,
+                                                  ε=.01)
+
+
+  if save_conditioning
+    apply_Π_inv_A = LinearMap(x -> Π_lorasc_ε01_0 \ (A * x), nothing, A.n)
+    printlnln("Solve for least dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps01_0^{-1} * A_$ireal ...")
+    vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+    printlnln("Solve for most dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps01_0^{-1} * A_$ireal ...")
+    vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+    try
+      λ_ld = vals_ld.eigenvalues[1].re
+      λ_md = vals_md.eigenvalues[1].re
+      push!(conds_0, λ_md / λ_ld)
+    catch e
+      push!(conds_0, -1)
+    end
+
+    apply_Π_inv_A = LinearMap(x -> Π_lorasc_ε01_t \ (A * x), nothing, A.n)
+    printlnln("Solve for least dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps01_t^{-1} * A_$ireal ...")
+    vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+    printlnln("Solve for most dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps01_t^{-1} * A_$ireal ...")
+    vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+    try
+      λ_ld = vals_ld.eigenvalues[1].re
+      λ_md = vals_md.eigenvalues[1].re
+      push!(conds_t, λ_md / λ_ld)
+    catch e
+      push!(conds_t, -1)
+    end
+  end
+
+  if save_spectra
+    tag = "lorasc_ndom$ndom"*"_eps01_0"
+    printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, A.n, A.n)
+    @time for j in 1:A.n
+      Π_inv_At[:, j] .= Π_lorasc_ε01_0 \ Array(A[:, j])
+    end
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds_0, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+    push!(λ_mds_0, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+
+    tag = "lorasc_ndom$ndom"*"_eps01_t"
+    printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, A.n, A.n)
+    @time for j in 1:A.n
+      Π_inv_At[:, j] .= Π_lorasc_ε01_t \ Array(A[:, j])
+    end
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds_t, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+    push!(λ_mds_t, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+  end
+
+  printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_lorasc_ndom$ndom"*"_eps01_0 ...")
+  _, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_ε01_0)
+  push!(iters_0, it)
+
+  printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_lorasc_ndom$ndom"*"_eps01_t ...")
+  _, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_ε01_t)
+  push!(iters_t, it)
+end
+if save_conditioning
+  npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps01_0.conds.nreals$nreals.npz", conds_0)
+  npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps01_t.conds.nreals$nreals.npz", conds_t)
+end
+npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps01_0.pcg-iters.nreals$nreals.npz", iters_0)
+npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps01_t.pcg-iters.nreals$nreals.npz", iters_t)
+
+
+
+
+printlnln("prepare_lorasc_precond with ε = 0.01 ...")
 Π_lorasc_ε00_0 = @time prepare_lorasc_precond(tentative_nnode,
                                               ndom,
                                               cells,
@@ -221,113 +434,248 @@ printlnln("prepare_lorasc_precond with ε = 0 ...")
                                               uexact,
                                               ε=0)
 
-Π_lorasc_ε01_ts, Π_lorasc_ε00_ts = [], []
+conds_0, conds_t = Float64[], Float64[]
+iters_0, iters_t = Int[], Int[]
+λ_lds_0, λ_lds_t = [], []
+λ_mds_0, λ_mds_t = [], []
 for ireal in 1:nreals
-  printlnln("assemble lorasc preconditioner with ε = 0.01 for A_$ireal ...")
-  Π_lorasc_ε01_t = @time prepare_lorasc_precond(tentative_nnode,
-                                                ndom,
-                                                cells,
-                                                points,
-                                                cell_neighbors,
-                                                exp.(gs[ireal]),
-                                                dirichlet_inds_g2l,
-                                                not_dirichlet_inds_g2l,
-                                                f,
-                                                uexact,
-                                                ε=.01)
-  push!(Π_lorasc_ε01_ts, Π_lorasc_ε01_t)
-end
-for ireal in 1:nreals
+  printlnln("do_isotropic_elliptic_assembly for ξ_$ireal ...")
+  A, b = @time do_isotropic_elliptic_assembly(cells, points,
+                                              dirichlet_inds_g2l,
+                                              not_dirichlet_inds_g2l,
+                                              point_markers,
+                                              exp.(gs[ireal]), f, uexact)
+
   printlnln("assemble lorasc preconditioner with ε = 0 for A_$ireal ...")
-  Π_lorasc_ε00_t = @time prepare_lorasc_precond(tentative_nnode,
-                                                ndom,
-                                                cells,
-                                                points,
-                                                cell_neighbors,
-                                                exp.(gs[ireal]),
-                                                dirichlet_inds_g2l,
-                                                not_dirichlet_inds_g2l,
-                                                f,
-                                                uexact,
-                                                ε=0)
-  push!(Π_lorasc_ε00_ts, Π_lorasc_ε00_t)
+
+  printlnln("prepare_global_schur ...")
+  A_IId, A_IΓd, A_ΓΓ, b_Id, b_Γ = @time prepare_global_schur(cells,
+                                                             points,
+                                                             epart,
+                                                             ind_Id_g2l,
+                                                             ind_Γ_g2l,
+                                                             node_owner,
+                                                             exp.(gs[ireal]),
+                                                             f,
+                                                             uexact)  
+                                                                                                                  
+  printlnln("assemble amg preconditioners of A_IId_0 ...")
+  Π_IId = @time [AMGPreconditioner{SmoothedAggregation}(A_IId[idom]) for idom in 1:ndom];
+                                                                                                                    
+  printlnln("prepare_local_schurs ...")
+  A_IIdd, A_IΓdd, A_ΓΓdd, _, _ = @time prepare_local_schurs(cells,
+                                                            points,
+                                                            epart,
+                                                            ind_Id_g2l,
+                                                            ind_Γd_g2l,
+                                                            ind_Γ_g2l,
+                                                            node_owner,
+                                                            exp.(gs[ireal]),
+                                                            f,
+                                                            uexact)
+                                                                       
+  if do_assembly_of_local_schurs
+    printlnln("assemble_local_schurs ...")
+    Sd_local_mat = @time assemble_local_schurs(A_IIdd, A_IΓdd, A_ΓΓdd, preconds=Π_IId)
+                                                                                                                    
+    printlnln("build LinearMap using assembled local schurs ...")
+    S = LinearMap(x -> apply_local_schurs(Sd_local_mat,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x), nothing,
+                                          n_Γ, issymmetric=true)
+  else
+    printlnln("build LinearMap using (p)cg solves ...")
+    S = LinearMap(x -> apply_local_schurs(A_IIdd,
+                                          A_IΓdd,
+                                          A_ΓΓdd,
+                                          ind_Γd_Γ2l,
+                                          node_Γ_cnt,
+                                          x,
+                                          preconds=Π_IId), 
+                                          nothing, n_Γ, issymmetric=true)
+  end
+
+  Π_lorasc_ε00_t =   @time prepare_lorasc_precond(S,
+                                                  A_IId,
+                                                  A_IΓd,
+                                                  A_ΓΓ,
+                                                  ind_Id_g2l,
+                                                  ind_Γ_g2l,
+                                                  not_dirichlet_inds_g2l,
+                                                  ε=0)
+  if save_conditioning
+    apply_Π_inv_A = LinearMap(x -> Π_lorasc_ε00_0 \ (A * x), nothing, A.n)
+    printlnln("Solve for least dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps00_0^{-1} * A_$ireal ...")
+    vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+    printlnln("Solve for most dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps00_0^{-1} * A_$ireal ...")
+    vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+    try
+      λ_ld = vals_ld.eigenvalues[1].re
+      λ_md = vals_md.eigenvalues[1].re
+      push!(conds_0, λ_md / λ_ld)
+    catch e
+      push!(conds_0, -1)
+    end
+
+    apply_Π_inv_A = LinearMap(x -> Π_lorasc_ε00_t \ (A * x), nothing, A.n)
+    printlnln("Solve for least dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps00_t^{-1} * A_$ireal ...")
+    vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+    printlnln("Solve for most dominant eigenvalue of Π_lorasc_ndom$ndom"*"_eps00_t^{-1} * A_$ireal ...")
+    vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+    try
+      λ_ld = vals_ld.eigenvalues[1].re
+      λ_md = vals_md.eigenvalues[1].re
+      push!(conds_t, λ_md / λ_ld)
+    catch e
+      push!(conds_t, -1)
+    end
+  end
+
+  if save_spectra
+    tag = "lorasc_ndom$ndom"*"_eps00_0"
+    printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, A.n, A.n)
+    @time for j in 1:A.n
+      Π_inv_At[:, j] .= Π_lorasc_ε00_0 \ Array(A[:, j])
+    end
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds_0, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+    push!(λ_mds_0, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+
+    tag = "lorasc_ndom$ndom"*"_eps00_t"
+    printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, A.n, A.n)
+    @time for j in 1:A.n
+      Π_inv_At[:, j] .= Π_lorasc_ε00_t \ Array(A[:, j])
+    end
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds_t, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+    push!(λ_mds_t, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+  end
+
+  printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_lorasc_ndom$ndom"*"_eps00_0 ...")
+  _, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_ε00_0)
+  push!(iters_0, it)
+
+  printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_lorasc_ndom$ndom"*"_eps00_t ...")
+  _, it, _ = @time pcg(A, b, zeros(A.n), Π_lorasc_ε00_t)
+  push!(iters_t, it)
 end
+if save_conditioning
+  npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps00_0.conds.nreals$nreals.npz", conds_0)
+  npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps00_t.conds.nreals$nreals.npz", conds_t)
+end
+npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps00_0.pcg-iters.nreals$nreals.npz", iters_0)
+npzwrite("data/$root_fname.lorasc_ndom$ndom"*"_eps00_t.pcg-iters.nreals$nreals.npz", iters_t)
+
+
+
 
 Π_bJ_0 = BJPreconditioner(ndom, A_0)
 
-Π_bJ_ts = []
+conds_0, conds_t = Float64[], Float64[]
+iters_0, iters_t = Int[], Int[]
+λ_lds_0, λ_lds_t = [], []
+λ_mds_0, λ_mds_t = [], []
 for ireal in 1:nreals
-  Π_bJ_t = BJPreconditioner(ndom, As[ireal])
-  push!(Π_bJ_ts, Π_bJ_t)
-end
+  printlnln("do_isotropic_elliptic_assembly for ξ_$ireal ...")
+  A, b = @time do_isotropic_elliptic_assembly(cells, points,
+                                              dirichlet_inds_g2l,
+                                              not_dirichlet_inds_g2l,
+                                              point_markers,
+                                              exp.(gs[ireal]), f, uexact)
 
+  Π_bJ_t = BJPreconditioner(ndom, A)
 
-#
-# Solve for some eigenpairs
-#
-function apply_preconditioner_get_eigenpairs(Π, tag)
-  λ_lds, Φ_lds = [], []
-  for ireal in 1:nreals
-    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
-    Π_inv_At = Array{Float64}(undef, As[ireal].n, As[ireal].n)
-    @time for j in 1:As[ireal].n
-      if size(Π) == (1,)
-        Π_inv_At[:, j] .= Π[1] \ Array(As[ireal][:, j])
-      else
-        Π_inv_At[:, j] .= Π[ireal] \ Array(As[ireal][:, j])
-      end
+  if save_conditioning
+    apply_Π_inv_A = LinearMap(x -> Π_bJ_0 \ (A * x), nothing, A.n)
+    printlnln("Solve for least dominant eigenvalue of Π_bJ_nb$ndom"*"_0^{-1} * A_$ireal ...")
+    vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+    printlnln("Solve for most dominant eigenvalue of Π_bJ_nb$ndom"*"_0^{-1} * A_$ireal ...")
+    vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+    try
+      λ_ld = vals_ld.eigenvalues[1].re
+      λ_md = vals_md.eigenvalues[1].re
+      push!(conds_0, λ_md / λ_ld)
+    catch e
+      push!(conds_0, -1)
     end
-    λ_ld, Φ_ld = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
-    push!(λ_lds, λ_ld)
-    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
-    push!(Φ_lds, Φ_ld)
-  end        
-  λ_mds, Φ_mds = [], []                                    
-  for ireal in 1:nreals
-    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
-    Π_inv_At = Array{Float64}(undef, As[ireal].n, As[ireal].n)
-    @time for j in 1:As[ireal].n
-      if size(Π) == (1,)
-        Π_inv_At[:, j] .= Π[1] \ Array(As[ireal][:, j])
-      else
-        Π_inv_At[:, j] .= Π[ireal] \ Array(As[ireal][:, j])
-      end
+
+    apply_Π_inv_A = LinearMap(x -> Π_bJ_t \ (A * x), nothing, A.n)
+    printlnln("Solve for least dominant eigenvalue of Π_bJ_nb$ndom"*"_t^{-1} * A_$ireal ...")
+    vals_ld, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=SR())
+    printlnln("Solve for most dominant eigenvalue of Π_bJ_nb$ndom"*"_t^{-1} * A_$ireal ...")
+    vals_md, _ = @time ArnoldiMethod.partialschur(apply_Π_inv_A, nev=1, tol=1e-6, which=LR())
+    try
+      λ_ld = vals_ld.eigenvalues[1].re
+      λ_md = vals_md.eigenvalues[1].re
+      push!(conds_t, λ_md / λ_ld)
+    catch e
+      push!(conds_t, -1)
     end
-    λ_md, Φ_md = @time Arpack.eigs(Π_inv_At, nev=As[ireal].n-100, which=:LM)
-    push!(λ_mds, λ_md)
-    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
-    push!(Φ_mds, Φ_md)
   end
+
+  if save_spectra
+    tag = "bJ_nb$ndom"*"_0"
+    printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, A.n, A.n)
+    @time for j in 1:A.n
+      Π_inv_At[:, j] .= Π_bJ_0 \ Array(A[:, j])
+    end
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds_0, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+    push!(λ_mds_0, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+
+    tag = "bJ_nb$ndom"*"_t"
+    printlnln("Assemble Π_$tag^{-1} * A_$ireal ...")
+    Π_inv_At = Array{Float64}(undef, A.n, A.n)
+    @time for j in 1:A.n
+      Π_inv_At[:, j] .= Π_bJ_t \ Array(A[:, j])
+    end
+    printlnln("solve for least dominant eigvecs of Π_$tag^{-1} * A_$ireal ...")
+    λ_ld, _ = @time Arpack.eigs(Π_inv_At, nev=100, which=:SM)
+    push!(λ_lds_t, λ_ld)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.ld.eigvals.npz", λ_ld)
+    printlnln("solve for most dominant eigvecs of Π_$tag^{-1} A_$ireal ...")
+    λ_md, _ = @time Arpack.eigs(Π_inv_At, nev=A.n-100, which=:LM)
+    push!(λ_mds_t, λ_md)
+    npzwrite("data/$root_fname.$tag" * "_As$ireal.md.eigvals.npz", λ_md)
+  end
+
+  printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_bJ_nb$ndom"*"_0 ...")
+  _, it, _ = @time pcg(A, b, zeros(A.n), Π_bJ_0)
+  push!(iters_0, it)
+
+  printlnln("pcg solve of A_$ireal * u_$ireal = b_$ireal with Π_bJ_nb$ndom"*"_t ...")
+  _, it, _ = @time pcg(A, b, zeros(A.n), Π_bJ_t)
+  push!(iters_t, it)  
 end
-
-if save_spectra
-  #apply_preconditioner_get_eigenpairs([Π_amg_0], "amg_0")
-  #apply_preconditioner_get_eigenpairs(Π_amg_ts, "amg_t")
-  apply_preconditioner_get_eigenpairs([Π_lorasc_ε00_0], "lorasc_ndom$ndom"*"_eps00_0")
-  apply_preconditioner_get_eigenpairs(Π_lorasc_ε00_ts, "lorasc_ndom$ndom"*"_eps00_t")
-  apply_preconditioner_get_eigenpairs([Π_lorasc_ε01_0], "lorasc_ndom$ndom"*"_eps01_0")
-  apply_preconditioner_get_eigenpairs(Π_lorasc_ε01_ts, "lorasc_ndom$ndom"*"_eps01_t")
-  apply_preconditioner_get_eigenpairs([Π_bJ_0], "bJ_nb$ndom"*"_0")
-  apply_preconditioner_get_eigenpairs(Π_bJ_ts, "bJ_nb$ndom"*"_t")
-
-  #conds_Πinv_A
+if save_conditioning
+  npzwrite("data/$root_fname.bJ_nb$ndom"*"_0.conds.nreals$nreals.npz", conds_0)
+  npzwrite("data/$root_fname.bJ_nb$ndom"*"_t.conds.nreals$nreals.npz", conds_t)
 end
-
-if save_spectra
-
-else
-end
+npzwrite("data/$root_fname.bJ_nb$ndom"*"_0.pcg-iters.nreals$nreals.npz", iters_0)
+npzwrite("data/$root_fname.bJ_nb$ndom"*"_t.pcg-iters.nreals$nreals.npz", iters_t)
 
 
 
-
-
-
-
-#
-# Preconditioner applications
-#
-println()
+"""
 
 print("apply amg_0 ...")
 @time Π_amg_0 \ rand(As[1].n);
@@ -339,7 +687,6 @@ end
 
 print("apply lorasc_0 ...")
 @time Π_lorasc_0 \ rand(As[1].n)
-
 
 #
 # Pcg solves
@@ -357,23 +704,23 @@ for ireal in 1:nreals
   u, it, _ = @time cg(As[ireal], bs[ireal], zeros(As[ireal].n))
   space_println("n = $(As[ireal].n), iter = $it")
 
-  """
+  
   #printlnln("ld-def-amg_0-pcg solve of A * u = b ...")
-  u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_ld, Π_amg_0);
-  space_println("n = $(As[ireal].n), nev = $nev (ld), iter = $it")
+  #u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_ld, Π_amg_0);
+  #space_println("n = $(As[ireal].n), nev = $nev (ld), iter = $it")
 
-  printlnln("md-def-amg_0-pcg solve of A * u = b ...")
-  u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_md, Π_amg_0);
-  space_println("n = $(As[ireal].n), nev = $nev (md), iter = $it")
-  """
+  #printlnln("md-def-amg_0-pcg solve of A * u = b ...")
+  #u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_md, Π_amg_0);
+  #space_println("n = $(As[ireal].n), nev = $nev (md), iter = $it")
+  
 
   printlnln("lorasc_0-pcg solve of A * u = b ...")
   u, it, _ = @time pcg(As[ireal], bs[ireal], zeros(As[ireal].n), Π_lorasc_0)
   space_println("n = $(As[ireal].n), iter = $it")
 
-  """
-  printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
-  u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_ld, Π_lorasc_0);
-  space_println("n = $(As[ireal].n), nev = $nev (ld), iter = $it")
-  """
+  
+  #printlnln("ld-def-lorasc_0-pcg solve of A * u = b ...")
+  #u, it, _ = @time defpcg(As[ireal], bs[ireal], zeros(As[ireal].n), Φ_ld, Π_lorasc_0);
+  #space_println("n = $(As[ireal].n), nev = $nev (ld), iter = $it")
 end
+"""
