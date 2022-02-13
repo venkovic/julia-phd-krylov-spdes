@@ -234,7 +234,7 @@ for ireal in 1:nreals
   end
 
   if save_spectra
-    tag = "neumann-neumann_0"
+    tag = "neumann-neumann_ndom$ndom"*"_0"
     printlnln("Assemble Π_$tag^{-1} * S_$ireal ...")
     Π_inv_St = Array{Float64}(undef, S.N, S.N)
     @time for j in 1:S.N
@@ -251,7 +251,7 @@ for ireal in 1:nreals
     push!(λ_mds_0, λ_md)
     npzwrite("data/$root_fname.$tag" * "_Ss$ireal.md.eigvals.npz", λ_md)
 
-    tag = "neumann-neumann_t"
+    tag = "neumann-neumann_ndom$ndom"*"_t"
     printlnln("Assemble Π_$tag^{-1} * S_$ireal ...")
     Π_inv_St = Array{Float64}(undef, S.N, S.N)
     @time for j in 1:S.N
@@ -278,11 +278,11 @@ for ireal in 1:nreals
   push!(iters_t, it)
 end
 if save_conditioning
-  npzwrite("data/$root_fname.neumann-neumann_0.conds.nreals$nreals.npz", conds_0)
-  npzwrite("data/$root_fname.neumann-neumann_t.conds.nreals$nreals.npz", conds_t)
+  npzwrite("data/$root_fname.neumann-neumann_ndom$ndom"*"_0.conds.nreals$nreals.npz", conds_0)
+  npzwrite("data/$root_fname.neumann-neumann_ndom$ndom"*"_t.conds.nreals$nreals.npz", conds_t)
 end
-npzwrite("data/$root_fname.neumann-neumann_0.pcg-iters.nreals$nreals.npz", iters_0)
-npzwrite("data/$root_fname.neumann-neumann_t.pcg-iters.nreals$nreals.npz", iters_t)
+npzwrite("data/$root_fname.neumann-neumann_ndom$ndom"*"_0.pcg-iters.nreals$nreals.npz", iters_0)
+npzwrite("data/$root_fname.neumann-neumann_ndom$ndom"*"_t.pcg-iters.nreals$nreals.npz", iters_t)
 
 
 
@@ -373,7 +373,7 @@ for ireal in 1:nreals
   end
 
   if save_spectra
-    tag = "A_GG_0"
+    tag = "A_GG_ndom$ndom"*"_0"
     printlnln("Assemble Π_$tag^{-1} * S_$ireal ...")
     Π_inv_St = Array{Float64}(undef, S.N, S.N)
     @time for j in 1:S.N
@@ -390,7 +390,7 @@ for ireal in 1:nreals
     push!(λ_mds_0, λ_md)
     npzwrite("data/$root_fname.$tag" * "_Ss$ireal.md.eigvals.npz", λ_md)
 
-    tag = "A_GG_t"
+    tag = "A_GG_ndom$ndom"*"_t"
     printlnln("Assemble Π_$tag^{-1} * S_$ireal ...")
     Π_inv_St = Array{Float64}(undef, S.N, S.N)
     @time for j in 1:S.N
@@ -417,11 +417,11 @@ for ireal in 1:nreals
   push!(iters_t, it)
 end
 if save_conditioning
-  npzwrite("data/$root_fname.A_GG_0.conds.nreals$nreals.npz", conds_0)
-  npzwrite("data/$root_fname.A_GG_t.conds.nreals$nreals.npz", conds_t)
+  npzwrite("data/$root_fname.A_GG_ndom$ndom"*"_0.conds.nreals$nreals.npz", conds_0)
+  npzwrite("data/$root_fname.A_GG_ndom$ndom"*"_t.conds.nreals$nreals.npz", conds_t)
 end
-npzwrite("data/$root_fname.A_GG_0.pcg-iters.nreals$nreals.npz", iters_0)
-npzwrite("data/$root_fname.A_GG_t.pcg-iters.nreals$nreals.npz", iters_t)
+npzwrite("data/$root_fname.A_GG_ndom$ndom"*"_0.pcg-iters.nreals$nreals.npz", iters_0)
+npzwrite("data/$root_fname.A_GG_ndom$ndom"*"_t.pcg-iters.nreals$nreals.npz", iters_t)
 
 
 
