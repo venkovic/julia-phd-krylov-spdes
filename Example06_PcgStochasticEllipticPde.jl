@@ -18,9 +18,9 @@ using LinearMaps: LinearMap
 using SparseArrays: SparseMatrixCSC
 import Arpack
 
-tentative_nnode = 8_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000
+tentative_nnode = 4_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000
 load_existing_mesh = false
-save_spectra = false
+save_spectra = true
 save_conditioning = false
 do_amg = true
 do_assembly_of_local_schurs = true # true for ndom = 200, false for ndom = 5
@@ -28,7 +28,7 @@ do_assembly_of_local_schurs = true # true for ndom = 200, false for ndom = 5
 ndom = 200 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
-nreals = 1_000
+nreals = 3# 1_000
 
 model = "SExp"
 sig2 = 1.
@@ -151,7 +151,7 @@ else
 end
 
 #
-# Realization assemblies for a random ξ_t
+# Realization assemblies for random ξ_t's
 #
 printlnln("in-place draw of ξ ...")
 gs = [copy(g) for _ in 1:nreals]
