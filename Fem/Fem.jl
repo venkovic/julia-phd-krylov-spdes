@@ -121,6 +121,9 @@ export McSampler,
        prepare_mc_sampler
 export McmcSampler,
        prepare_mcmc_sampler
+export HybridSampler,
+       prepare_hybrid_sampler
+
 
 function printlnln(str::String, width=2)
   println()
