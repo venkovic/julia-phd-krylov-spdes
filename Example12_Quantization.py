@@ -4,7 +4,7 @@ import numpy as np
 distance = ('L2-full', 'cdf-full',)
 Ps = (5, 10, 20, 30, 40, 50, 60, 70 ,80, 90, 100,)
 nsmp_preconds = 10_000
-nsmp = 1_000
+nsmp = 5_000
 root_fname = 'SExp_sig21.0_L0.1_DoF20000'
 
 iters, assignments, dists, dists_to_0 = {}, {}, {}, {}
@@ -46,4 +46,4 @@ for ax in axes.flatten():
   ax.grid(ls='-.')
    
 
-pl.savefig("Example12.pdf")
+pl.savefig("img/Example12.pdf")
