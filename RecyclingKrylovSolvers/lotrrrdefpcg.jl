@@ -1,0 +1,2 @@
+lotrrrdefpcg = rrdefpcg
+lotrrrpcg = rrpcg
