@@ -18,15 +18,15 @@ model = "SExp"
 sig2 = 1.
 L = .1
 
-nreals = 1_0#00
+nreals = 1_000
 
 tentative_nnode = 4_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000
 load_existing_mesh = true
-save_spectra = true
+save_spectra = false
 save_conditioning = false
 do_assembly_of_local_schurs = true # true for ndom = 200, false for ndom = 5
 
-ndom = 200 # 5, 10, 20, 30, 80, 200
+ndom = 5 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)

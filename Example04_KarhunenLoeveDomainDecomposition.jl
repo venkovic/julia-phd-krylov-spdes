@@ -8,10 +8,10 @@ using Utils: space_println, printlnln
 
 using NPZ: npzwrite
 
-tentative_nnode = 4_000 # 4_000, 100_000
+tentative_nnode = 8_000 # 4_000, 100_000, 8_000, 16_000, 32_000, 64_000, 128_000
 load_existing_mesh = false
 
-ndom = 5 # 5, 10, 20, 30, 80, 200
+ndom = 20 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
 nev = 70 # 25
@@ -42,7 +42,7 @@ else
 end
 
 model = "SExp"
-L = 1. # .05, .1, .5, 1., 5., 10.
+L = .1 # .05, .1, .5, 1., 5., 10.
 sig2 = 1.
 save_eigvals = true
 root_fname = get_root_filename(model, sig2, L, tentative_nnode)

@@ -8,9 +8,7 @@ Pkg.activate(".")
 using Fem
 using RecyclingKrylovSolvers: cg, pcg, defpcg, eigpcg, eigdefpcg
 using Preconditioners: AMGPreconditioner, SmoothedAggregation
-using MyPreconditioners: BJPreconditioner, BJop,
-                         Cholesky16, get_cholesky16,
-                         Cholesky32, get_cholesky32
+using MyPreconditioners: BJPreconditioner
 
 using Utils: space_println, printlnln, 
              save_deflated_system, save_system,
@@ -30,10 +28,10 @@ include("Example09_DefPcgMcmcStochasticEllipticPde_Functions.jl")
 troubleshoot = true
 
 maxit = 5_000
-tentative_nnode = 40_000
+tentative_nnode = 4_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000
 load_existing_mesh = false
 
-ndom = 16
+ndom = 5 # 5, 10, 20, 30, 80, 200
 load_existing_partition = false
 
 nbj = ndom
@@ -41,11 +39,9 @@ nbj = ndom
 nvec = floor(Int, 1.25 * ndom)
 spdim = 3 * ndom
 
-preconds = ["neumann-neumann$(ndom)_0"] # ∈ ("amg_0", 
-                                        #    "bj$(nbj)_0",
-                                        #    "lorasc$(ndom)_0",
-                                        #    "lorasc$(ndom)_1",
-                                        #    "neumann-neumann$(ndom)_0")
+preconds = ["lorasc$(ndom)_1"] # ∈ ("amg_0", 
+                               #    "bj$(nbj)_0",
+                               #    "lorasc$(ndom)_1")
 
 const preconds_with_dd = ("lorasc$(ndom)_0",
                           "lorasc$(ndom)_1",

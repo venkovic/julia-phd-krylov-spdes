@@ -19,6 +19,11 @@ using LinearMaps: LinearMap
 import SuiteSparse
 import JLD
 
+using distributed
+
+addprocs(11)
+
+
 using Clustering
 using Distributions: MvNormal, Normal, cdf
 using Statistics: quantile
@@ -86,19 +91,21 @@ M = get_mass_matrix(cells, points)
 ns = 10_000
 Ps = (10, 100, 1_000,) # 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100
 distances = ("L2", "cdf",)
-nKLs = (5, 10, 20, 30, 80, 200,)
-nreals = 100
+nKL = 2
 
-dt_clvq, w2_clvq = test_clvq(ns, Ps, distances, nKLs, nreals)
-dt_kmeans, w2_kmeans = test_kmeans(ns, Ps, distances, nKLs, nreals)
+do_kmeans(ns, Ps, distances, nKL)
 
-for P in Ps
-  for dist in distances
-    for nKL in nKLs
-      npzwrite("data/Example13_$(root_fname)_$(P)_$(dist)_$(nKL).dt_clvq.npz", dt_clvq[P][dist][nKL])
-      npzwrite("data/Example13_$(root_fname)_$(P)_$(dist)_$(nKL).w2_clvq.npz", w2_clvq[P][dist][nKL])
-      npzwrite("data/Example13_$(root_fname)_$(P)_$(dist)_$(nKL).dt_kmeans.npz", dt_kmeans[P][dist][nKL])
-      npzwrite("data/Example13_$(root_fname)_$(P)_$(dist)_$(nKL).w2_kmeans.npz", w2_kmeans[P][dist][nKL])
-    end
+n = 10_000
+x = LinRange(-4.05, 4.05, n)
+
+w2_map = SharedArray{Float64,2}(n, n)
+cluster_map = SharedArray{Int,2}(n, n)
+freq_map = SharedArray{Float64,2}(n, n)
+
+dt = @elapsed @distributed for j in 1:n
+  for i in 1:n
+    w2_map[i, j] = nothing
+    cluster_map[i, j] = nothing
+    freq_map[i, j] = nothing
   end
 end

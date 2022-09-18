@@ -29,16 +29,16 @@ using ParallelDataTransfer
 
 include("Example17_DefPcgMcmcStochasticEllipticPde_Functions.jl")
 
-maxit = 5_000
-tentative_nnode = 4_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000 @ 10 subdomains
+maxit = 4_000
+tentative_nnode = 128_000 # 4_000, 8_000, 16_000, 32_000, 64_000, 128_000 @ 10 subdomains
 load_existing_mesh = false
-ndom = 30 # 5, 7, 10, 15, 20, 30 @ 32_000 DoFs
+ndom = 10 # 5, 7, 10, 15, 20, 30 @ 32_000 DoFs
 load_existing_partition = false
 nbj = ndom
 nvec = ndom
 spdim = 3 * ndom
 precond = "bj$(nbj)_0"  # ∈ ("bj$(nbj)_0",
-                             #    "lorasc$(ndom)_1")
+                        #    "lorasc$(ndom)_1")
 
 const preconds_with_dd = ("lorasc$(ndom)_0",
                           "lorasc$(ndom)_1",

@@ -281,7 +281,70 @@ function test_solvers_on_several_chains(nchains::Int,
                                         maxit::Int;
                                         verbose=true)
 
+  iters = Dict{String,Array{Int}}()
+
+  for ichain in 1:nchains
+
+    println("\n\nworking on chain $ichain / $nchains ...")
+    
+    iter = Dict{String,Int}()
+    computed_chain = false
+    while !computed_chain
+      try
+        iter = test_solvers_on_single_chain(nsmp, Λ, Ψ, Π, precond, nvec, 
+                                            spdim, maxit, verbose=verbose)
+        computed_chain = true
+      catch err
+        nothing
+      end
+    end
+
+    for (method, _iter) in iter
+      if !haskey(iters, method) 
+        iters[method] = Array{Int}(undef, nchains)
+      end
+      iters[method][ichain] = _iter
+    end
+
+    println("\n\n ... done working on chain $ichain / $nchains.")
+
+    for (method, _iters) in iters
+      npzwrite("data/$(root_fname)_$(method)_nvec$(nvec)_spdim$(spdim).it.npz", _iters[1:ichain])
+    end
+
+  end # while ichain <= nchains
+
+  return iters
+end
+
+
+"""
+test_solvers_on_several_chains_pll(nchains::Int,
+                                   nsmp::Int,
+                                   Λ::Array{Float64,1},
+                                   Ψ::Array{Float64,2},
+                                   Π,
+                                   preconds::String,
+                                   nvec::Int,
+                                   spdim::Int
+                                   maxit::Int;
+                                   verbose=true)
+
+"""
+function test_solvers_on_several_chains_pll(nchains::Int,
+                                            nsmp::Int,
+                                            Λ::Array{Float64,1},
+                                            Ψ::Array{Float64,2},
+                                            Π,
+                                            precond::String,
+                                            nvec::Int,
+                                            spdim::Int,
+                                            maxit::Int;
+                                            verbose=true)
+
   @everywhere begin
+    verbose = $verbose
+
     iters = Dict{String,Array{Int}}()
 
     for ichain in 1:nchains
