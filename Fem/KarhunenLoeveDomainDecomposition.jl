@@ -1122,3 +1122,43 @@ function get_kl_coordinates(g::Array{Float64,1},
   end
   return ξ
 end
+
+
+"""
+     set!(Λ::Array{Float64,1},
+          Ψ::Array{Float64,2},
+          ξ::Array{Float64,1},
+          g::Array{Float64,1})
+
+Assembles the coefficient field from a given latent vector.
+
+Input:
+
+ `Λ::Array{Float64,1}`, `size(Λ) = (nmode,)`,
+  eigenvalues of KL expansion.
+
+ `Ψ::Array{Float64,2}`, `size(Ψ) = (nnode, nmode)`,
+  eigenfunctions of KL expansion.
+
+ `ξ::Array{Float64,1}`, `size(ξ) = (nmode,)`,
+  latent vector.
+
+ `g::Array{Float64,1}`, `size(g) = (nnode,)`,
+  coefficient field.
+
+"""
+function set!(Λ::Array{Float64,1},
+              Ψ::Array{Float64,2},
+              ξ::Array{Float64,1},
+              g::Array{Float64,1})
+
+  nnode, _ = size(Ψ) # Number of mesh nodes
+  nmode = length(Λ) # Number of reduced modes
+
+  g .= sqrt(Λ[1]) * ξ[1] * Ψ[:, 1]
+  for α in 2:nmode
+    g[:] += sqrt(Λ[α]) * ξ[α] * Ψ[:, α]
+  end
+  
+  return g
+end
