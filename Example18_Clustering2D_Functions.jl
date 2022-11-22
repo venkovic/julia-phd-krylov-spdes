@@ -1,32 +1,21 @@
 using Distributions: MvNormal, Normal, cdf
 using Arpack: eigs
+using Random
 
 function get_data(ns::Int,
-                  Λ::Array,
-                  M::SparseArrays.SparseMatrixCSC{Float64,Int};
+                  Λ::Array;
                   distance="L2")
   nKL = length(Λ)
 
   seed!(987_654_321)
   X = rand(MvNormal(nKL, 1.), ns)
 
-  #chol = cholesky(M)
-  #P = sparse(1:M.n, chol.p, ones(M.n))
-  #L = P' * sparse(chol.L)
-  # M ≈ L * L' 
-
-
-  vals, vecs = eigs(M, nev=Int(.1 * M.n))
-  sqrtM = vecs *  * vecs'
-
   if distance == "L2"
     X .*= sqrt.(Λ) 
-    X .= L * X
 
   elseif distance == "cdf"
     X .= cdf.(Normal(), X)
-    X .= L * X
-    #X .= quantile.(Normal(), X)
+    X .*= sqrt.(Λ)
   end
 
   return X
@@ -50,38 +39,35 @@ function get_distortion(X::Array{Float64,2}, hXt::Array{Float64,2})
   return w2
 end
 
+function do_kmeans(ns, Ps, distances, nKL, Λs)
+  hηt_kmeans = Dict(P => Dict(dist => Dict(Λ => zeros(nKL, P) for Λ in Λs) for dist in distances) for P in Ps)
+  hξt_kmeans = Dict(P => Dict(dist => Dict(Λ => zeros(nKL, P) for Λ in Λs) for dist in distances) for P in Ps)
+  freqs_kmeans = Dict(P => Dict(dist => Dict(Λ => [0. for _ in 1:P] for Λ in Λs) for dist in distances) for P in Ps)
+  w2_kmeans = Dict(P => Dict(dist => Dict(Λ => 0. for Λ in Λs) for dist in distances) for P in Ps)
 
 
 
+  Random.seed!(3)
 
-function do_kmeans(ns, Ps, distances, nKL, M)
-  hηt_kmeans = Dict(P => Dict(dist => Dict(nKL => zeros(nKL, P)) for dist in distances) for P in Ps)
-  hξt_kmeans = Dict(P => Dict(dist => Dict(nKL => zeros(nKL, P)) for dist in distances) for P in Ps)
-  
-  get_ξ = true
   for P in Ps
     for dist in distances
-      for nKL in nKLs
-        for ireal in 1:nreals
-          Λtrunc = Λ[1:nKL]
-  
-          X = get_data(ns, Λtrunc, M, distance=dist)
-  
-          println("kmeans working on ireal = $ireal, nKL = $nKL, dist = $dist, P = $P.")
-          dt_kmeans[P][dist][nKL][ireal] = @elapsed res = kmeans(X, P)
-          hηt_kmeans[P][dist][nKL] = res.centers
-          w2_kmeans[P][dist][nKL][ireal] = get_distortion(X, hηt_kmeans)
-          if get_ξ
-            hξt_kmeans = copy(hηt_kmeans)
-            if dist == "L2"
-              hξt_kmeans ./= sqrt.(Λtrunc)
-            elseif dist == "cdf"
-              hξt_kmeans .= quantile.(Normal(), hξt_kmeans)
-            end
-          end
+      for Λ in Λs
+        Λtrunc = Λ[1:nKL]
+        X = get_data(ns, Λtrunc, distance=dist)
+        println("kmeans working on nKL = $nKL, dist = $dist, P = $P.")
+        res = kmeans(X, P, tol=1e-8, maxiter=1_000)
+        hηt_kmeans[P][dist][Λ] = res.centers
+        hξt_kmeans[P][dist][Λ] = copy(hηt_kmeans[P][dist][Λ])
+        freqs_kmeans[P][dist][Λ] = [sum(res.assignments .== p) / ns for p in 1:P]
+        if dist == "L2"
+          hξt_kmeans[P][dist][Λ] ./= sqrt.(Λtrunc)
+        elseif dist == "cdf"
+          hξt_kmeans[P][dist][Λ] ./= sqrt.(Λtrunc)
+          hξt_kmeans[P][dist][Λ] .= quantile.(Normal(), hξt_kmeans[P][dist][Λ])
         end
+        w2_kmeans[P][dist][Λ] = get_distortion(X, res.centers)
       end
     end
   end
-  return dt_kmeans, w2_kmeans
+  return hηt_kmeans, hξt_kmeans, freqs_kmeans, w2_kmeans
 end
