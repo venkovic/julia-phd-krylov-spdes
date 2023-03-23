@@ -123,7 +123,7 @@ function rrdefpcg(A::Union{SparseMatrixCSC{T},
     end
   end
 
-  VtAV[1:nvec, 1:nvec] = WtA * W
+  VtAV[1:nvec, 1:nvec] = WtAW
   VtAV[1:nvec, nvec+1:spdim] = WtA * Z
   VtAV[nvec+1:spdim, 1:nvec] = VtAV[1:nvec, nvec+1:spdim]'
   if isa(A, FunctionMap)
@@ -262,8 +262,10 @@ function rrpcg(A::Union{SparseMatrixCSC{T},
     mul!(AZ, A, Z)
   end
   VtAV[1:spdim, 1:spdim] = Z'AZ
+  VtAV = Symmetric(VtAV)
 
   VtMV[1:spdim, 1:spdim] = I(spdim)
+  VtMV = Symmetric(VtMV)
 
   vals, vecs = eigen(VtAV, VtMV)
   for ivec in 1:nvec
